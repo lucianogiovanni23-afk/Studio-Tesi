@@ -1,50 +1,55 @@
-import { AGENT_ORDER, type AgentId } from '../agents'
+import type { AgentKey } from '../types'
 
-/** Dimensioni della stanza low-poly (in unità di scena). */
+/** Dimensioni dell'ufficio, in unità di scena. */
 export const ROOM = {
-  halfWidth: 8,
-  halfDepth: 7,
-  wallHeight: 7,
+  halfWidth: 9.5,
+  halfDepth: 8.5,
+  wallHeight: 6.4,
 }
 
-/** Posizione x delle 4 scrivanie, disposte in fila. */
-export const DESK_X = [-4.5, -1.5, 1.5, 4.5]
-/** Le scrivanie stanno davanti alla parete di fondo. */
-export const DESK_Z = -3.6
-/** Il personaggio lavora dietro la scrivania, rivolto verso la camera. */
-export const WORK_Z = -4.7
-/** Posizione di riposo: fila aperta davanti alle scrivanie. */
-export const REST_Z = 0.7
-/** Velocità di camminata, in unità di scena al secondo. */
-export const WALK_SPEED = 3.2
+/** Distanza fra il centro della scrivania e la sedia. */
+export const SEAT_OFFSET = 0.95
+/** Zona di attesa, davanti alle postazioni. */
+export const REST_Z = 3.4
+export const WALK_SPEED = 2.9
 
-export interface AgentLayout {
+export interface Workstation {
   index: number
-  deskPosition: [number, number, number]
-  /** Percorso a tappe dal punto di riposo alla scrivania, aggirando le scrivanie. */
+  /** Centro della scrivania. */
+  desk: [number, number]
+  /** Posizione della sedia: il lavoratore siede dal lato della telecamera. */
+  seat: [number, number]
+  /** Punto di attesa da cui parte la camminata. */
+  rest: [number, number]
+  /** Percorso a tappe dalla zona di attesa alla sedia. */
   path: [number, number][]
 }
 
-function buildLayout(index: number): AgentLayout {
-  const x = DESK_X[index]
-  // Corridoio di passaggio: lo spazio libero a sinistra di ogni scrivania.
-  const aisleX = x - 1.5
+function build(index: number, deskX: number, deskZ: number): Workstation {
+  const seatZ = deskZ + SEAT_OFFSET
   return {
     index,
-    deskPosition: [x, 0, DESK_Z],
+    desk: [deskX, deskZ],
+    seat: [deskX, seatZ],
+    rest: [deskX, REST_Z],
     path: [
-      [x, REST_Z],
-      [aisleX, REST_Z],
-      [aisleX, WORK_Z],
-      [x, WORK_Z],
+      [deskX, REST_Z],
+      [deskX, seatZ],
     ],
   }
 }
 
-export const LAYOUT: Record<AgentId, AgentLayout> = AGENT_ORDER.reduce(
-  (acc, id, index) => {
-    acc[id] = buildLayout(index)
-    return acc
-  },
-  {} as Record<AgentId, AgentLayout>,
-)
+/**
+ * Due file sfalsate: tre postazioni contro la parete di fondo e due davanti,
+ * così la lavagna resta visibile e nessuno copre il collega.
+ */
+export const WORKSTATIONS: Record<AgentKey, Workstation> = {
+  lettore: build(0, -5.4, -5.1),
+  ricercatore: build(1, 0, -5.1),
+  selettore: build(2, 5.4, -5.1),
+  scrittore: build(3, -2.7, -0.7),
+  controllore: build(4, 2.7, -0.7),
+}
+
+export const CAMERA_HOME: [number, number, number] = [0, 8.4, 15.2]
+export const CAMERA_TARGET: [number, number, number] = [0, 1.6, -2.6]
