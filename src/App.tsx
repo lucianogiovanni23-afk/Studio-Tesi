@@ -1,38 +1,43 @@
 import { useEffect } from 'react'
-import { installSupervisorHooks } from './agents/supervisor'
+import { installaHookControllore } from './agents/supervisor'
+import { NOME_SOCIETA } from './agents/definitions'
 import { useLayoutMode } from './hooks/useLayoutMode'
 import { DesktopLayout } from './layouts/DesktopLayout'
 import { TabletLayout } from './layouts/TabletLayout'
+import { Ticker } from './panels/Ticker'
 import { useStudioStore } from './store'
 
 export default function App() {
-  const mode = useLayoutMode()
-  const running = useStudioStore((s) => s.running)
-  const approvalPending = useStudioStore((s) => s.approvalStatus === 'pending')
+  const modalita = useLayoutMode()
+  const inEsecuzione = useStudioStore((s) => s.inEsecuzione)
+  const inAttesa = useStudioStore((s) => s.approvazione === 'in_attesa')
 
-  // Il Controllore sorveglia console ed errori di runtime dall'avvio dell'app.
-  useEffect(() => installSupervisorHooks(), [])
+  // Il Controllore sorveglia console ed errori di runtime fin dall'avvio.
+  useEffect(() => installaHookControllore(), [])
 
-  const phase = approvalPending
+  const fase = inAttesa
     ? 'in attesa della tua approvazione'
-    : running
-      ? 'squadra al lavoro'
-      : 'in attesa di istruzioni'
+    : inEsecuzione
+      ? 'seduta in corso'
+      : 'seduta ferma'
 
   return (
-    <div className={`app app-${mode}`}>
-      <header className="app-head">
+    <div className={`app app-${modalita}`}>
+      <Ticker />
+
+      <header className="intestazione">
         <div>
           <h1>Studio tesi</h1>
           <p>
-            Cinque agenti AI in un ufficio 3D lavorano in sequenza al tuo capitolo di tesi in Finanza
-            Aziendale, con ricerca reale su internet e la tua approvazione nel mezzo.
+            Cinque agenti lavorano come broker nella sala operativa di {NOME_SOCIETA} al tuo capitolo
+            di tesi in Finanza Aziendale: ricerca reale, verifica delle fonti e la tua approvazione
+            nel mezzo.
           </p>
         </div>
-        <span className={`phase phase-${running ? 'on' : 'off'}`}>{phase}</span>
+        <span className={`fase ${inEsecuzione ? 'fase-attiva' : ''}`}>{fase}</span>
       </header>
 
-      {mode === 'desktop' ? <DesktopLayout /> : <TabletLayout />}
+      {modalita === 'desktop' ? <DesktopLayout /> : <TabletLayout />}
     </div>
   )
 }

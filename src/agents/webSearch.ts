@@ -1,197 +1,84 @@
-import type {
-  ContentBlock,
-  TextBlock,
-  WebSearchResultItem,
-  WebSearchToolResultBlock,
-  WebSearchToolResultError,
+import type Anthropic from '@anthropic-ai/sdk'
+import {
+  ApiError,
+  WEB_SEARCH_TOOL,
+  chiamataConStrumenti,
+  type ChiamataBase,
+  type Messaggio,
 } from './api'
-import type { Source } from '../types'
+import { TOOL_CONSEGNA_RICERCATORE } from './schemas'
+import { raccogliRicerca, type RaccoltaRicerca } from './verifyUrls'
+import type { Consegna, RisultatoRicercatore } from '../types'
 
-export const WEB_SEARCH_TOOL = {
-  type: 'web_search_20250305',
-  name: 'web_search',
-  max_uses: 6,
-} as const
-
-export interface RealResult {
-  url: string
-  title: string
-}
-
-export interface SearchHarvest {
-  /** Risultati realmente restituiti dal motore di ricerca. */
-  results: RealResult[]
-  /** Query effettivamente eseguite dal modello. */
-  queries: string[]
-  /** Messaggi d'errore del tool, già tradotti. */
-  errors: string[]
-  /** true se il tool di ricerca è stato invocato almeno una volta. */
-  used: boolean
-}
-
-function describeSearchError(code: string): string {
-  switch (code) {
-    case 'too_many_requests':
-      return 'Il tool di ricerca web ha superato il limite di richieste (rate limit). Attendi qualche minuto e riprova.'
-    case 'max_uses_exceeded':
-      return 'Il tool di ricerca web ha esaurito il numero massimo di ricerche consentite per questa chiamata.'
-    case 'query_too_long':
-      return 'La query di ricerca era troppo lunga: il Ricercatore deve usare query più brevi.'
-    case 'invalid_input':
-      return 'La query inviata al tool di ricerca web non era valida.'
-    case 'unavailable':
-      return 'Il tool di ricerca web è temporaneamente non disponibile.'
-    default:
-      return `Il tool di ricerca web ha restituito un errore (${code}).`
-  }
-}
-
-function isError(
-  content: WebSearchResultItem[] | WebSearchToolResultError,
-): content is WebSearchToolResultError {
-  return !Array.isArray(content) && content?.type === 'web_search_tool_result_error'
-}
-
-/** Normalizza un URL per confrontarlo: senza protocollo, senza www, senza slash finale. */
-export function normalizeUrl(url: string): string {
-  return url
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/^www\./, '')
-    .replace(/[/?#]+$/, '')
+export interface EsitoRicerca {
+  consegna: Consegna<RisultatoRicercatore>
+  raccolta: RaccoltaRicerca
 }
 
 /**
- * Raccoglie dai blocchi della risposta gli URL realmente restituiti dal motore di ricerca
- * (risultati del tool e citazioni), più le query eseguite e gli eventuali errori.
+ * Esegue il turno del Ricercatore.
+ *
+ * Il modello deve prima cercare davvero, quindi `tool_choice` resta "auto" e il
+ * prompt gli chiede di chiudere chiamando il tool di consegna. Se non lo fa, si
+ * fa una seconda chiamata che gliela impone: in quel caso la cronologia
+ * dell'assistente viene rispedita invariata, perché i risultati di ricerca
+ * contengono `encrypted_content` che l'API deve poter decifrare.
  */
-export function harvestSearch(blocks: ContentBlock[]): SearchHarvest {
-  const byUrl = new Map<string, RealResult>()
-  const queries: string[] = []
-  const errors: string[] = []
-  let used = false
+export async function eseguiRicerca(opts: ChiamataBase): Promise<EsitoRicerca> {
+  const tools = [WEB_SEARCH_TOOL, TOOL_CONSEGNA_RICERCATORE]
 
-  for (const block of blocks) {
-    if (block.type === 'server_tool_use') {
-      used = true
-      const query = (block as { input?: { query?: string } }).input?.query
-      if (query) queries.push(query)
-      continue
-    }
+  const primo = await chiamataConStrumenti({
+    ...opts,
+    tools,
+    nomeToolConsegna: TOOL_CONSEGNA_RICERCATORE.name,
+  })
 
-    if (block.type === 'web_search_tool_result') {
-      used = true
-      const content = (block as WebSearchToolResultBlock).content
-      if (isError(content)) {
-        const message = describeSearchError(content.error_code)
-        if (!errors.includes(message)) errors.push(message)
-        continue
-      }
-      for (const item of content ?? []) {
-        if (typeof item?.url !== 'string' || !item.url) continue
-        const key = normalizeUrl(item.url)
-        if (!byUrl.has(key)) byUrl.set(key, { url: item.url, title: item.title ?? item.url })
-      }
-      continue
-    }
+  const raccolta = raccogliRicerca(primo.blocchi)
 
-    if (block.type === 'text') {
-      for (const citation of (block as TextBlock).citations ?? []) {
-        if (typeof citation.url !== 'string' || !citation.url) continue
-        const key = normalizeUrl(citation.url)
-        if (!byUrl.has(key)) {
-          byUrl.set(key, { url: citation.url, title: citation.title ?? citation.url })
-        }
-      }
-    }
+  if (primo.consegna) {
+    return { consegna: normalizza(primo.consegna), raccolta }
   }
 
-  return { results: [...byUrl.values()], queries, errors, used }
-}
+  // Non ha consegnato: glielo si chiede esplicitamente, senza rifare ricerche.
+  const messaggi: Messaggio[] = [
+    ...primo.messaggi,
+    {
+      role: 'user',
+      content:
+        'Ora consegna il risultato in formato strutturato chiamando il tool submit_ricercatore. Riporta solo le fonti che hai davvero trovato con la ricerca web, con gli URL esatti restituiti dai risultati. Non eseguire altre ricerche.',
+    },
+  ]
 
-const SOURCE_BLOCK = /\[\s*FONTE\s*\]/gi
+  const secondo = await chiamataConStrumenti({
+    ...opts,
+    messages: messaggi,
+    tools,
+    toolChoice: { type: 'tool', name: TOOL_CONSEGNA_RICERCATORE.name } as Anthropic.ToolChoice,
+    nomeToolConsegna: TOOL_CONSEGNA_RICERCATORE.name,
+  })
 
-function fieldOf(block: string, label: string): string {
-  const re = new RegExp(`^\\s*${label}\\s*:\\s*(.*)$`, 'im')
-  const match = re.exec(block)
-  return match ? match[1].trim() : ''
-}
-
-/**
- * Estrae le fonti dal RISULTATO del Ricercatore e le confronta con gli URL reali:
- * una fonte è `verified` solo se il suo URL compare davvero nei risultati della ricerca.
- */
-export function parseSources(result: string, real: RealResult[]): Source[] {
-  const realByUrl = new Map(real.map((r) => [normalizeUrl(r.url), r]))
-  const chunks = result.split(SOURCE_BLOCK).slice(1)
-  const sources: Source[] = []
-  const seen = new Set<string>()
-
-  for (const chunk of chunks) {
-    const url = fieldOf(chunk, 'URL')
-    if (!url || !/^https?:\/\//i.test(url)) continue
-    const key = normalizeUrl(url)
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    const match = realByUrl.get(key)
-    sources.push({
-      title: fieldOf(chunk, 'TITOLO') || match?.title || url,
-      url: match?.url ?? url,
-      summary: fieldOf(chunk, 'CONTENUTO'),
-      relevance: fieldOf(chunk, 'RILEVANZA'),
-      verified: Boolean(match),
-    })
+  if (!secondo.consegna) {
+    throw new ApiError(
+      'sconosciuto',
+      'Il Ricercatore non ha consegnato le fonti in formato strutturato nemmeno su richiesta esplicita.',
+      null,
+      true,
+    )
   }
 
-  return sources
+  // La seconda risposta non contiene nuove ricerche: vale la raccolta del primo giro.
+  return { consegna: normalizza(secondo.consegna), raccolta }
 }
 
-/** Blocchi [TENUTA] / [SCARTATA] prodotti dal Selettore. */
-export function parseSelection(
-  result: string,
-  found: Source[],
-): { kept: Source[]; discarded: { title: string; url: string; reason: string }[] } {
-  const foundByUrl = new Map(found.map((s) => [normalizeUrl(s.url), s]))
-  const kept: Source[] = []
-  const discarded: { title: string; url: string; reason: string }[] = []
-  const keptSeen = new Set<string>()
-
-  const tokens = result.split(/\[\s*(TENUTA|SCARTATA)\s*\]/gi)
-  for (let i = 1; i < tokens.length; i += 2) {
-    const kind = tokens[i].toUpperCase()
-    const chunk = tokens[i + 1] ?? ''
-    const url = fieldOf(chunk, 'URL')
-    if (!url) continue
-    const key = normalizeUrl(url)
-    const original = foundByUrl.get(key)
-
-    if (kind === 'TENUTA') {
-      if (keptSeen.has(key)) continue
-      keptSeen.add(key)
-      kept.push(
-        original ?? {
-          title: fieldOf(chunk, 'TITOLO') || url,
-          url,
-          summary: fieldOf(chunk, 'CONTENUTO'),
-          relevance: fieldOf(chunk, 'MOTIVO'),
-          verified: false,
-        },
-      )
-    } else {
-      discarded.push({
-        title: original?.title ?? fieldOf(chunk, 'TITOLO') ?? url,
-        url,
-        reason: fieldOf(chunk, 'MOTIVO'),
-      })
-    }
+/** L'input del tool arriva come `unknown`: lo si riporta alla forma attesa. */
+function normalizza(grezzo: unknown): Consegna<RisultatoRicercatore> {
+  const dato = (grezzo ?? {}) as Partial<Consegna<RisultatoRicercatore>>
+  const risultato = (dato.risultato ?? {}) as Partial<RisultatoRicercatore>
+  return {
+    passaggi: Array.isArray(dato.passaggi) ? dato.passaggi.filter((p) => typeof p === 'string') : [],
+    risultato: {
+      fonti: Array.isArray(risultato.fonti) ? risultato.fonti : [],
+      fonti_scartate: Array.isArray(risultato.fonti_scartate) ? risultato.fonti_scartate : [],
+    },
   }
-
-  return { kept, discarded }
-}
-
-/** Il Selettore può chiedere un nuovo giro di ricerca se le fonti non bastano. */
-export function wantsNewSearch(result: string): boolean {
-  return /\[\s*NUOVA\s*RICERCA\s*\]/i.test(result)
 }

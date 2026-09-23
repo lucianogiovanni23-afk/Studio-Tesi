@@ -1,67 +1,79 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStudioStore } from '../store'
-import { CAMERA_HOME, CAMERA_TARGET, WORKSTATIONS } from './layout'
+import { CAMERA_BERSAGLIO, CAMERA_CASA, POSTAZIONI } from './layout'
 
-/** Riferimento minimo a OrbitControls: basta il target e update(). */
-export interface OrbitControlsLike {
+/** Riferimento minimo a OrbitControls: bastano il bersaglio e update(). */
+export interface ControlliOrbita {
   target: THREE.Vector3
   update: () => void
 }
 
-const TRANSITION_SECONDS = 1.1
+const DURATA = 1.1
 
 /**
- * Transizione fluida della telecamera verso la postazione scelta.
- * Finita l'animazione i controlli tornano liberi, così si può orbitare a mano.
+ * Transizione fluida verso la postazione scelta. Finita l'animazione i
+ * controlli tornano liberi, così si può continuare a orbitare a mano.
  */
-export function CameraRig({ controls }: { controls: React.MutableRefObject<OrbitControlsLike | null> }) {
+export function CameraRig({ controlli }: { controlli: React.MutableRefObject<ControlliOrbita | null> }) {
   const camera = useThree((s) => s.camera)
-  const focus = useStudioStore((s) => s.cameraFocus)
-  const token = useStudioStore((s) => s.cameraFocusToken)
+  const fuoco = useStudioStore((s) => s.fuocoCamera)
+  const token = useStudioStore((s) => s.tokenFuoco)
 
-  const progress = useRef(1)
-  const fromPosition = useRef(new THREE.Vector3())
-  const fromTarget = useRef(new THREE.Vector3())
-  const toPosition = useRef(new THREE.Vector3())
-  const toTarget = useRef(new THREE.Vector3())
+  const ridotto = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+    [],
+  )
+
+  const avanzamento = useRef(1)
+  const daPosizione = useRef(new THREE.Vector3())
+  const daBersaglio = useRef(new THREE.Vector3())
+  const aPosizione = useRef(new THREE.Vector3())
+  const aBersaglio = useRef(new THREE.Vector3())
 
   useEffect(() => {
     if (token === 0) return
 
-    fromPosition.current.copy(camera.position)
-    fromTarget.current.copy(controls.current?.target ?? new THREE.Vector3(...CAMERA_TARGET))
+    daPosizione.current.copy(camera.position)
+    daBersaglio.current.copy(controlli.current?.target ?? new THREE.Vector3(...CAMERA_BERSAGLIO))
 
-    if (focus) {
-      const station = WORKSTATIONS[focus]
-      const [sx, sz] = station.seat
-      toTarget.current.set(sx, 1.35, sz - 0.5)
-      // Si arriva davanti alla postazione, leggermente dall'alto e di lato.
-      toPosition.current.set(sx * 0.55, 3.5, sz + 5.2)
+    if (fuoco) {
+      const [sx, sz] = POSTAZIONI[fuoco].sedia
+      aBersaglio.current.set(sx, 1.35, sz - 0.5)
+      aPosizione.current.set(sx * 0.55, 3.4, sz + 5.2)
     } else {
-      toPosition.current.set(...CAMERA_HOME)
-      toTarget.current.set(...CAMERA_TARGET)
+      aPosizione.current.set(...CAMERA_CASA)
+      aBersaglio.current.set(...CAMERA_BERSAGLIO)
     }
 
-    progress.current = 0
-  }, [token, focus, camera, controls])
+    // Con prefers-reduced-motion si salta l'animazione e si arriva subito.
+    avanzamento.current = ridotto ? 1 : 0
+    if (ridotto) {
+      camera.position.copy(aPosizione.current)
+      if (controlli.current) {
+        controlli.current.target.copy(aBersaglio.current)
+        controlli.current.update()
+      }
+    }
+  }, [token, fuoco, camera, controlli, ridotto])
 
-  useFrame((_, rawDelta) => {
-    if (progress.current >= 1) return
-    const dt = Math.min(rawDelta, 0.1)
-    progress.current = Math.min(1, progress.current + dt / TRANSITION_SECONDS)
+  useFrame((_, deltaGrezzo) => {
+    if (avanzamento.current >= 1) return
+    const dt = Math.min(deltaGrezzo, 0.1)
+    avanzamento.current = Math.min(1, avanzamento.current + dt / DURATA)
 
-    // Ease-in-out cubica, così la transizione parte e finisce morbida.
-    const t = progress.current
-    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+    const t = avanzamento.current
+    const morbido = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 
-    camera.position.lerpVectors(fromPosition.current, toPosition.current, eased)
-    if (controls.current) {
-      controls.current.target.lerpVectors(fromTarget.current, toTarget.current, eased)
-      controls.current.update()
+    camera.position.lerpVectors(daPosizione.current, aPosizione.current, morbido)
+    if (controlli.current) {
+      controlli.current.target.lerpVectors(daBersaglio.current, aBersaglio.current, morbido)
+      controlli.current.update()
     } else {
-      camera.lookAt(toTarget.current)
+      camera.lookAt(aBersaglio.current)
     }
   })
 

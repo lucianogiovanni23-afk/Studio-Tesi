@@ -1,68 +1,76 @@
 import type { AgentKey } from '../types'
 
+/**
+ * Nome di fantasia della società: l'ambientazione evoca l'epoca senza usare
+ * marchi, titoli o nomi reali o di finzione legati a film.
+ */
+export const NOME_SOCIETA = 'Harrow & Vance Securities'
+export const SOTTOTITOLO_SOCIETA = 'Investment Research · Est. 1987'
+
+export type Dettaglio = 'occhiali' | 'fazzoletto' | 'orologio' | 'auricolare' | 'cartellino'
+
 export interface AgentDefinition {
   key: AgentKey
-  /** Nome sulla targhetta e nelle card. */
-  name: string
+  nome: string
   /** Nome corto per la micro-etichetta 3D. */
-  shortName: string
-  /** Ruolo, stampato sulla targhetta della scrivania. */
-  role: string
-  /** Colore distintivo: monitor, luce di postazione, bordo della card. */
-  color: string
-  /** Dettaglio caratterizzante del personaggio. */
-  trait: 'occhiali' | 'cravatta' | 'cuffie' | 'cartellino' | 'sciarpa'
+  nomeCorto: string
+  ruolo: string
+  /** Colore distintivo: monitor, luce di postazione, accento sulla cravatta. */
+  colore: string
+  dettaglio: Dettaglio
+  /** Colore dell'abito, per variare i broker fra loro. */
+  abito: string
 }
 
-export const AGENTS: AgentDefinition[] = [
+export const AGENTI: AgentDefinition[] = [
   {
     key: 'lettore',
-    name: 'Lettore',
-    shortName: 'Lettore',
-    role: 'Studia il materiale del corso',
-    color: '#2dd4bf',
-    trait: 'occhiali',
+    nome: 'Lettore',
+    nomeCorto: 'Lettore',
+    ruolo: 'Dossier del corso',
+    colore: '#2dd4bf',
+    dettaglio: 'occhiali',
+    abito: '#232a3a',
   },
   {
     key: 'ricercatore',
-    name: 'Ricercatore',
-    shortName: 'Ricerca',
-    role: 'Cerca fonti reali online',
-    color: '#f2b134',
-    trait: 'cuffie',
+    nome: 'Ricercatore',
+    nomeCorto: 'Ricerca',
+    ruolo: 'Fonti dal mercato',
+    colore: '#f2b134',
+    dettaglio: 'auricolare',
+    abito: '#2a2f42',
   },
   {
     key: 'selettore',
-    name: 'Selettore',
-    shortName: 'Selezione',
-    role: 'Sceglie le fonti pertinenti',
-    color: '#d98a9d',
-    trait: 'sciarpa',
+    nome: 'Selettore',
+    nomeCorto: 'Selezione',
+    ruolo: 'Vaglio delle fonti',
+    colore: '#d98a9d',
+    dettaglio: 'fazzoletto',
+    abito: '#262b3c',
   },
   {
     key: 'scrittore',
-    name: 'Scrittore',
-    shortName: 'Scrittura',
-    role: 'Redige tre bozze del capitolo',
-    color: '#a855f7',
-    trait: 'cravatta',
+    nome: 'Scrittore',
+    nomeCorto: 'Scrittura',
+    ruolo: 'Stesura del capitolo',
+    colore: '#a855f7',
+    dettaglio: 'orologio',
+    abito: '#1f2536',
   },
   {
     key: 'controllore',
-    name: 'Controllore',
-    shortName: 'Controllo',
-    role: 'Sorveglia qualità ed errori',
-    color: '#6366f1',
-    trait: 'cartellino',
+    nome: 'Controllore',
+    nomeCorto: 'Controllo',
+    ruolo: 'Compliance interna',
+    colore: '#6366f1',
+    dettaglio: 'cartellino',
+    abito: '#2b3145',
   },
 ]
 
-export const AGENT_ORDER: AgentKey[] = AGENTS.map((a) => a.key)
-
-/** Agenti della pipeline vera e propria: il Controllore è attivo in parallelo. */
-export const PIPELINE_ORDER: AgentKey[] = ['lettore', 'ricercatore', 'selettore', 'scrittore']
-
-export const AGENT_BY_KEY: Record<AgentKey, AgentDefinition> = AGENTS.reduce(
+export const AGENTE: Record<AgentKey, AgentDefinition> = AGENTI.reduce(
   (acc, a) => {
     acc[a.key] = a
     return acc

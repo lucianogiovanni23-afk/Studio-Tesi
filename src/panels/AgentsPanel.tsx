@@ -1,124 +1,216 @@
 import { useState } from 'react'
-import { AGENTS } from '../agents/definitions'
+import { AGENTI } from '../agents/definitions'
 import { useStudioStore } from '../store'
 import type { AgentKey, AgentStatus } from '../types'
 
-const STATUS_LABEL: Record<AgentStatus, string> = {
+const ETICHETTA_STATO: Record<AgentStatus, string> = {
   idle: 'in attesa del turno',
-  queued: 'in coda',
-  walking: 'sta andando alla postazione',
+  walking: 'raggiunge la postazione',
   working: 'al lavoro',
-  waiting: 'aspetta la tua decisione',
+  waiting: 'attende la tua decisione',
   done: 'completato',
   error: 'errore',
 }
 
-function AgentCard({ agentKey }: { agentKey: AgentKey }) {
-  const agent = AGENTS.find((a) => a.key === agentKey)!
-  const runtime = useStudioStore((s) => s.agents[agentKey])
-  const openBubbleAgent = useStudioStore((s) => s.openBubbleAgent)
-  const toggleBubble = useStudioStore((s) => s.toggleBubble)
-  const focusCamera = useStudioStore((s) => s.focusCamera)
-  const [tab, setTab] = useState<'result' | 'reasoning'>('result')
-
-  const hasOutput = runtime.result !== '' || runtime.reasoning !== ''
+function SchedaAgente({ agentKey }: { agentKey: AgentKey }) {
+  const agente = AGENTI.find((a) => a.key === agentKey)!
+  const runtime = useStudioStore((s) => s.agenti[agentKey])
+  const nuvolettaAperta = useStudioStore((s) => s.nuvolettaAperta)
+  const alternaNuvoletta = useStudioStore((s) => s.alternaNuvoletta)
+  const inquadra = useStudioStore((s) => s.inquadra)
 
   return (
-    <article className={`agent-card status-${runtime.status}`} style={{ borderColor: agent.color }}>
-      <header className="agent-head">
-        <span className="agent-dot" style={{ background: agent.color }} />
-        <div className="agent-id">
-          <strong style={{ color: agent.color }}>{agent.name}</strong>
-          <span className="agent-role">{agent.role}</span>
+    <article className={`scheda-agente stato-${runtime.status}`} style={{ borderLeftColor: agente.colore }}>
+      <header className="scheda-testa">
+        <span className="pallino" style={{ background: agente.colore }} />
+        <div className="scheda-identita">
+          <strong style={{ color: agente.colore }}>{agente.nome}</strong>
+          <span className="scheda-ruolo">{agente.ruolo}</span>
         </div>
-        <span className={`agent-status status-pill-${runtime.status}`}>
-          {STATUS_LABEL[runtime.status]}
-        </span>
+        <span className={`pillola pillola-${runtime.status}`}>{ETICHETTA_STATO[runtime.status]}</span>
       </header>
 
-      {runtime.microLabel && <p className="agent-micro">{runtime.microLabel}</p>}
-      {runtime.attempts > 1 && (
-        <p className="hint">Tentativi effettuati dal Controllore: {runtime.attempts}</p>
+      {runtime.microLabel && <p className="scheda-micro">{runtime.microLabel}</p>}
+      {runtime.tentativi > 1 && (
+        <p className="nota">Tentativi effettuati dal Controllore: {runtime.tentativi}</p>
       )}
-      {runtime.error && <p className="alert alert-error">{runtime.error}</p>}
+      {runtime.errore && (
+        <p className="allerta allerta-errore" role="alert">
+          {runtime.errore}
+        </p>
+      )}
 
-      <div className="agent-actions">
-        <button type="button" className="btn btn-tiny" onClick={() => focusCamera(agentKey)}>
+      <div className="azioni">
+        <button type="button" className="bottone bottone-minuscolo" onClick={() => inquadra(agentKey)}>
           Vai alla postazione
         </button>
         <button
           type="button"
-          className="btn btn-tiny"
-          onClick={() => toggleBubble(agentKey)}
-          disabled={runtime.steps.length === 0}
+          className="bottone bottone-minuscolo"
+          onClick={() => alternaNuvoletta(agentKey)}
+          disabled={runtime.passaggi.length === 0}
         >
-          {openBubbleAgent === agentKey ? 'Chiudi nuvoletta' : 'Apri nuvoletta'}
+          {nuvolettaAperta === agentKey ? 'Chiudi ragionamento' : 'Apri ragionamento'}
         </button>
       </div>
 
-      {hasOutput && (
-        <>
-          <div className="mini-tabs">
-            <button
-              type="button"
-              className={`mini-tab ${tab === 'result' ? 'mini-tab-on' : ''}`}
-              onClick={() => setTab('result')}
-            >
-              Risultato
-            </button>
-            <button
-              type="button"
-              className={`mini-tab ${tab === 'reasoning' ? 'mini-tab-on' : ''}`}
-              onClick={() => setTab('reasoning')}
-            >
-              Ragionamento ({runtime.steps.length})
-            </button>
-          </div>
-          {tab === 'result' ? (
-            <pre className="output">{runtime.result || '(nessun risultato)'}</pre>
-          ) : runtime.steps.length > 0 ? (
-            <ol className="steps">
-              {runtime.steps.map((step, i) => (
-                <li key={i}>{step}</li>
-              ))}
-            </ol>
-          ) : (
-            <p className="hint">Nessun passaggio di ragionamento registrato.</p>
-          )}
-        </>
+      {runtime.passaggi.length > 0 && (
+        <ol className="passaggi">
+          {runtime.passaggi.map((p, i) => (
+            <li key={i}>{p}</li>
+          ))}
+        </ol>
       )}
     </article>
   )
 }
 
-function SourcesSummary() {
-  const foundSources = useStudioStore((s) => s.foundSources)
-  const selectedSources = useStudioStore((s) => s.selectedSources)
-  const searchNotice = useStudioStore((s) => s.searchNotice)
-
-  if (foundSources.length === 0 && !searchNotice) return null
-  const selectedUrls = new Set(selectedSources.map((s) => s.url))
+function Dossier() {
+  const dossier = useStudioStore((s) => s.dossier)
+  const [aperto, setAperto] = useState(false)
+  if (!dossier) return null
 
   return (
-    <section className="panel">
-      <h2 className="panel-title">Fonti dalla ricerca web</h2>
-      {searchNotice && <p className="alert alert-warn">{searchNotice}</p>}
-      <p className="hint">
-        {foundSources.length} trovate · {selectedSources.length} selezionate
+    <section className="pannello">
+      <button
+        type="button"
+        className="riga-espandibile"
+        onClick={() => setAperto((v) => !v)}
+        aria-expanded={aperto}
+      >
+        <span aria-hidden>{aperto ? '▾' : '▸'}</span> Dossier del corso
+        <span className="nota-inline">{dossier.concetti_chiave.length} concetti chiave</span>
+      </button>
+
+      {aperto && (
+        <div className="dossier">
+          <h3 className="sotto-titolo">Concetti chiave</h3>
+          <ul className="elenco-semplice">
+            {dossier.concetti_chiave.map((c, i) => (
+              <li key={i}>
+                <strong>{c.termine}</strong> — {c.definizione}
+                <em className="riferimento"> ({c.lezione_di_riferimento})</em>
+              </li>
+            ))}
+          </ul>
+
+          <h3 className="sotto-titolo">Metriche applicabili</h3>
+          <ul className="elenco-semplice">
+            {dossier.metriche_applicabili.map((m, i) => (
+              <li key={i}>{m}</li>
+            ))}
+          </ul>
+
+          <h3 className="sotto-titolo">Collegamenti con l'argomento</h3>
+          <ul className="elenco-semplice">
+            {dossier.collegamenti_argomento.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+
+          <h3 className="sotto-titolo">Sintesi dei dati del caso</h3>
+          <p className="paragrafo">{dossier.sintesi_dati_caso}</p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function Fonti() {
+  const fonti = useStudioStore((s) => s.fonti)
+  const scartateDalRicercatore = useStudioStore((s) => s.fontiScartate)
+  const selezionate = useStudioStore((s) => s.selezionate)
+  const avviso = useStudioStore((s) => s.avvisoRicerca)
+  const [mostraScartate, setMostraScartate] = useState(false)
+
+  if (fonti.length === 0 && !avviso) return null
+  const scelte = new Set(selezionate.map((s) => s.url))
+
+  return (
+    <section className="pannello">
+      <h2 className="pannello-titolo filetto-doppio">Fonti dalla ricerca web</h2>
+      {avviso && (
+        <p className="allerta allerta-avviso" role="alert">
+          {avviso}
+        </p>
+      )}
+      <p className="nota">
+        {fonti.length} verificate · {selezionate.length} selezionate
       </p>
-      <ul className="source-list">
-        {foundSources.map((source) => (
-          <li key={source.url} className="source">
-            <div className="source-head">
-              <strong>{source.title}</strong>
-              {selectedUrls.has(source.url) && <span className="tag tag-ok">selezionata</span>}
-              {!source.verified && <span className="tag tag-warn">URL non confermato</span>}
+
+      <ul className="elenco-fonti">
+        {fonti.map((f) => (
+          <li key={f.url} className="fonte">
+            <div className="fonte-testa">
+              <strong>{f.titolo}</strong>
+              <span className="etichetta-tipo">{f.tipo}</span>
+              {scelte.has(f.url) && <span className="etichetta etichetta-ok">selezionata</span>}
             </div>
-            <a className="source-url" href={source.url} target="_blank" rel="noreferrer noopener">
-              {source.url}
+            <a className="fonte-url" href={f.url} target="_blank" rel="noreferrer noopener">
+              {f.url}
             </a>
-            {source.summary && <p className="source-text">{source.summary}</p>}
-            {source.relevance && <p className="source-text source-why">{source.relevance}</p>}
+            <p className="fonte-testo">{f.descrizione}</p>
+            <p className="fonte-testo fonte-motivo">{f.perche_rilevante}</p>
+          </li>
+        ))}
+      </ul>
+
+      {scartateDalRicercatore.length > 0 && (
+        <>
+          <button
+            type="button"
+            className="bottone bottone-vuoto bottone-piccolo"
+            onClick={() => setMostraScartate((v) => !v)}
+          >
+            {mostraScartate ? 'Nascondi' : 'Mostra'} le {scartateDalRicercatore.length} fonti scartate dal
+            Ricercatore
+          </button>
+          {mostraScartate && (
+            <ul className="elenco-fonti elenco-fonti-tenue">
+              {scartateDalRicercatore.map((s, i) => (
+                <li key={i} className="fonte">
+                  <strong>{s.titolo}</strong>
+                  <span className="fonte-url">{s.url}</span>
+                  <p className="fonte-testo">Scartata perché: {s.motivo}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
+function Checklist() {
+  const referto = useStudioStore((s) => s.referto)
+  const inquadra = useStudioStore((s) => s.inquadra)
+  if (!referto) return null
+
+  const icona = { ok: '✓', problema: '✕', non_applicabile: '–' }
+
+  return (
+    <section className="pannello">
+      <h2 className="pannello-titolo filetto-doppio">Verifiche del Controllore</h2>
+      <ul className="checklist">
+        {referto.checklist.map((v) => (
+          <li key={v.id} className={`voce-checklist voce-${v.esito}`}>
+            <span className="voce-icona" aria-hidden>
+              {icona[v.esito]}
+            </span>
+            <div>
+              <strong>{v.voce}</strong>
+              <p className="fonte-testo">{v.dettaglio}</p>
+              {v.esito === 'problema' && v.agente && v.agente !== 'controllore' && (
+                <button
+                  type="button"
+                  className="bottone bottone-minuscolo"
+                  onClick={() => inquadra(v.agente!)}
+                >
+                  Vai al {v.agente}
+                </button>
+              )}
+            </div>
           </li>
         ))}
       </ul>
@@ -126,78 +218,20 @@ function SourcesSummary() {
   )
 }
 
-function DraftsPanel() {
-  const drafts = useStudioStore((s) => s.drafts)
-  const supervisorVerdict = useStudioStore((s) => s.supervisorVerdict)
-  const [active, setActive] = useState(0)
-
-  if (drafts.length === 0) return null
-  const current = drafts[Math.min(active, drafts.length - 1)]
-
-  return (
-    <section className="panel">
-      <h2 className="panel-title">Le tre opzioni dello Scrittore</h2>
-      <div className="mini-tabs">
-        {drafts.map((draft, i) => (
-          <button
-            key={i}
-            type="button"
-            className={`mini-tab ${i === active ? 'mini-tab-on' : ''} ${
-              draft.review && !draft.review.ok ? 'mini-tab-flag' : ''
-            }`}
-            onClick={() => setActive(i)}
-          >
-            {draft.label}
-            {draft.review && !draft.review.ok ? ' ⚠' : draft.review ? ' ✓' : ''}
-          </button>
-        ))}
-      </div>
-
-      <p className="draft-approach">{current.approach}</p>
-
-      {current.review && (
-        <p className={`alert ${current.review.ok ? 'alert-ok' : 'alert-warn'}`}>
-          <strong>Controllore:</strong> {current.review.ok ? 'nessun problema rilevato.' : 'problema rilevato.'}{' '}
-          {current.review.note}
-        </p>
-      )}
-
-      <div className="actions">
-        <button
-          type="button"
-          className="btn btn-ghost btn-small"
-          onClick={() => void navigator.clipboard?.writeText(current.text)}
-        >
-          Copia questa opzione
-        </button>
-        <span className="counter">{current.text.split(/\s+/).filter(Boolean).length} parole</span>
-      </div>
-
-      <pre className="output output-draft">{current.text}</pre>
-
-      {supervisorVerdict && (
-        <details className="details">
-          <summary>Referto completo del Controllore</summary>
-          <pre className="output">{supervisorVerdict}</pre>
-        </details>
-      )}
-    </section>
-  )
-}
-
 export function AgentsPanel() {
   return (
     <>
-      <section className="panel">
-        <h2 className="panel-title">I cinque agenti</h2>
-        <div className="agent-grid">
-          {AGENTS.map((agent) => (
-            <AgentCard key={agent.key} agentKey={agent.key} />
+      <section className="pannello">
+        <h2 className="pannello-titolo filetto-doppio">La squadra</h2>
+        <div className="griglia-agenti">
+          {AGENTI.map((a) => (
+            <SchedaAgente key={a.key} agentKey={a.key} />
           ))}
         </div>
       </section>
-      <SourcesSummary />
-      <DraftsPanel />
+      <Dossier />
+      <Fonti />
+      <Checklist />
     </>
   )
 }

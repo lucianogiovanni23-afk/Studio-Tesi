@@ -1,88 +1,109 @@
-import { AGENT_BY_KEY } from '../agents/definitions'
+import { useState } from 'react'
+import { AGENTE } from '../agents/definitions'
 import { useStudioStore } from '../store'
 import type { LogKind } from '../types'
 
-const ICON: Record<LogKind, string> = {
+const ICONA: Record<LogKind, string> = {
   ok: '✓',
-  warn: '⚠',
-  repair: '⟳',
-  fail: '✕',
-  info: 'ℹ',
+  avviso: '⚠',
+  riparazione: '⟳',
+  fallimento: '✕',
+  info: '·',
 }
 
-const KIND_LABEL: Record<LogKind, string> = {
+const DESCRIZIONE: Record<LogKind, string> = {
   ok: 'esito positivo',
-  warn: 'avviso',
-  repair: 'riparazione in corso',
-  fail: 'fallimento',
+  avviso: 'avviso',
+  riparazione: 'riparazione in corso',
+  fallimento: 'fallimento',
   info: 'informazione',
 }
 
-function timestamp(at: number): string {
+function orario(at: number): string {
   const d = new Date(at)
   return `${d.toLocaleTimeString('it-IT', { hour12: false })}.${String(d.getMilliseconds()).padStart(3, '0')}`
 }
 
-/** Console di diagnostica del Controllore: chiusa di default, con contatori sempre visibili. */
+/** Console di diagnostica del Controllore: chiusa di default, con i contatori. */
 export function Console() {
-  const logs = useStudioStore((s) => s.logs)
-  const open = useStudioStore((s) => s.consoleOpen)
-  const setConsoleOpen = useStudioStore((s) => s.setConsoleOpen)
-  const clearLogs = useStudioStore((s) => s.clearLogs)
-  const unseenLogs = useStudioStore((s) => s.unseenLogs)
-  const unseenErrors = useStudioStore((s) => s.unseenErrors)
-  const unlockUi = useStudioStore((s) => s.unlockUi)
+  const log = useStudioStore((s) => s.log)
+  const aperta = useStudioStore((s) => s.consoleAperta)
+  const setAperta = useStudioStore((s) => s.setConsoleAperta)
+  const svuota = useStudioStore((s) => s.svuotaLog)
+  const nonVisti = useStudioStore((s) => s.logNonVisti)
+  const erroriNonVisti = useStudioStore((s) => s.erroriNonVisti)
+  const sblocca = useStudioStore((s) => s.sbloccaInterfaccia)
+  const [copiato, setCopiato] = useState(false)
 
-  const totalErrors = logs.filter((l) => l.kind === 'fail').length
+  const errori = log.filter((l) => l.kind === 'fallimento').length
+
+  const copia = async () => {
+    const testo = log
+      .map(
+        (l) =>
+          `[${orario(l.at)}] ${l.kind.toUpperCase()}${l.agente ? ` (${l.agente})` : ''} ${l.messaggio}`,
+      )
+      .join('\n')
+    try {
+      await navigator.clipboard?.writeText(testo)
+      setCopiato(true)
+      window.setTimeout(() => setCopiato(false), 2000)
+    } catch {
+      // Copia non disponibile.
+    }
+  }
 
   return (
-    <section className="panel console">
+    <section className="pannello console">
       <button
         type="button"
-        className="console-toggle"
-        onClick={() => setConsoleOpen(!open)}
-        aria-expanded={open}
+        className="console-interruttore"
+        onClick={() => setAperta(!aperta)}
+        aria-expanded={aperta}
       >
-        <span className="console-caret" aria-hidden>
-          {open ? '▾' : '▸'}
+        <span className="console-freccia" aria-hidden>
+          {aperta ? '▾' : '▸'}
         </span>
-        <span className="console-title">Console del Controllore</span>
-        <span className="console-counts">
-          <span className="count">{logs.length} eventi</span>
-          {totalErrors > 0 && <span className="count count-error">{totalErrors} errori</span>}
-          {!open && unseenLogs > 0 && (
-            <span className="count count-new">
-              {unseenLogs} nuovi
-              {unseenErrors > 0 ? ` · ${unseenErrors} ✕` : ''}
+        <span className="console-titolo">Console del Controllore</span>
+        <span className="console-contatori">
+          <span className="conteggio">{log.length} eventi</span>
+          {errori > 0 && <span className="conteggio conteggio-errore">{errori} errori</span>}
+          {!aperta && nonVisti > 0 && (
+            <span className="conteggio conteggio-nuovo">
+              {nonVisti} nuovi{erroriNonVisti > 0 ? ` · ${erroriNonVisti} ✕` : ''}
             </span>
           )}
         </span>
       </button>
 
-      {open && (
+      {aperta && (
         <>
-          <div className="actions">
-            <button type="button" className="btn btn-tiny" onClick={clearLogs}>
-              Svuota la console
+          <div className="azioni azioni-console">
+            <button type="button" className="bottone bottone-minuscolo" onClick={() => void copia()}>
+              {copiato ? 'Copiato ✓' : 'Copia log'}
             </button>
-            <button type="button" className="btn btn-tiny" onClick={unlockUi}>
+            <button type="button" className="bottone bottone-minuscolo" onClick={svuota}>
+              Svuota
+            </button>
+            <button type="button" className="bottone bottone-minuscolo" onClick={sblocca}>
               Sblocca l'interfaccia
             </button>
           </div>
-          <ol className="log-list">
-            {logs.length === 0 && <li className="hint">Nessun evento registrato.</li>}
-            {logs.map((entry) => (
-              <li key={entry.id} className={`log log-${entry.kind}`}>
-                <span className="log-icon" title={KIND_LABEL[entry.kind]} aria-label={KIND_LABEL[entry.kind]}>
-                  {ICON[entry.kind]}
+
+          <ol className="elenco-log" aria-live="polite">
+            {log.length === 0 && <li className="nota">Nessun evento registrato.</li>}
+            {log.map((voce) => (
+              <li key={voce.id} className={`log log-${voce.kind}`}>
+                <span className="log-icona" title={DESCRIZIONE[voce.kind]} aria-label={DESCRIZIONE[voce.kind]}>
+                  {ICONA[voce.kind]}
                 </span>
-                <span className="log-time">{timestamp(entry.at)}</span>
-                {entry.agent && (
-                  <span className="log-agent" style={{ color: AGENT_BY_KEY[entry.agent].color }}>
-                    {AGENT_BY_KEY[entry.agent].name}
+                <span className="log-ora">{orario(voce.at)}</span>
+                {voce.agente && (
+                  <span className="log-agente" style={{ color: AGENTE[voce.agente].colore }}>
+                    {AGENTE[voce.agente].nome}
                   </span>
                 )}
-                <span className="log-message">{entry.message}</span>
+                <span className="log-messaggio">{voce.messaggio}</span>
               </li>
             ))}
           </ol>

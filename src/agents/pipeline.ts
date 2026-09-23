@@ -1,616 +1,820 @@
-import { useStudioStore } from '../store'
-import { MAX_TOKENS, WRITER_MAX_TOKENS, callAnthropic, type ApiMessage } from './api'
-import { AGENT_BY_KEY } from './definitions'
+import { AGENT_KEYS, fontiApprovate, useStudioStore } from '../store'
+import type {
+  AgentKey,
+  Consegna,
+  Fonte,
+  ImpiantoKey,
+  RisultatoControllore,
+  RisultatoLettore,
+  RisultatoScrittore,
+  RisultatoSelettore,
+} from '../types'
 import {
-  CHAT_SYSTEM,
-  SYSTEM_PROMPTS,
-  buildChatContext,
-  buildMaterialText,
-  buildUserMessage,
-  lettoreInstruction,
-  ricercatoreInstruction,
-  scrittoreInstruction,
-  selettoreInstruction,
-  supervisorDraftsInstruction,
-  supervisorSourcesInstruction,
-  type SharedContext,
+  ApiError,
+  chiamataChatStream,
+  chiamataStrutturata,
+  chiamataStrutturataStream,
+  creaClient,
+  toApiError,
+  type ChiamataBase,
+} from './api'
+import {
+  IMPIANTI,
+  SYSTEM_CHAT_BASE,
+  SYSTEM_CONTROLLORE,
+  SYSTEM_LETTORE,
+  SYSTEM_RICERCATORE,
+  SYSTEM_SCRITTORE,
+  SYSTEM_SELETTORE,
+  contestoChat,
+  elencoFonti,
+  messaggioControllore,
+  messaggioLettore,
+  messaggioRicercatore,
+  messaggioScrittore,
+  messaggioSelettore,
+  riepilogoCaso,
+  type ContestoProgetto,
 } from './prompts'
 import {
-  applyAgentOutput,
-  guardedCall,
-  logFail,
+  SCHEMA_CONTROLLORE,
+  SCHEMA_LETTORE,
+  SCHEMA_SCRITTORE,
+  SCHEMA_SELETTORE,
+} from './schemas'
+import {
+  elencoNonVuoto,
+  logAvviso,
+  logFallimento,
   logInfo,
   logOk,
-  logWarn,
-  parseDraftReviews,
-  parseDrafts,
-  readStatus,
-  requireBlocks,
-  requireSections,
-  requireStatusLine,
+  logRiparazione,
+  passaggiValidi,
+  segnalaFineChiamata,
+  segnalaInizioChiamata,
+  segnalaSconfinamenti,
+  sorveglia,
+  testoSostanzioso,
+  ticker,
 } from './supervisor'
-import {
-  WEB_SEARCH_TOOL,
-  harvestSearch,
-  parseSelection,
-  parseSources,
-  wantsNewSearch,
-} from './webSearch'
-import type { AgentKey } from '../types'
+import { verificaFonti } from './verifyUrls'
+import { eseguiRicerca } from './webSearch'
 
-/** Token della run corrente: incrementarlo invalida quella precedente. */
-let runToken = 0
+let tokenRun = 0
 let controller: AbortController | null = null
 
-/** Se la scena 3D non è montata non restiamo bloccati ad aspettare l'arrivo. */
-const ARRIVAL_TIMEOUT_MS = 12_000
-const MAX_SEARCH_ROUNDS = 4
+const TIMEOUT_ARRIVO_MS = 12_000
+const MAX_GIRI_RICERCA = 4
+
+function scaduto(token: number): boolean {
+  return token !== tokenRun
+}
 
 function isAbort(err: unknown): boolean {
   return err instanceof DOMException && err.name === 'AbortError'
 }
 
-function stale(token: number): boolean {
-  return token !== runToken
+function contesto(): ContestoProgetto {
+  const s = useStudioStore.getState()
+  return {
+    argomento: s.argomento,
+    capitolo: s.capitolo,
+    courseFiles: s.courseFiles,
+    caseFiles: s.caseFiles,
+  }
 }
 
-/** Attende che il personaggio abbia finito di camminare fino alla postazione. */
-function waitForArrival(agent: AgentKey, token: number): Promise<void> {
+function base(modello: string, maxTokens: number, signal: AbortSignal): Omit<ChiamataBase, 'system' | 'messages'> {
+  return {
+    client: creaClient(useStudioStore.getState().apiKey),
+    model: modello,
+    maxTokens,
+    signal,
+  }
+}
+
+function sistema(testo: string, suggerimento: string) {
+  const blocchi = [{ type: 'text' as const, text: testo }]
+  if (suggerimento) blocchi.push({ type: 'text' as const, text: suggerimento })
+  return blocchi
+}
+
+/** Attende che il broker abbia finito di camminare fino alla postazione. */
+function attendiArrivo(agente: AgentKey, token: number): Promise<void> {
   return new Promise((resolve) => {
-    if (useStudioStore.getState().agents[agent].arrived) {
+    if (useStudioStore.getState().agenti[agente].arrived) {
       resolve()
       return
     }
     let timer: ReturnType<typeof setTimeout>
-    const unsubscribe = useStudioStore.subscribe((state) => {
-      if (state.agents[agent].arrived || stale(token)) {
+    const stop = useStudioStore.subscribe((s) => {
+      if (s.agenti[agente].arrived || scaduto(token)) {
         clearTimeout(timer)
-        unsubscribe()
+        stop()
         resolve()
       }
     })
     timer = setTimeout(() => {
-      unsubscribe()
+      stop()
       resolve()
-    }, ARRIVAL_TIMEOUT_MS)
+    }, TIMEOUT_ARRIVO_MS)
   })
 }
 
-/** Blocca la pipeline finché lo studente non approva o rifiuta la selezione. */
-function waitForDecision(token: number): Promise<'approved' | 'rejected' | 'cancelled'> {
+/** Blocca la pipeline finché lo studente non decide. */
+function attendiDecisione(token: number): Promise<'approvata' | 'rifiutata' | 'annullata'> {
   return new Promise((resolve) => {
-    const current = useStudioStore.getState().approvalStatus
-    if (current === 'approved' || current === 'rejected') {
-      resolve(current)
+    const attuale = useStudioStore.getState().approvazione
+    if (attuale === 'approvata' || attuale === 'rifiutata') {
+      resolve(attuale)
       return
     }
-    const unsubscribe = useStudioStore.subscribe((state) => {
-      if (stale(token)) {
-        unsubscribe()
-        resolve('cancelled')
+    const stop = useStudioStore.subscribe((s) => {
+      if (scaduto(token)) {
+        stop()
+        resolve('annullata')
         return
       }
-      if (state.approvalStatus === 'approved' || state.approvalStatus === 'rejected') {
-        unsubscribe()
-        resolve(state.approvalStatus)
+      if (s.approvazione === 'approvata' || s.approvazione === 'rifiutata') {
+        stop()
+        resolve(s.approvazione)
       }
     })
   })
 }
 
-async function goToDesk(agent: AgentKey, token: number, label: string) {
-  const store = useStudioStore.getState()
-  store.setActiveAgent(agent)
-  store.patchAgent(agent, { status: 'walking', microLabel: 'Vado alla postazione…', arrived: false })
-  await waitForArrival(agent, token)
-  if (stale(token)) return
-  useStudioStore.getState().patchAgent(agent, { status: 'working', microLabel: label })
-}
-
-function sharedContext(): SharedContext {
+async function allaPostazione(agente: AgentKey, token: number, etichetta: string) {
   const s = useStudioStore.getState()
-  return {
-    thesisTopic: s.thesisTopic,
-    chapterBrief: s.chapterBrief,
-    courseFiles: s.courseFiles,
-  }
+  s.setAgenteAttivo(agente)
+  s.patchAgente(agente, { status: 'walking', microLabel: 'raggiungo la postazione…', arrived: false })
+  await attendiArrivo(agente, token)
+  if (scaduto(token)) return
+  useStudioStore.getState().patchAgente(agente, { status: 'working', microLabel: etichetta })
 }
 
-/** Interrompe la run in corso, chiamata API inclusa. */
-export function cancelRun() {
-  runToken += 1
+export function annullaEsecuzione() {
+  tokenRun += 1
   controller?.abort()
   controller = null
-  const store = useStudioStore.getState()
-  store.setRunning(false)
-  store.setActiveAgent(null)
-  store.resetApproval()
-  logWarn(null, 'Esecuzione interrotta manualmente.')
+  const s = useStudioStore.getState()
+  s.setInEsecuzione(false)
+  s.setAgenteAttivo(null)
+  s.azzeraApprovazione()
+  logAvviso(null, 'Esecuzione interrotta manualmente.')
 }
 
-export async function runPipeline() {
-  const start = useStudioStore.getState()
-  const apiKey = start.apiKey.trim()
+// ---------------------------------------------------------------------------
+// I singoli passi
+// ---------------------------------------------------------------------------
 
-  if (!apiKey) {
-    start.setGlobalError('Incolla la tua chiave API Anthropic prima di avviare la squadra.')
+async function passoLettore(token: number, signal: AbortSignal): Promise<RisultatoLettore> {
+  await allaPostazione('lettore', token, 'studio il materiale del corso…')
+  const s = useStudioStore.getState()
+
+  const consegna = await sorveglia<Consegna<RisultatoLettore>>({
+    agente: 'lettore',
+    passo: 'Lettore',
+    signal,
+    esegui: async (_t, suggerimento) => {
+      const { dati } = await chiamataStrutturata<Consegna<RisultatoLettore>>({
+        ...base(s.modelli.lettore, 4000, signal),
+        system: sistema(SYSTEM_LETTORE, suggerimento),
+        messages: [messaggioLettore(contesto())],
+        schema: SCHEMA_LETTORE,
+      })
+      return dati
+    },
+    valida: (d) => {
+      if (!passaggiValidi(d?.passaggi)) return { ok: false, suggerimento: 'Il campo "passaggi" deve contenere almeno 3 passaggi di una frase ciascuno.' }
+      const r = d?.risultato
+      if (!elencoNonVuoto(r?.concetti_chiave)) return { ok: false, suggerimento: 'Manca "concetti_chiave".' }
+      if (!elencoNonVuoto(r?.metriche_applicabili)) return { ok: false, suggerimento: 'Manca "metriche_applicabili".' }
+      if (!testoSostanzioso(r?.sintesi_dati_caso, 40)) return { ok: false, suggerimento: '"sintesi_dati_caso" è troppo breve.' }
+      return { ok: true }
+    },
+  })
+
+  const store = useStudioStore.getState()
+  store.setDossier(consegna.risultato)
+  store.patchAgente('lettore', { status: 'done', microLabel: 'dossier pronto', passaggi: consegna.passaggi, errore: null })
+  ticker('LETTORE ▲ DOSSIER PRONTO', '▲')
+  return consegna.risultato
+}
+
+async function passoRicercatore(
+  token: number,
+  signal: AbortSignal,
+  dossier: RisultatoLettore,
+  giro: number,
+  motivoNuovoGiro?: string,
+): Promise<Fonte[]> {
+  await allaPostazione('ricercatore', token, 'cerco fonti online…')
+  const s = useStudioStore.getState()
+
+  const esito = await sorveglia({
+    agente: 'ricercatore',
+    passo: `Ricercatore (giro ${giro})`,
+    signal,
+    esegui: async (_t, suggerimento) =>
+      eseguiRicerca({
+        ...base(s.modelli.ricercatore, 6000, signal),
+        system: sistema(SYSTEM_RICERCATORE, suggerimento),
+        messages: [messaggioRicercatore(contesto(), dossier, motivoNuovoGiro)],
+      }),
+    valida: (e) => {
+      if (!e.raccolta.usato && e.raccolta.errori.length === 0) {
+        return { ok: false, suggerimento: 'Non hai usato la ricerca web: devi eseguire davvero delle ricerche prima di consegnare.' }
+      }
+      if (!passaggiValidi(e.consegna.passaggi)) {
+        return { ok: false, suggerimento: 'Il campo "passaggi" deve contenere almeno 3 passaggi.' }
+      }
+      return { ok: true }
+    },
+  })
+
+  const { consegna, raccolta } = esito
+  const store = useStudioStore.getState()
+
+  if (raccolta.query.length > 0) {
+    logInfo('ricercatore', `Query eseguite: ${raccolta.query.join(' · ')}`)
+  }
+  for (const errore of raccolta.errori) logFallimento('ricercatore', errore)
+  store.setAvvisoRicerca(raccolta.errori.length > 0 ? raccolta.errori.join(' ') : null)
+
+  // Verifica deterministica: le fonti non confermate non passano al Selettore.
+  const { verificate, respinte } = verificaFonti(consegna.risultato.fonti, raccolta.risultati)
+  const fonti: Fonte[] = verificate.map((f) => ({ ...f, verificata: true }))
+
+  for (const r of respinte) {
+    logFallimento(
+      'ricercatore',
+      `Fonte esclusa perché l'URL non compare nei risultati di ricerca: "${r.titolo}" — ${r.url}`,
+    )
+  }
+
+  store.setFonti(fonti, consegna.risultato.fonti_scartate ?? [])
+  store.patchAgente('ricercatore', {
+    status: 'done',
+    microLabel: `${fonti.length} fonti verificate`,
+    passaggi: consegna.passaggi,
+    errore: null,
+  })
+
+  logOk(
+    'ricercatore',
+    `${consegna.risultato.fonti.length} fonti dichiarate, ${fonti.length} con URL confermato, ${respinte.length} escluse.`,
+  )
+  ticker(`RICERCATORE ▲ ${fonti.length} FONTI VERIFICATE`, '▲')
+
+  if (fonti.length === 0) {
+    const messaggio =
+      raccolta.errori.length > 0
+        ? `La ricerca web non ha prodotto fonti utilizzabili. ${raccolta.errori.join(' ')}`
+        : raccolta.vuota
+          ? 'La ricerca web non ha restituito alcun risultato per queste query. Prova a riformulare argomento e capitolo.'
+          : 'Nessuna fonte dichiarata dal Ricercatore ha superato la verifica degli URL.'
+    store.setAvvisoRicerca(messaggio)
+    throw new ApiError('sconosciuto', messaggio)
+  }
+
+  return fonti
+}
+
+async function passoSelettore(
+  token: number,
+  signal: AbortSignal,
+  dossier: RisultatoLettore,
+  fonti: Fonte[],
+  motivoRifiuto: string,
+  selezionePrecedente: string,
+  giro: number,
+): Promise<RisultatoSelettore> {
+  await allaPostazione('selettore', token, 'valuto la pertinenza…')
+  const s = useStudioStore.getState()
+
+  const consegna = await sorveglia<Consegna<RisultatoSelettore>>({
+    agente: 'selettore',
+    passo: `Selettore (giro ${giro})`,
+    signal,
+    esegui: async (_t, suggerimento) => {
+      const { dati } = await chiamataStrutturata<Consegna<RisultatoSelettore>>({
+        ...base(s.modelli.selettore, 4000, signal),
+        system: sistema(SYSTEM_SELETTORE, suggerimento),
+        messages: [messaggioSelettore(contesto(), dossier, fonti, motivoRifiuto, selezionePrecedente)],
+        schema: SCHEMA_SELETTORE,
+      })
+      return dati
+    },
+    valida: (d) => {
+      if (!passaggiValidi(d?.passaggi)) return { ok: false, suggerimento: 'Il campo "passaggi" deve contenere almeno 3 passaggi.' }
+      if (!Array.isArray(d?.risultato?.selezionate)) return { ok: false, suggerimento: 'Manca l\'elenco "selezionate".' }
+      if (typeof d?.risultato?.copertura_sufficiente !== 'boolean') {
+        return { ok: false, suggerimento: 'Manca il campo booleano "copertura_sufficiente".' }
+      }
+      return { ok: true }
+    },
+  })
+
+  // Il Selettore non può inventare URL: si tengono solo quelli dell'elenco ricevuto.
+  const ammessi = new Set(fonti.map((f) => f.url))
+  const selezionate = consegna.risultato.selezionate.filter((v) => ammessi.has(v.url))
+  const fuoriElenco = consegna.risultato.selezionate.length - selezionate.length
+  if (fuoriElenco > 0) {
+    logAvviso('selettore', `${fuoriElenco} selezioni ignorate: l'URL non era nell'elenco del Ricercatore.`)
+  }
+
+  const store = useStudioStore.getState()
+  store.setSelezione(selezionate, consegna.risultato.scartate ?? [], consegna.risultato.copertura_sufficiente)
+  store.patchAgente('selettore', { passaggi: consegna.passaggi, errore: null })
+  logOk('selettore', `${selezionate.length} fonti tenute, ${(consegna.risultato.scartate ?? []).length} scartate.`)
+
+  return { ...consegna.risultato, selezionate }
+}
+
+async function passoScrittore(
+  token: number,
+  signal: AbortSignal,
+  dossier: RisultatoLettore,
+  approvate: Fonte[],
+): Promise<void> {
+  await allaPostazione('scrittore', token, 'scrivo le tre opzioni…')
+  const s = useStudioStore.getState()
+
+  const impianti: ImpiantoKey[] = ['A', 'B', 'C']
+  s.inizializzaOpzioni(
+    impianti.map((i) => ({
+      impianto: i,
+      etichetta: IMPIANTI[i].etichetta,
+      passaggi: [],
+      risultato: null,
+      stato: 'in_corso',
+      errore: null,
+      valutazione: null,
+    })),
+  )
+
+  // Le tre opzioni partono insieme: se una fallisce le altre restano valide.
+  const esiti = await Promise.allSettled(impianti.map((i) => scriviOpzione(i, dossier, approvate, signal)))
+
+  let riuscite = 0
+  esiti.forEach((esito, indice) => {
+    const impianto = impianti[indice]
+    if (esito.status === 'fulfilled') {
+      riuscite += 1
+      useStudioStore.getState().patchOpzione(impianto, {
+        risultato: esito.value.risultato,
+        passaggi: esito.value.passaggi,
+        stato: 'ok',
+        errore: null,
+      })
+    } else {
+      const messaggio = toApiError(esito.reason).message
+      useStudioStore.getState().patchOpzione(impianto, { stato: 'errore', errore: messaggio })
+      logFallimento('scrittore', `Opzione ${impianto} non prodotta: ${messaggio}`)
+    }
+  })
+
+  if (scaduto(token)) return
+
+  useStudioStore.getState().patchAgente('scrittore', {
+    status: riuscite > 0 ? 'done' : 'error',
+    microLabel: riuscite > 0 ? `${riuscite} opzioni su 3` : 'nessuna opzione prodotta',
+    errore: riuscite > 0 ? null : 'Tutte e tre le opzioni sono fallite.',
+  })
+  logOk('scrittore', `${riuscite} opzioni su 3 prodotte.`)
+  ticker(`SCRITTORE ▲ ${riuscite}/3 OPZIONI`, riuscite === 3 ? '▲' : '▼')
+
+  if (riuscite === 0) {
+    throw new ApiError('sconosciuto', 'Nessuna delle tre opzioni è stata prodotta.')
+  }
+}
+
+/** Una singola opzione dello Scrittore, riutilizzabile dal bottone "rigenera". */
+export async function scriviOpzione(
+  impianto: ImpiantoKey,
+  dossier: RisultatoLettore,
+  approvate: Fonte[],
+  signal: AbortSignal,
+): Promise<Consegna<RisultatoScrittore>> {
+  const s = useStudioStore.getState()
+
+  return sorveglia<Consegna<RisultatoScrittore>>({
+    agente: 'scrittore',
+    passo: `Scrittore — opzione ${impianto}`,
+    signal,
+    esegui: async (_t, suggerimento) => {
+      const { dati } = await chiamataStrutturataStream<Consegna<RisultatoScrittore>>({
+        ...base(s.modelli.scrittore, 16000, signal),
+        effort: 'high',
+        system: sistema(SYSTEM_SCRITTORE, suggerimento),
+        messages: [messaggioScrittore(contesto(), dossier, approvate, impianto)],
+        schema: SCHEMA_SCRITTORE,
+      })
+      return dati
+    },
+    valida: (d) => {
+      if (!passaggiValidi(d?.passaggi)) return { ok: false, suggerimento: 'Il campo "passaggi" deve contenere almeno 3 passaggi.' }
+      const r = d?.risultato
+      if (!testoSostanzioso(r?.titolo, 8)) return { ok: false, suggerimento: 'Manca un titolo sensato.' }
+      if (!elencoNonVuoto(r?.paragrafi, 3)) return { ok: false, suggerimento: 'Servono almeno 3 paragrafi con titoletto e testo.' }
+      const parole = (r?.paragrafi ?? []).reduce(
+        (n, p) => n + (typeof p?.testo === 'string' ? p.testo.split(/\s+/).filter(Boolean).length : 0),
+        0,
+      )
+      if (parole < 400) {
+        return { ok: false, suggerimento: `Il capitolo è troppo breve (${parole} parole): servono almeno 600 parole di testo continuo.` }
+      }
+      const ammessi = new Set(approvate.map((f) => f.url))
+      const estranee = (r?.fonti_citate ?? []).filter((u) => !ammessi.has(u))
+      if (estranee.length > 0) {
+        return { ok: false, suggerimento: `Hai citato URL non approvati: ${estranee.join(', ')}. Usa solo le fonti approvate.` }
+      }
+      return { ok: true }
+    },
+  })
+}
+
+async function passoControllore(token: number, signal: AbortSignal, approvate: Fonte[]): Promise<void> {
+  const store = useStudioStore.getState()
+  const opzioni = store.opzioni.filter((o) => o.stato === 'ok')
+  if (opzioni.length === 0) return
+
+  await allaPostazione('controllore', token, 'verifico le opzioni…')
+  const s = useStudioStore.getState()
+
+  const nonVerificate = s.fonti.filter((f) => !f.verificata)
+  const esitoUrl =
+    nonVerificate.length === 0
+      ? `Tutte le ${s.fonti.length} fonti in uso hanno un URL confermato dai risultati della ricerca web. Le fonti non confermate erano già state escluse automaticamente.`
+      : `Attenzione: ${nonVerificate.length} fonti hanno un URL non confermato.`
+
+  // Controllo lessicale di supporto, riportato in console.
+  const testoCompleto = opzioni
+    .map((o) => o.risultato?.paragrafi.map((p) => `${p.titoletto} ${p.testo}`).join(' ') ?? '')
+    .join(' ')
+  const sospetti = segnalaSconfinamenti(testoCompleto)
+  if (sospetti.length > 0) {
+    logAvviso('controllore', `Termini fuori perimetro da verificare nel testo: ${sospetti.join(', ')}.`)
+  }
+
+  const consegna = await sorveglia<Consegna<RisultatoControllore>>({
+    agente: 'controllore',
+    passo: 'Controllore — verifica finale',
+    signal,
+    esegui: async (_t, suggerimento) => {
+      const { dati } = await chiamataStrutturata<Consegna<RisultatoControllore>>({
+        ...base(s.modelli.controllore, 5000, signal),
+        system: sistema(SYSTEM_CONTROLLORE, suggerimento),
+        messages: [messaggioControllore(contesto(), approvate, opzioni, esitoUrl)],
+        schema: SCHEMA_CONTROLLORE,
+      })
+      return dati
+    },
+    valida: (d) => {
+      if (!passaggiValidi(d?.passaggi)) return { ok: false, suggerimento: 'Il campo "passaggi" deve contenere almeno 3 passaggi.' }
+      const r = d?.risultato
+      if (!elencoNonVuoto(r?.checklist, 4)) {
+        return { ok: false, suggerimento: 'La checklist deve contenere tutte e quattro le voci obbligatorie.' }
+      }
+      if (!elencoNonVuoto(r?.valutazioni, opzioni.length)) {
+        return { ok: false, suggerimento: `Servono ${opzioni.length} valutazioni, una per ogni opzione prodotta.` }
+      }
+      return { ok: true }
+    },
+  })
+
+  const finale = useStudioStore.getState()
+  finale.setReferto(consegna.risultato)
+  finale.patchAgente('controllore', {
+    status: 'done',
+    microLabel: 'controllo completato',
+    passaggi: consegna.passaggi,
+    errore: null,
+  })
+
+  for (const valutazione of consegna.risultato.valutazioni) {
+    finale.patchOpzione(valutazione.opzione, {
+      valutazione: { punti_di_forza: valutazione.punti_di_forza, criticita: valutazione.criticita },
+    })
+  }
+
+  const problemi = consegna.risultato.checklist.filter((v) => v.esito === 'problema')
+  if (problemi.length > 0) {
+    logAvviso('controllore', `${problemi.length} voci della checklist con problemi: ${problemi.map((p) => p.id).join(', ')}.`)
+    ticker(`CONTROLLORE ▼ ${problemi.length} RILIEVI`, '▼')
+  } else {
+    logOk('controllore', 'Checklist tutta positiva.')
+    ticker('CONTROLLORE ▲ NESSUN RILIEVO', '▲')
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Orchestrazione
+// ---------------------------------------------------------------------------
+
+export async function avviaSquadra(riprendiDa?: AgentKey) {
+  const iniziale = useStudioStore.getState()
+
+  if (!iniziale.apiKey.trim()) {
+    iniziale.setErroreGlobale('Incolla la tua chiave API Anthropic nel pannello impostazioni.')
     return
   }
-  if (start.courseFiles.length === 0 || start.courseFiles.some((f) => f.status !== 'ready')) {
-    start.setGlobalError('Carica il materiale del corso e attendi che il caricamento sia al 100%.')
+  if (iniziale.courseFiles.length === 0 || iniziale.courseFiles.some((f) => f.status !== 'pronto')) {
+    iniziale.setErroreGlobale('Carica il materiale del corso e attendi che il caricamento sia al 100%.')
     return
   }
-  if (!start.thesisTopic.trim() || !start.chapterBrief.trim()) {
-    start.setGlobalError("Scrivi l'argomento della tesi e il capitolo da produrre.")
+  if (!iniziale.argomento.trim() || !iniziale.capitolo.trim()) {
+    iniziale.setErroreGlobale("Compila l'argomento della tesi e il capitolo da scrivere.")
     return
   }
 
-  runToken += 1
-  const token = runToken
+  tokenRun += 1
+  const token = tokenRun
   controller?.abort()
   controller = new AbortController()
   const signal = controller.signal
 
-  start.resetRun()
-  start.setRunning(true)
-  logInfo(null, 'Avvio della squadra: contesto condiviso pronto per tutti e 5 gli agenti.')
+  const store = useStudioStore.getState()
+  store.setErroreGlobale(null)
+  store.setRipresaDa(null)
+  store.setInEsecuzione(true)
+  store.setCampanella(false)
 
-  // Il Controllore è attivo dall'inizio e resta in ascolto per tutta la pipeline.
-  useStudioStore
-    .getState()
-    .patchAgent('controllore', { status: 'working', microLabel: 'Sorveglio il processo…' })
+  // Riprendendo da un agente si conservano i risultati già ottenuti.
+  const daCapo = !riprendiDa
+  if (daCapo) {
+    for (const k of AGENT_KEYS) {
+      store.patchAgente(k, { status: 'idle', microLabel: '', passaggi: [], errore: null, arrived: false, tentativi: 0 })
+    }
+    store.setDossier(null)
+    store.setFonti([], [])
+    store.setSelezione([], [], true)
+    store.azzeraApprovazione()
+    store.inizializzaOpzioni([])
+    store.setReferto(null)
+  }
+
+  // Il Controllore si siede per primo e resta attivo per tutto il processo.
+  useStudioStore.getState().patchAgente('controllore', {
+    status: 'working',
+    microLabel: 'sorveglio il processo…',
+    arrived: false,
+  })
+  logInfo(null, 'Avvio della squadra.')
+  ticker('SEDUTA APERTA ● HARROW & VANCE SECURITIES', '●')
 
   try {
-    // --- 1. Lettore --------------------------------------------------------
-    await goToDesk('lettore', token, 'Studio il materiale del corso…')
-    if (stale(token)) return
+    const ordine: AgentKey[] = ['lettore', 'ricercatore', 'selettore', 'scrittore']
+    const partenza = riprendiDa ? ordine.indexOf(riprendiDa) : 0
 
-    const lettore = await guardedCall({
-      agent: 'lettore',
-      step: 'Lettore',
-      apiKey,
-      system: SYSTEM_PROMPTS.lettore,
-      messages: [buildUserMessage(sharedContext(), lettoreInstruction())],
-      maxTokens: MAX_TOKENS,
-      signal,
-      validate: requireSections(200),
-    })
-    if (stale(token)) return
+    // --- Lettore ---------------------------------------------------------
+    let dossier = useStudioStore.getState().dossier
+    if (partenza <= 0 || !dossier) {
+      dossier = await passoLettore(token, signal)
+    }
+    if (scaduto(token)) return
 
-    applyAgentOutput('lettore', lettore.reasoning, lettore.result)
-    useStudioStore.getState().patchAgent('lettore', { status: 'done', microLabel: 'Base pronta ✓' })
+    // --- Ricerca, selezione e approvazione --------------------------------
+    let approvato = useStudioStore.getState().approvazione === 'approvata' && partenza > 2
+    let giro = 0
+    let serveRicerca = partenza <= 1 || useStudioStore.getState().fonti.length === 0
+    let motivoNuovoGiro: string | undefined
+    let selezionePrecedente = ''
 
-    // --- 2-3. Ricerca → selezione → approvazione (ciclo) -------------------
-    let approved = false
-    let round = 0
-    let needSearch = true
-    let searchFeedback = ''
-    let previousSelection = ''
+    while (!approvato && giro < MAX_GIRI_RICERCA) {
+      giro += 1
 
-    while (!approved && round < MAX_SEARCH_ROUNDS) {
-      round += 1
-
-      if (needSearch) {
-        await goToDesk('ricercatore', token, 'Cerco fonti online…')
-        if (stale(token)) return
-
-        const ricercatore = await guardedCall({
-          agent: 'ricercatore',
-          step: `Ricercatore (giro ${round})`,
-          apiKey,
-          system: SYSTEM_PROMPTS.ricercatore,
-          messages: [
-            buildUserMessage(
-              sharedContext(),
-              ricercatoreInstruction(lettore.result, searchFeedback || undefined),
-            ),
-          ],
-          maxTokens: MAX_TOKENS,
-          tools: [{ ...WEB_SEARCH_TOOL }],
-          signal,
-          validate: (response, sections) => {
-            const base = requireSections(80)(response, sections)
-            if (!base.ok) return base
-            const harvest = harvestSearch(response.blocks)
-            if (!harvest.used && harvest.errors.length === 0) {
-              return {
-                ok: false,
-                hint: 'Non hai usato il tool di ricerca web: devi eseguire davvero delle ricerche prima di elencare le fonti.',
-              }
-            }
-            if (harvest.errors.length > 0) return { ok: true }
-            const parsed = parseSources(sections.result, harvest.results)
-            if (parsed.length === 0 && !/NESSUNA\s+FONTE\s+TROVATA/i.test(sections.result)) {
-              return {
-                ok: false,
-                hint: 'Nessuna fonte riconosciuta: usa lo schema a blocchi [FONTE] con le righe TITOLO, URL, CONTENUTO, RILEVANZA.',
-              }
-            }
-            return { ok: true }
-          },
-        })
-        if (stale(token)) return
-
-        const harvest = harvestSearch(ricercatore.response.blocks)
-        const sources = parseSources(ricercatore.result, harvest.results)
-        const unverified = sources.filter((s) => !s.verified)
-
-        applyAgentOutput('ricercatore', ricercatore.reasoning, ricercatore.result)
-        useStudioStore.getState().setFoundSources(sources)
-
-        if (harvest.queries.length > 0) {
-          logInfo('ricercatore', `Query eseguite: ${harvest.queries.join(' · ')}`)
-        }
-
-        if (harvest.errors.length > 0) {
-          const notice = harvest.errors.join(' ')
-          useStudioStore.getState().setSearchNotice(notice)
-          for (const error of harvest.errors) logFail('ricercatore', error)
-        } else {
-          useStudioStore.getState().setSearchNotice(null)
-        }
-
-        if (sources.length === 0) {
-          const message =
-            harvest.errors.length > 0
-              ? `La ricerca web non ha prodotto fonti utilizzabili. ${harvest.errors.join(' ')}`
-              : 'La ricerca web non ha restituito fonti utilizzabili per questo argomento. Prova a riformulare l\'argomento della tesi o a riavviare la squadra.'
-          useStudioStore.getState().setSearchNotice(message)
-          useStudioStore
-            .getState()
-            .patchAgent('ricercatore', { status: 'error', microLabel: 'Nessuna fonte trovata', error: message })
-          useStudioStore.getState().setGlobalError(message)
-          logFail('ricercatore', message)
-          return
-        }
-
-        logOk(
-          'ricercatore',
-          `${sources.length} fonti riportate, ${sources.length - unverified.length} con URL confermato dalla ricerca.`,
-        )
-
-        // Il Controllore verifica che gli URL siano reali.
-        const check = await guardedCall({
-          agent: 'controllore',
-          step: 'Verifica URL delle fonti',
-          apiKey,
-          system: SYSTEM_PROMPTS.controllore,
-          messages: [
-            buildUserMessage(
-              sharedContext(),
-              supervisorSourcesInstruction(sources, unverified, harvest.errors),
-            ),
-          ],
-          maxTokens: MAX_TOKENS,
-          signal,
-          validate: requireStatusLine(),
-        })
-        if (stale(token)) return
-
-        applyAgentOutput('controllore', check.reasoning, check.result)
-        if (unverified.length > 0) {
-          const message = `${unverified.length} fonte/i con URL non confermato dai risultati di ricerca: ${unverified
-            .map((s) => s.url)
-            .join(', ')}`
-          logFail('controllore', message)
-          useStudioStore.getState().setSearchNotice(message)
-        } else if (readStatus(check.response.text) === 'PROBLEMA') {
-          logWarn('controllore', 'Il controllo sulle fonti ha segnalato un problema: vedi il referto.')
-        } else {
-          logOk('controllore', 'Tutti gli URL riportati corrispondono a risultati reali di ricerca.')
-        }
-
-        useStudioStore
-          .getState()
-          .patchAgent('ricercatore', { status: 'done', microLabel: 'Fonti trovate ✓' })
+      if (serveRicerca) {
+        await passoRicercatore(token, signal, dossier!, giro, motivoNuovoGiro)
+        if (scaduto(token)) return
       }
 
-      // --- Selettore ------------------------------------------------------
-      await goToDesk('selettore', token, 'Seleziono le fonti…')
-      if (stale(token)) return
-
-      const found = useStudioStore.getState().foundSources
-      const selettore = await guardedCall({
-        agent: 'selettore',
-        step: `Selettore (giro ${round})`,
-        apiKey,
-        system: SYSTEM_PROMPTS.selettore,
-        messages: [
-          buildUserMessage(
-            sharedContext(),
-            selettoreInstruction(
-              lettore.result,
-              found,
-              useStudioStore.getState().rejectionReason,
-              previousSelection,
-            ),
-          ),
-        ],
-        maxTokens: MAX_TOKENS,
+      const fonti = useStudioStore.getState().fonti
+      const selezione = await passoSelettore(
+        token,
         signal,
-        validate: requireBlocks(
-          /\[\s*(TENUTA|SCARTATA)\s*\]/gi,
-          1,
-          'Usa lo schema a blocchi [TENUTA] / [SCARTATA] con le righe TITOLO, URL, MOTIVO.',
-        ),
-      })
-      if (stale(token)) return
+        dossier!,
+        fonti,
+        useStudioStore.getState().motivoRifiuto,
+        selezionePrecedente,
+        giro,
+      )
+      if (scaduto(token)) return
 
-      previousSelection = selettore.result
-      applyAgentOutput('selettore', selettore.reasoning, selettore.result)
+      selezionePrecedente = selezione.selezionate
+        .map((v) => `- ${v.url}: ${v.motivo}`)
+        .join('\n')
 
-      const { kept, discarded } = parseSelection(selettore.result, found)
-      useStudioStore.getState().setSelectedSources(kept)
-      useStudioStore.getState().setDiscardedSources(discarded)
-      logOk('selettore', `${kept.length} fonti tenute, ${discarded.length} scartate.`)
-
-      if (kept.length === 0 || wantsNewSearch(selettore.result)) {
-        if (round >= MAX_SEARCH_ROUNDS) {
-          logWarn('selettore', 'Numero massimo di giri di ricerca raggiunto: procedo con quello che c\'è.')
+      if (selezione.selezionate.length === 0 || !selezione.copertura_sufficiente) {
+        if (giro >= MAX_GIRI_RICERCA) {
+          logAvviso('selettore', 'Numero massimo di giri raggiunto: procedo con quello che c\'è.')
         } else {
-          searchFeedback =
-            kept.length === 0
-              ? 'Nessuna delle fonti trovate era pertinente.'
-              : 'Il Selettore ha chiesto un nuovo giro di ricerca: le fonti pertinenti non bastano.'
-          logRepairNewSearch(searchFeedback)
-          needSearch = true
-          useStudioStore.getState().resetApproval()
-          useStudioStore
-            .getState()
-            .patchAgent('selettore', { status: 'done', microLabel: 'Servono altre fonti' })
+          motivoNuovoGiro =
+            selezione.selezionate.length === 0
+              ? 'Nessuna fonte del giro precedente era abbastanza pertinente.'
+              : 'Il Selettore ha giudicato insufficiente la copertura delle fonti.'
+          logRiparazione('selettore', `Nuovo giro di ricerca: ${motivoNuovoGiro}`)
+          serveRicerca = true
+          useStudioStore.getState().azzeraApprovazione()
+          useStudioStore.getState().patchAgente('selettore', { status: 'done', microLabel: 'servono altre fonti' })
           continue
         }
       }
 
       // --- Punto di approvazione umana ------------------------------------
-      useStudioStore.getState().requestApproval()
-      useStudioStore
-        .getState()
-        .patchAgent('selettore', { status: 'waiting', microLabel: 'Attendo la tua approvazione…' })
+      const attesa = useStudioStore.getState()
+      attesa.chiediApprovazione()
+      attesa.patchAgente('selettore', { status: 'waiting', microLabel: 'attendo la tua approvazione…' })
       logInfo('selettore', 'In attesa dell\'approvazione umana sulle fonti selezionate.')
+      ticker('SELETTORE ● ATTESA APPROVAZIONE', '●')
 
-      const decision = await waitForDecision(token)
-      if (stale(token) || decision === 'cancelled') return
+      const decisione = await attendiDecisione(token)
+      if (scaduto(token) || decisione === 'annullata') return
 
-      if (decision === 'approved') {
-        approved = true
+      if (decisione === 'approvata') {
+        approvato = true
         logOk('selettore', 'Selezione approvata dallo studente.')
-        useStudioStore
-          .getState()
-          .patchAgent('selettore', { status: 'done', microLabel: 'Fonti approvate ✓' })
+        ticker('APPROVAZIONE ▲ FONTI CONFERMATE', '▲')
+        useStudioStore.getState().patchAgente('selettore', { status: 'done', microLabel: 'fonti approvate' })
       } else {
-        const reason = useStudioStore.getState().rejectionReason
-        logWarn('selettore', `Selezione rifiutata${reason ? `: ${reason}` : '.'} Rivedo la scelta.`)
-        useStudioStore.getState().resetApproval()
-        needSearch = false
+        const motivo = useStudioStore.getState().motivoRifiuto
+        logAvviso('selettore', `Selezione rifiutata${motivo ? `: ${motivo}` : '.'} Rivedo la scelta.`)
+        ticker('APPROVAZIONE ▼ SELEZIONE RIFIUTATA', '▼')
+        useStudioStore.getState().azzeraApprovazione()
+        serveRicerca = false
       }
     }
 
-    if (!approved) {
-      const message =
-        'Non è stato possibile arrivare a una selezione approvata entro il numero massimo di giri. Riavvia la squadra o modifica l\'argomento.'
-      useStudioStore.getState().setGlobalError(message)
-      logFail(null, message)
+    if (!approvato) {
+      const messaggio = 'Non si è arrivati a una selezione approvata entro il numero massimo di giri.'
+      useStudioStore.getState().setErroreGlobale(messaggio)
+      logFallimento(null, messaggio)
       return
     }
 
-    // --- 4. Scrittore ------------------------------------------------------
-    const selected = useStudioStore.getState().selectedSources
-    await goToDesk('scrittore', token, 'Scrivo le tre bozze…')
-    if (stale(token)) return
+    // --- Scrittore e Controllore ------------------------------------------
+    const approvate = fontiApprovate(useStudioStore.getState())
+    await passoScrittore(token, signal, dossier!, approvate)
+    if (scaduto(token)) return
 
-    const scrittore = await guardedCall({
-      agent: 'scrittore',
-      step: 'Scrittore',
-      apiKey,
-      system: SYSTEM_PROMPTS.scrittore,
-      messages: [buildUserMessage(sharedContext(), scrittoreInstruction(lettore.result, selected))],
-      maxTokens: WRITER_MAX_TOKENS,
-      signal,
-      validate: (response, sections) => {
-        const base = requireSections(600)(response, sections)
-        if (!base.ok) return base
-        const drafts = parseDrafts(sections.result)
-        if (drafts.length < 3) {
-          return {
-            ok: false,
-            hint: `Hai prodotto ${drafts.length} opzioni invece di 3. Usa i marcatori [OPZIONE 1], [OPZIONE 2], [OPZIONE 3] con le righe APPROCCIO: e TESTO:.`,
-          }
-        }
-        const tooShort = drafts.find((d) => d.text.split(/\s+/).length < 150)
-        if (tooShort) {
-          return {
-            ok: false,
-            hint: `L'${tooShort.label.toLowerCase()} è troppo breve: ogni opzione deve essere un testo completo di almeno 450 parole.`,
-          }
-        }
-        return { ok: true }
-      },
-    })
-    if (stale(token)) return
+    await passoControllore(token, signal, approvate)
+    if (scaduto(token)) return
 
-    const drafts = parseDrafts(scrittore.result)
-    applyAgentOutput('scrittore', scrittore.reasoning, scrittore.result)
-    useStudioStore.getState().setDrafts(drafts)
-    useStudioStore.getState().patchAgent('scrittore', { status: 'done', microLabel: 'Tre bozze pronte ✓' })
-    logOk('scrittore', `${drafts.length} opzioni di scrittura prodotte.`)
-
-    // --- 5. Controllo finale ----------------------------------------------
-    await goToDesk('controllore', token, 'Valuto le tre opzioni…')
-    if (stale(token)) return
-
-    const finalCheck = await guardedCall({
-      agent: 'controllore',
-      step: 'Valutazione delle bozze',
-      apiKey,
-      system: SYSTEM_PROMPTS.controllore,
-      messages: [buildUserMessage(sharedContext(), supervisorDraftsInstruction(drafts, selected))],
-      maxTokens: MAX_TOKENS,
-      signal,
-      validate: (response, sections) => {
-        const base = requireStatusLine()(response, sections)
-        if (!base.ok) return base
-        if (parseDraftReviews(sections.result).size < drafts.length) {
-          return {
-            ok: false,
-            hint: 'Devi valutare tutte le opzioni con i blocchi [VALUTAZIONE OPZIONE n], ESITO: e NOTE:.',
-          }
-        }
-        return { ok: true }
-      },
-    })
-    if (stale(token)) return
-
-    applyAgentOutput('controllore', finalCheck.reasoning, finalCheck.result)
-    useStudioStore.getState().setSupervisorVerdict(finalCheck.result)
-
-    const reviews = parseDraftReviews(finalCheck.result)
-    let problems = 0
-    for (const [index, review] of reviews) {
-      if (index >= drafts.length) continue
-      useStudioStore.getState().setDraftReview(index, review)
-      if (!review.ok) problems += 1
-    }
-
-    if (problems > 0) {
-      logWarn('controllore', `${problems} opzione/i con problemi segnalati: le altre restano valide.`)
-    } else {
-      logOk('controllore', 'Le tre opzioni risultano coerenti con le fonti approvate.')
-    }
-
-    useStudioStore
-      .getState()
-      .patchAgent('controllore', { status: 'done', microLabel: 'Controllo completato ✓' })
-    useStudioStore.getState().setActiveAgent(null)
-    logOk(null, 'Pipeline completata: scegli l\'opzione che preferisci.')
+    useStudioStore.getState().setCampanella(true)
+    logOk(null, 'Capitolo completato: scegli l\'opzione che preferisci.')
+    ticker('SEDUTA CHIUSA ▲ CAPITOLO PRONTO', '▲')
   } catch (err) {
-    if (isAbort(err) || stale(token)) return
+    if (isAbort(err) || scaduto(token)) return
 
-    const agent = useStudioStore.getState().activeAgent
-    const message =
-      err instanceof Error ? err.message : 'Errore inatteso durante l\'esecuzione della pipeline.'
-
-    if (agent) {
-      useStudioStore.getState().patchAgent(agent, {
+    const errore = toApiError(err)
+    const agente = useStudioStore.getState().agenteAttivo
+    if (agente) {
+      useStudioStore.getState().patchAgente(agente, {
         status: 'error',
-        microLabel: 'Errore',
-        error: message,
+        microLabel: 'errore',
+        errore: errore.message,
       })
+      useStudioStore.getState().setRipresaDa(agente)
     }
-    useStudioStore.getState().setGlobalError(message)
-    logFail(agent, message)
+    useStudioStore.getState().setErroreGlobale(errore.message)
+    logFallimento(agente, errore.message)
+    ticker('ERRORE ▼ ESECUZIONE INTERROTTA', '▼')
   } finally {
-    // I controlli tornano sempre attivi, anche dopo un errore.
-    if (!stale(token)) {
-      const store = useStudioStore.getState()
-      store.setRunning(false)
-      store.setActiveAgent(null)
-      if (store.approvalStatus === 'pending') store.resetApproval()
-      if (store.agents.controllore.status === 'working') {
-        store.patchAgent('controllore', { status: 'done', microLabel: 'Sorveglianza conclusa' })
+    // I controlli tornano sempre utilizzabili, anche dopo un errore.
+    if (!scaduto(token)) {
+      const finale = useStudioStore.getState()
+      finale.setInEsecuzione(false)
+      finale.setAgenteAttivo(null)
+      if (finale.approvazione === 'in_attesa') finale.azzeraApprovazione()
+      if (finale.agenti.controllore.status === 'working') {
+        finale.patchAgente('controllore', { status: 'done', microLabel: 'sorveglianza conclusa' })
       }
     }
   }
 }
 
-function logRepairNewSearch(reason: string) {
-  useStudioStore.getState().addLog('repair', 'selettore', `Nuovo giro di ricerca: ${reason}`)
+/** Rigenera una singola opzione fallita senza rifare il resto. */
+export async function rigeneraOpzione(impianto: ImpiantoKey) {
+  const s = useStudioStore.getState()
+  const dossier = s.dossier
+  if (!dossier) return
+
+  const approvate = fontiApprovate(s)
+  const locale = new AbortController()
+  s.patchOpzione(impianto, { stato: 'in_corso', errore: null })
+  logInfo('scrittore', `Rigenerazione dell'opzione ${impianto}.`)
+
+  try {
+    const consegna = await scriviOpzione(impianto, dossier, approvate, locale.signal)
+    useStudioStore.getState().patchOpzione(impianto, {
+      risultato: consegna.risultato,
+      passaggi: consegna.passaggi,
+      stato: 'ok',
+      errore: null,
+    })
+    logOk('scrittore', `Opzione ${impianto} rigenerata.`)
+  } catch (err) {
+    const messaggio = toApiError(err).message
+    useStudioStore.getState().patchOpzione(impianto, { stato: 'errore', errore: messaggio })
+    logFallimento('scrittore', `Rigenerazione dell'opzione ${impianto} fallita: ${messaggio}`)
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Chat sul progetto
 // ---------------------------------------------------------------------------
 
-export async function sendChatMessage(text: string) {
-  const store = useStudioStore.getState()
-  const question = text.trim()
-  if (!question || store.chatBusy) return
+export async function inviaMessaggioChat(testo: string) {
+  const s = useStudioStore.getState()
+  const domanda = testo.trim()
+  if (!domanda || s.chatInCorso) return
 
-  const apiKey = store.apiKey.trim()
-  if (!apiKey) {
-    store.setChatError('Incolla la tua chiave API Anthropic per usare la chat.')
+  if (!s.apiKey.trim()) {
+    s.setChatErrore('Incolla la tua chiave API Anthropic per usare la chat.')
     return
   }
 
-  store.addChatMessage({ role: 'user', content: question })
-  store.setChatBusy(true)
-  store.setChatError(null)
+  s.aggiungiChat({ role: 'user', content: domanda })
+  s.setChatInCorso(true)
+  s.setChatErrore(null)
+  s.setChatParziale('')
+
+  const locale = new AbortController()
 
   try {
-    const state = useStudioStore.getState()
+    const stato = useStudioStore.getState()
 
-    const agentStates = Object.entries(state.agents)
-      .map(([key, runtime]) => {
-        const def = AGENT_BY_KEY[key as AgentKey]
-        return `- ${def.name}: stato "${runtime.status}"${runtime.microLabel ? ` (${runtime.microLabel})` : ''}${
-          runtime.error ? ` — errore: ${runtime.error}` : ''
-        }`
-      })
+    const statiAgenti = AGENT_KEYS.map((k) => {
+      const a = stato.agenti[k]
+      return `- ${k}: ${a.status}${a.microLabel ? ` (${a.microLabel})` : ''}${a.errore ? ` — errore: ${a.errore}` : ''}`
+    }).join('\n')
+
+    const console20 = stato.log
+      .slice(-20)
+      .map((l) => `[${new Date(l.at).toLocaleTimeString('it-IT')}] ${l.kind.toUpperCase()} ${l.messaggio}`)
       .join('\n')
 
-    const recentLogs = state.logs
-      .slice(-25)
-      .map((l) => `[${new Date(l.at).toLocaleTimeString('it-IT')}] ${l.kind.toUpperCase()} ${l.message}`)
-      .join('\n')
-
-    const pdfNames = state.courseFiles
-      .filter((f) => f.kind === 'pdf' && f.status === 'ready')
-      .map((f) => f.name)
-    const materialText = buildMaterialText(state.courseFiles)
-    const materialSummary = [
-      pdfNames.length > 0 ? `PDF caricati: ${pdfNames.join(', ')}.` : '',
-      materialText,
-    ]
-      .filter(Boolean)
-      .join('\n\n')
-      .slice(0, 8000)
-
-    const approvalInfo =
-      state.approvalStatus === 'pending'
-        ? `in attesa della decisione dello studente (giro ${state.approvalRound})`
-        : state.approvalHistory.length > 0
-          ? state.approvalHistory.join(' | ')
+    const approvazione =
+      stato.approvazione === 'in_attesa'
+        ? `in attesa della decisione dello studente (giro ${stato.giroApprovazione})`
+        : stato.storicoApprovazioni.length > 0
+          ? stato.storicoApprovazioni.join(' | ')
           : 'non ancora richiesta'
 
-    const context = buildChatContext({
-      thesisTopic: state.thesisTopic,
-      chapterBrief: state.chapterBrief,
-      materialSummary,
-      foundSources: state.foundSources,
-      selectedSources: state.selectedSources,
-      drafts: state.drafts,
-      agentStates,
-      recentLogs,
-      approvalInfo,
-    })
+    // Il contesto sta nel system e viene rigenerato a ogni domanda.
+    const system = [
+      { type: 'text' as const, text: SYSTEM_CHAT_BASE },
+      {
+        type: 'text' as const,
+        text: contestoChat({
+          argomento: stato.argomento,
+          capitolo: stato.capitolo,
+          dossier: stato.dossier,
+          riepilogoCaso: riepilogoCaso(stato.caseFiles),
+          fontiApprovate: fontiApprovate(stato),
+          opzioni: stato.opzioni,
+          statiAgenti,
+          console: console20,
+          approvazione,
+        }),
+      },
+    ]
 
-    const history: ApiMessage[] = state.chatMessages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }))
-    // Il contesto aggiornato viaggia insieme all'ultima domanda.
-    history[history.length - 1] = {
-      role: 'user',
-      content: `${context}\n\n---\n\nDOMANDA DELLO STUDENTE:\n${question}`,
+    segnalaInizioChiamata()
+    let risposta: string
+    try {
+      risposta = await chiamataChatStream({
+        client: creaClient(stato.apiKey),
+        model: stato.modelli.chat,
+        maxTokens: 4000,
+        system,
+        messages: stato.chat.map((m) => ({ role: m.role, content: m.content })),
+        signal: locale.signal,
+        onTesto: (frammento) => {
+          const attuale = useStudioStore.getState()
+          attuale.setChatParziale(attuale.chatParziale + frammento)
+        },
+      })
+    } finally {
+      segnalaFineChiamata()
     }
 
-    const response = await callAnthropic({
-      apiKey,
-      system: CHAT_SYSTEM,
-      messages: history,
-      maxTokens: MAX_TOKENS,
-    })
+    if (!risposta) throw new ApiError('sconosciuto', "L'assistente ha risposto senza contenuto.")
 
-    const answer = response.text.trim()
-    if (!answer) throw new Error("L'assistente ha risposto senza contenuto testuale.")
-
-    useStudioStore.getState().addChatMessage({ role: 'assistant', content: answer })
+    useStudioStore.getState().aggiungiChat({ role: 'assistant', content: risposta })
+    useStudioStore.getState().setChatParziale('')
     logOk(null, 'Risposta della chat ricevuta.')
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Errore inatteso nella chat.'
-    useStudioStore.getState().setChatError(message)
-    logFail(null, `Chat: ${message}`)
+    const messaggio = toApiError(err).message
+    useStudioStore.getState().setChatErrore(messaggio)
+    useStudioStore.getState().setChatParziale('')
+    logFallimento(null, `Chat: ${messaggio}`)
   } finally {
-    useStudioStore.getState().setChatBusy(false)
+    useStudioStore.getState().setChatInCorso(false)
   }
+}
+
+/** Riepilogo delle fonti approvate, usato dalla lavagna in scena. */
+export function riepilogoFontiApprovate(): string {
+  return elencoFonti(fontiApprovate(useStudioStore.getState()))
 }

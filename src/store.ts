@@ -1,328 +1,436 @@
 import { create } from 'zustand'
-import { AGENT_ORDER } from './agents/definitions'
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { del, get, set as idbSet } from 'idb-keyval'
+import { MODELLI_PREDEFINITI, type ModelSlot } from './agents/api'
+import { ARGOMENTO_PREDEFINITO, CAPITOLO_PREDEFINITO } from './agents/prompts'
 import type {
   AgentKey,
   AgentRuntime,
   ApprovalStatus,
+  CaseFile,
   ChatMessage,
   CourseFile,
-  DiscardedSource,
-  Draft,
-  DraftReview,
+  Fonte,
+  FonteScartata,
+  ImpiantoKey,
   LogEntry,
   LogKind,
-  Source,
+  Opzione,
+  RisultatoControllore,
+  RisultatoLettore,
+  SceltaFonte,
+  TickerItem,
 } from './types'
 
-const API_KEY_STORAGE = 'studio-tesi.anthropic-api-key'
-const MAX_LOGS = 400
+const CHIAVE_API_STORAGE = 'studio-tesi.anthropic-api-key'
+const MAX_LOG = 500
+const MAX_TICKER = 40
 
-function emptyAgent(): AgentRuntime {
-  return {
-    status: 'idle',
-    microLabel: '',
-    reasoning: '',
-    steps: [],
-    result: '',
-    error: null,
-    arrived: false,
-    attempts: 0,
-  }
+export const AGENT_KEYS: AgentKey[] = [
+  'lettore',
+  'ricercatore',
+  'selettore',
+  'scrittore',
+  'controllore',
+]
+
+function agenteVuoto(): AgentRuntime {
+  return { status: 'idle', microLabel: '', passaggi: [], errore: null, arrived: false, tentativi: 0 }
 }
 
-function emptyAgents(): Record<AgentKey, AgentRuntime> {
-  return AGENT_ORDER.reduce(
-    (acc, key) => {
-      acc[key] = emptyAgent()
+function agentiVuoti(): Record<AgentKey, AgentRuntime> {
+  return AGENT_KEYS.reduce(
+    (acc, k) => {
+      acc[k] = agenteVuoto()
       return acc
     },
     {} as Record<AgentKey, AgentRuntime>,
   )
 }
 
-function readStoredKey(): string {
+// La chiave API resta in localStorage e non entra mai nello stato persistito.
+function leggiChiave(): string {
   try {
-    return localStorage.getItem(API_KEY_STORAGE) ?? ''
+    return localStorage.getItem(CHIAVE_API_STORAGE) ?? ''
   } catch {
     return ''
   }
 }
 
-function writeStoredKey(value: string) {
+function scriviChiave(valore: string) {
   try {
-    if (value) localStorage.setItem(API_KEY_STORAGE, value)
-    else localStorage.removeItem(API_KEY_STORAGE)
+    if (valore) localStorage.setItem(CHIAVE_API_STORAGE, valore)
+    else localStorage.removeItem(CHIAVE_API_STORAGE)
   } catch {
-    // localStorage non disponibile: la chiave resta in memoria per questa sessione.
+    // Storage non disponibile: la chiave resta solo in memoria per questa sessione.
   }
 }
 
-let logId = 0
+/** localStorage è troppo piccolo per i capitoli: la sessione vive in IndexedDB. */
+const storageIndexedDb: StateStorage = {
+  getItem: async (nome) => (await get<string>(nome)) ?? null,
+  setItem: async (nome, valore) => {
+    await idbSet(nome, valore)
+  },
+  removeItem: async (nome) => {
+    await del(nome)
+  },
+}
+
+let idLog = 0
+let idTicker = 0
 
 export interface StudioState {
+  // --- configurazione ---
   apiKey: string
+  modelli: Record<ModelSlot, string>
+
+  // --- materiale ---
   courseFiles: CourseFile[]
-  thesisTopic: string
-  chapterBrief: string
+  caseFiles: CaseFile[]
+  argomento: string
+  capitolo: string
 
-  agents: Record<AgentKey, AgentRuntime>
-  running: boolean
-  activeAgent: AgentKey | null
-  globalError: string | null
+  // --- esecuzione ---
+  agenti: Record<AgentKey, AgentRuntime>
+  inEsecuzione: boolean
+  agenteAttivo: AgentKey | null
+  erroreGlobale: string | null
+  /** Agente da cui ripartire dopo un errore. */
+  ripresaDa: AgentKey | null
 
-  foundSources: Source[]
-  selectedSources: Source[]
-  discardedSources: DiscardedSource[]
-  searchNotice: string | null
+  dossier: RisultatoLettore | null
+  fonti: Fonte[]
+  fontiScartate: FonteScartata[]
+  selezionate: SceltaFonte[]
+  scartateDalSelettore: SceltaFonte[]
+  coperturaSufficiente: boolean
+  avvisoRicerca: string | null
 
-  approvalStatus: ApprovalStatus
-  approvalRound: number
-  rejectionReason: string
-  /** Cronologia delle decisioni umane, mostrata nella card di approvazione. */
-  approvalHistory: string[]
+  approvazione: ApprovalStatus
+  giroApprovazione: number
+  motivoRifiuto: string
+  storicoApprovazioni: string[]
 
-  drafts: Draft[]
-  supervisorVerdict: string
+  opzioni: Opzione[]
+  referto: RisultatoControllore | null
 
-  logs: LogEntry[]
-  consoleOpen: boolean
-  /** Eventi registrati mentre la console era chiusa. */
-  unseenLogs: number
-  unseenErrors: number
+  // --- diagnostica e interfaccia ---
+  log: LogEntry[]
+  consoleAperta: boolean
+  logNonVisti: number
+  erroriNonVisti: number
+  ticker: TickerItem[]
 
-  openBubbleAgent: AgentKey | null
-  cameraFocus: AgentKey | null
-  cameraFocusToken: number
+  nuvolettaAperta: AgentKey | null
+  fuocoCamera: AgentKey | null
+  tokenFuoco: number
+  campanellaSuonata: boolean
+  audioAttivo: boolean
 
-  chatMessages: ChatMessage[]
-  chatBusy: boolean
-  chatError: string | null
+  chat: ChatMessage[]
+  chatInCorso: boolean
+  chatErrore: string | null
+  chatParziale: string
 
-  setApiKey: (key: string) => void
-  clearApiKey: () => void
+  // --- azioni ---
+  setApiKey: (k: string) => void
+  setModello: (slot: ModelSlot, id: string) => void
+  ripristinaModelli: () => void
 
-  addCourseFile: (file: CourseFile) => void
-  patchCourseFile: (id: string, patch: Partial<CourseFile>) => void
-  removeCourseFile: (id: string) => void
-  clearCourseFiles: () => void
+  aggiungiCourseFile: (f: CourseFile) => void
+  aggiornaCourseFile: (id: string, patch: Partial<CourseFile>) => void
+  rimuoviCourseFile: (id: string) => void
+  aggiungiCaseFile: (f: CaseFile) => void
+  aggiornaCaseFile: (id: string, patch: Partial<CaseFile>) => void
+  rimuoviCaseFile: (id: string) => void
 
-  setThesisTopic: (value: string) => void
-  setChapterBrief: (value: string) => void
+  setArgomento: (v: string) => void
+  setCapitolo: (v: string) => void
 
-  patchAgent: (key: AgentKey, patch: Partial<AgentRuntime>) => void
-  setArrived: (key: AgentKey, arrived: boolean) => void
-  setRunning: (running: boolean) => void
-  setActiveAgent: (key: AgentKey | null) => void
-  setGlobalError: (message: string | null) => void
+  patchAgente: (k: AgentKey, patch: Partial<AgentRuntime>) => void
+  setArrivato: (k: AgentKey, v: boolean) => void
+  setInEsecuzione: (v: boolean) => void
+  setAgenteAttivo: (k: AgentKey | null) => void
+  setErroreGlobale: (m: string | null) => void
+  setRipresaDa: (k: AgentKey | null) => void
 
-  setFoundSources: (sources: Source[]) => void
-  setSelectedSources: (sources: Source[]) => void
-  setDiscardedSources: (sources: DiscardedSource[]) => void
-  setSearchNotice: (notice: string | null) => void
+  setDossier: (d: RisultatoLettore | null) => void
+  setFonti: (f: Fonte[], scartate: FonteScartata[]) => void
+  setSelezione: (sel: SceltaFonte[], scartate: SceltaFonte[], copertura: boolean) => void
+  setAvvisoRicerca: (m: string | null) => void
 
-  requestApproval: () => void
-  approveSources: () => void
-  rejectSources: (reason: string) => void
-  resetApproval: () => void
+  chiediApprovazione: () => void
+  approva: () => void
+  rifiuta: (motivo: string) => void
+  azzeraApprovazione: () => void
 
-  setDrafts: (drafts: Draft[]) => void
-  setDraftReview: (index: number, review: DraftReview) => void
-  setSupervisorVerdict: (verdict: string) => void
+  inizializzaOpzioni: (opzioni: Opzione[]) => void
+  patchOpzione: (impianto: ImpiantoKey, patch: Partial<Opzione>) => void
+  setReferto: (r: RisultatoControllore | null) => void
 
-  addLog: (kind: LogKind, agent: AgentKey | null, message: string) => void
-  setConsoleOpen: (open: boolean) => void
-  clearLogs: () => void
+  aggiungiLog: (kind: LogKind, agente: AgentKey | null, messaggio: string) => void
+  setConsoleAperta: (v: boolean) => void
+  svuotaLog: () => void
+  aggiungiTicker: (testo: string, segno: TickerItem['segno']) => void
 
-  toggleBubble: (key: AgentKey) => void
-  closeBubble: () => void
-  focusCamera: (key: AgentKey | null) => void
+  alternaNuvoletta: (k: AgentKey) => void
+  chiudiNuvoletta: () => void
+  inquadra: (k: AgentKey | null) => void
+  setCampanella: (v: boolean) => void
+  setAudioAttivo: (v: boolean) => void
 
-  addChatMessage: (message: ChatMessage) => void
-  setChatBusy: (busy: boolean) => void
-  setChatError: (error: string | null) => void
-  clearChat: () => void
+  aggiungiChat: (m: ChatMessage) => void
+  setChatInCorso: (v: boolean) => void
+  setChatErrore: (m: string | null) => void
+  setChatParziale: (t: string) => void
+  svuotaChat: () => void
 
-  /** Riabilita i controlli: usata dal Controllore dopo un errore di runtime. */
-  unlockUi: () => void
-  resetRun: () => void
+  sbloccaInterfaccia: () => void
+  nuovaSessione: () => void
 }
 
-export const useStudioStore = create<StudioState>()((set, get) => ({
-  apiKey: readStoredKey(),
-  courseFiles: [],
-  thesisTopic: '',
-  chapterBrief: '',
+const statoEsecuzioneVuoto = {
+  agenti: agentiVuoti(),
+  inEsecuzione: false,
+  agenteAttivo: null,
+  erroreGlobale: null,
+  ripresaDa: null,
+  dossier: null,
+  fonti: [],
+  fontiScartate: [],
+  selezionate: [],
+  scartateDalSelettore: [],
+  coperturaSufficiente: true,
+  avvisoRicerca: null,
+  approvazione: 'inattiva' as ApprovalStatus,
+  giroApprovazione: 0,
+  motivoRifiuto: '',
+  storicoApprovazioni: [],
+  opzioni: [],
+  referto: null,
+  nuvolettaAperta: null,
+  campanellaSuonata: false,
+}
 
-  agents: emptyAgents(),
-  running: false,
-  activeAgent: null,
-  globalError: null,
+export const useStudioStore = create<StudioState>()(
+  persist(
+    (set, get) => ({
+      apiKey: leggiChiave(),
+      modelli: { ...MODELLI_PREDEFINITI },
 
-  foundSources: [],
-  selectedSources: [],
-  discardedSources: [],
-  searchNotice: null,
+      courseFiles: [],
+      caseFiles: [],
+      argomento: ARGOMENTO_PREDEFINITO,
+      capitolo: CAPITOLO_PREDEFINITO,
 
-  approvalStatus: 'idle',
-  approvalRound: 0,
-  rejectionReason: '',
-  approvalHistory: [],
+      ...statoEsecuzioneVuoto,
 
-  drafts: [],
-  supervisorVerdict: '',
+      log: [],
+      consoleAperta: false,
+      logNonVisti: 0,
+      erroriNonVisti: 0,
+      ticker: [],
 
-  logs: [],
-  consoleOpen: false,
-  unseenLogs: 0,
-  unseenErrors: 0,
+      fuocoCamera: null,
+      tokenFuoco: 0,
+      audioAttivo: true,
 
-  openBubbleAgent: null,
-  cameraFocus: null,
-  cameraFocusToken: 0,
+      chat: [],
+      chatInCorso: false,
+      chatErrore: null,
+      chatParziale: '',
 
-  chatMessages: [],
-  chatBusy: false,
-  chatError: null,
+      setApiKey: (k) => {
+        scriviChiave(k)
+        set({ apiKey: k, erroreGlobale: null })
+      },
+      setModello: (slot, id) => set((s) => ({ modelli: { ...s.modelli, [slot]: id } })),
+      ripristinaModelli: () => set({ modelli: { ...MODELLI_PREDEFINITI } }),
 
-  setApiKey: (key) => {
-    writeStoredKey(key)
-    set({ apiKey: key, globalError: null })
-  },
-  clearApiKey: () => {
-    writeStoredKey('')
-    set({ apiKey: '' })
-  },
+      aggiungiCourseFile: (f) => set((s) => ({ courseFiles: [...s.courseFiles, f] })),
+      aggiornaCourseFile: (id, patch) =>
+        set((s) => ({ courseFiles: s.courseFiles.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
+      rimuoviCourseFile: (id) => set((s) => ({ courseFiles: s.courseFiles.filter((f) => f.id !== id) })),
+      aggiungiCaseFile: (f) => set((s) => ({ caseFiles: [...s.caseFiles, f] })),
+      aggiornaCaseFile: (id, patch) =>
+        set((s) => ({ caseFiles: s.caseFiles.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
+      rimuoviCaseFile: (id) => set((s) => ({ caseFiles: s.caseFiles.filter((f) => f.id !== id) })),
 
-  addCourseFile: (file) => set((s) => ({ courseFiles: [...s.courseFiles, file] })),
-  patchCourseFile: (id, patch) =>
-    set((s) => ({
-      courseFiles: s.courseFiles.map((f) => (f.id === id ? { ...f, ...patch } : f)),
-    })),
-  removeCourseFile: (id) =>
-    set((s) => ({ courseFiles: s.courseFiles.filter((f) => f.id !== id) })),
-  clearCourseFiles: () => set({ courseFiles: [] }),
+      setArgomento: (argomento) => set({ argomento }),
+      setCapitolo: (capitolo) => set({ capitolo }),
 
-  setThesisTopic: (thesisTopic) => set({ thesisTopic }),
-  setChapterBrief: (chapterBrief) => set({ chapterBrief }),
+      patchAgente: (k, patch) =>
+        set((s) => ({ agenti: { ...s.agenti, [k]: { ...s.agenti[k], ...patch } } })),
+      setArrivato: (k, v) =>
+        set((s) =>
+          s.agenti[k].arrived === v ? s : { agenti: { ...s.agenti, [k]: { ...s.agenti[k], arrived: v } } },
+        ),
+      setInEsecuzione: (inEsecuzione) => set({ inEsecuzione }),
+      setAgenteAttivo: (agenteAttivo) => set({ agenteAttivo }),
+      setErroreGlobale: (erroreGlobale) => set({ erroreGlobale }),
+      setRipresaDa: (ripresaDa) => set({ ripresaDa }),
 
-  patchAgent: (key, patch) =>
-    set((s) => ({ agents: { ...s.agents, [key]: { ...s.agents[key], ...patch } } })),
-  setArrived: (key, arrived) =>
-    set((s) =>
-      s.agents[key].arrived === arrived
-        ? s
-        : { agents: { ...s.agents, [key]: { ...s.agents[key], arrived } } },
-    ),
-  setRunning: (running) => set({ running }),
-  setActiveAgent: (activeAgent) => set({ activeAgent }),
-  setGlobalError: (globalError) => set({ globalError }),
+      setDossier: (dossier) => set({ dossier }),
+      setFonti: (fonti, fontiScartate) => set({ fonti, fontiScartate }),
+      setSelezione: (selezionate, scartateDalSelettore, coperturaSufficiente) =>
+        set({ selezionate, scartateDalSelettore, coperturaSufficiente }),
+      setAvvisoRicerca: (avvisoRicerca) => set({ avvisoRicerca }),
 
-  setFoundSources: (foundSources) => set({ foundSources }),
-  setSelectedSources: (selectedSources) => set({ selectedSources }),
-  setDiscardedSources: (discardedSources) => set({ discardedSources }),
-  setSearchNotice: (searchNotice) => set({ searchNotice }),
+      chiediApprovazione: () =>
+        set((s) => ({
+          approvazione: 'in_attesa',
+          giroApprovazione: s.giroApprovazione + 1,
+          motivoRifiuto: '',
+        })),
+      approva: () =>
+        set((s) => ({
+          approvazione: 'approvata',
+          storicoApprovazioni: [...s.storicoApprovazioni, `Giro ${s.giroApprovazione}: approvato.`],
+        })),
+      rifiuta: (motivo) =>
+        set((s) => ({
+          approvazione: 'rifiutata',
+          motivoRifiuto: motivo,
+          storicoApprovazioni: [
+            ...s.storicoApprovazioni,
+            `Giro ${s.giroApprovazione}: non convince${motivo.trim() ? ` — ${motivo.trim()}` : '.'}`,
+          ],
+        })),
+      azzeraApprovazione: () => set({ approvazione: 'inattiva', motivoRifiuto: '' }),
 
-  requestApproval: () =>
-    set((s) => ({
-      approvalStatus: 'pending',
-      approvalRound: s.approvalRound + 1,
-      rejectionReason: '',
-    })),
-  approveSources: () =>
-    set((s) => ({
-      approvalStatus: 'approved',
-      approvalHistory: [...s.approvalHistory, `Giro ${s.approvalRound}: approvato.`],
-    })),
-  rejectSources: (reason) =>
-    set((s) => ({
-      approvalStatus: 'rejected',
-      rejectionReason: reason,
-      approvalHistory: [
-        ...s.approvalHistory,
-        `Giro ${s.approvalRound}: non convince${reason.trim() ? ` — ${reason.trim()}` : '.'}`,
-      ],
-    })),
-  resetApproval: () => set({ approvalStatus: 'idle', rejectionReason: '' }),
+      inizializzaOpzioni: (opzioni) => set({ opzioni }),
+      patchOpzione: (impianto, patch) =>
+        set((s) => ({
+          opzioni: s.opzioni.map((o) => (o.impianto === impianto ? { ...o, ...patch } : o)),
+        })),
+      setReferto: (referto) => set({ referto }),
 
-  setDrafts: (drafts) => set({ drafts }),
-  setDraftReview: (index, review) =>
-    set((s) => ({
-      drafts: s.drafts.map((d, i) => (i === index ? { ...d, review } : d)),
-    })),
-  setSupervisorVerdict: (supervisorVerdict) => set({ supervisorVerdict }),
+      aggiungiLog: (kind, agente, messaggio) =>
+        set((s) => {
+          idLog += 1
+          const voce: LogEntry = { id: idLog, at: Date.now(), kind, agente, messaggio }
+          const log = [...s.log, voce].slice(-MAX_LOG)
+          if (s.consoleAperta) return { log }
+          return {
+            log,
+            logNonVisti: s.logNonVisti + 1,
+            erroriNonVisti: s.erroriNonVisti + (kind === 'fallimento' ? 1 : 0),
+          }
+        }),
+      setConsoleAperta: (v) =>
+        set(v ? { consoleAperta: true, logNonVisti: 0, erroriNonVisti: 0 } : { consoleAperta: false }),
+      svuotaLog: () => set({ log: [], logNonVisti: 0, erroriNonVisti: 0 }),
+      aggiungiTicker: (testo, segno) =>
+        set((s) => {
+          idTicker += 1
+          return { ticker: [...s.ticker, { id: idTicker, testo, segno }].slice(-MAX_TICKER) }
+        }),
 
-  addLog: (kind, agent, message) =>
-    set((s) => {
-      logId += 1
-      const entry: LogEntry = { id: logId, at: Date.now(), kind, agent, message }
-      const logs = [...s.logs, entry].slice(-MAX_LOGS)
-      if (s.consoleOpen) return { logs }
-      return {
-        logs,
-        unseenLogs: s.unseenLogs + 1,
-        unseenErrors: s.unseenErrors + (kind === 'fail' ? 1 : 0),
-      }
-    }),
-  setConsoleOpen: (open) =>
-    set(open ? { consoleOpen: true, unseenLogs: 0, unseenErrors: 0 } : { consoleOpen: false }),
-  clearLogs: () => set({ logs: [], unseenLogs: 0, unseenErrors: 0 }),
+      alternaNuvoletta: (k) =>
+        set((s) => ({ nuvolettaAperta: s.nuvolettaAperta === k ? null : k })),
+      chiudiNuvoletta: () => set({ nuvolettaAperta: null }),
+      inquadra: (k) => set((s) => ({ fuocoCamera: k, tokenFuoco: s.tokenFuoco + 1 })),
+      setCampanella: (campanellaSuonata) => set({ campanellaSuonata }),
+      setAudioAttivo: (audioAttivo) => set({ audioAttivo }),
 
-  toggleBubble: (key) => set((s) => ({ openBubbleAgent: s.openBubbleAgent === key ? null : key })),
-  closeBubble: () => set({ openBubbleAgent: null }),
-  focusCamera: (key) => set((s) => ({ cameraFocus: key, cameraFocusToken: s.cameraFocusToken + 1 })),
+      aggiungiChat: (m) => set((s) => ({ chat: [...s.chat, m] })),
+      setChatInCorso: (chatInCorso) => set({ chatInCorso }),
+      setChatErrore: (chatErrore) => set({ chatErrore }),
+      setChatParziale: (chatParziale) => set({ chatParziale }),
+      svuotaChat: () => set({ chat: [], chatErrore: null, chatParziale: '' }),
 
-  addChatMessage: (message) => set((s) => ({ chatMessages: [...s.chatMessages, message] })),
-  setChatBusy: (chatBusy) => set({ chatBusy }),
-  setChatError: (chatError) => set({ chatError }),
-  clearChat: () => set({ chatMessages: [], chatError: null }),
-
-  unlockUi: () => {
-    const { agents } = get()
-    const patched = { ...agents }
-    for (const key of AGENT_ORDER) {
-      if (patched[key].status === 'working' || patched[key].status === 'walking') {
-        patched[key] = {
-          ...patched[key],
-          status: 'error',
-          microLabel: 'Interrotto da un errore',
-          error: patched[key].error ?? 'Interfaccia ripristinata dopo un errore di runtime.',
+      /** Riabilita i controlli: usata dal Controllore dopo un errore di runtime. */
+      sbloccaInterfaccia: () => {
+        const { agenti } = get()
+        const patch = { ...agenti }
+        for (const k of AGENT_KEYS) {
+          if (patch[k].status === 'working' || patch[k].status === 'walking') {
+            patch[k] = {
+              ...patch[k],
+              status: 'error',
+              microLabel: 'interrotto',
+              errore: patch[k].errore ?? 'Interfaccia ripristinata dopo un errore di runtime.',
+            }
+          }
         }
-      }
-    }
-    set({ agents: patched, running: false, activeAgent: null, chatBusy: false })
-  },
+        set({ agenti: patch, inEsecuzione: false, agenteAttivo: null, chatInCorso: false })
+      },
 
-  resetRun: () =>
-    set({
-      agents: emptyAgents(),
-      running: false,
-      activeAgent: null,
-      globalError: null,
-      foundSources: [],
-      selectedSources: [],
-      discardedSources: [],
-      searchNotice: null,
-      approvalStatus: 'idle',
-      approvalRound: 0,
-      rejectionReason: '',
-      approvalHistory: [],
-      drafts: [],
-      supervisorVerdict: '',
-      openBubbleAgent: null,
+      nuovaSessione: () =>
+        set({
+          ...statoEsecuzioneVuoto,
+          agenti: agentiVuoti(),
+          courseFiles: [],
+          caseFiles: [],
+          log: [],
+          logNonVisti: 0,
+          erroriNonVisti: 0,
+          ticker: [],
+          chat: [],
+          chatErrore: null,
+          chatParziale: '',
+          chatInCorso: false,
+        }),
     }),
-}))
+    {
+      name: 'studio-tesi-sessione',
+      storage: createJSONStorage(() => storageIndexedDb),
+      version: 1,
+      // I PDF originali non si salvano: pesano troppo e si ricaricano.
+      partialize: (s) => ({
+        modelli: s.modelli,
+        argomento: s.argomento,
+        capitolo: s.capitolo,
+        courseFiles: s.courseFiles.map((f) => ({ ...f, base64: undefined })),
+        caseFiles: s.caseFiles,
+        agenti: s.agenti,
+        dossier: s.dossier,
+        fonti: s.fonti,
+        fontiScartate: s.fontiScartate,
+        selezionate: s.selezionate,
+        scartateDalSelettore: s.scartateDalSelettore,
+        coperturaSufficiente: s.coperturaSufficiente,
+        approvazione: s.approvazione,
+        giroApprovazione: s.giroApprovazione,
+        storicoApprovazioni: s.storicoApprovazioni,
+        opzioni: s.opzioni,
+        referto: s.referto,
+        log: s.log,
+        ticker: s.ticker,
+        chat: s.chat,
+        audioAttivo: s.audioAttivo,
+      }),
+    },
+  ),
+)
 
-/** Vero quando c'è almeno un file e tutti sono stati letti al 100%. */
-export function selectMaterialReady(s: StudioState): boolean {
-  return s.courseFiles.length > 0 && s.courseFiles.every((f) => f.status === 'ready')
+// --- selettori ---------------------------------------------------------------
+
+/** I PDF salvati perdono il base64: dopo un ricaricamento vanno ricaricati. */
+export function materialeDaRicaricare(s: StudioState): CourseFile[] {
+  return s.courseFiles.filter((f) => f.kind === 'pdf' && f.status === 'pronto' && !f.base64)
 }
 
-export function selectCanStart(s: StudioState): boolean {
+export function materialePronto(s: StudioState): boolean {
   return (
-    selectMaterialReady(s) &&
-    s.thesisTopic.trim().length > 0 &&
-    s.chapterBrief.trim().length > 0 &&
-    s.apiKey.trim().length > 0 &&
-    !s.running
+    s.courseFiles.length > 0 &&
+    s.courseFiles.every((f) => f.status === 'pronto') &&
+    materialeDaRicaricare(s).length === 0
   )
+}
+
+export function siPuoAvviare(s: StudioState): boolean {
+  return (
+    materialePronto(s) &&
+    s.argomento.trim().length > 0 &&
+    s.capitolo.trim().length > 0 &&
+    s.apiKey.trim().length > 0 &&
+    !s.inEsecuzione
+  )
+}
+
+export function fontiApprovate(s: StudioState): Fonte[] {
+  const scelte = new Set(s.selezionate.map((v) => v.url))
+  return s.fonti.filter((f) => scelte.has(f.url))
 }

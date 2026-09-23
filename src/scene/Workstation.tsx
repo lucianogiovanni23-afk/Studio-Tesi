@@ -2,262 +2,331 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { AGENT_BY_KEY } from '../agents/definitions'
+import { AGENTE } from '../agents/definitions'
 import { useStudioStore } from '../store'
 import type { AgentKey } from '../types'
-import { SEAT_OFFSET, WORKSTATIONS } from './layout'
+import { POSTAZIONI, SEDIA_Z } from './layout'
 
-const WOOD = '#9b6a44'
-const WOOD_DARK = '#6d452c'
-const METAL = '#3a4250'
-const PLASTIC = '#2a303c'
+const LEGNO = '#5a3922'
+const LEGNO_SCURO = '#40281763'
+const PELLE = '#1f3b2e'
+const OTTONE = '#c9a227'
+const PLASTICA = '#d8d2c0'
+const METALLO = '#2f3542'
 
-/** Griglia di tasti accennata sulla tastiera. */
-function Keys() {
-  const keys = useMemo(() => {
-    const out: [number, number][] = []
-    for (let row = 0; row < 4; row++) {
-      for (let col = 0; col < 12; col++) {
-        out.push([-0.33 + col * 0.06, -0.075 + row * 0.05])
+/** Griglia di tasti accennata, disegnata in un solo instancedMesh. */
+function Tasti() {
+  const posizioni = useMemo(() => {
+    const fuori: [number, number][] = []
+    for (let riga = 0; riga < 4; riga++) {
+      for (let colonna = 0; colonna < 12; colonna++) {
+        fuori.push([-0.33 + colonna * 0.06, -0.075 + riga * 0.05])
       }
     }
-    return out
+    return fuori
   }, [])
 
   return (
-    <group position={[0, 0.026, 0]}>
-      {keys.map(([x, z], i) => (
-        <mesh key={i} position={[x, 0, z]}>
-          <boxGeometry args={[0.045, 0.012, 0.038]} />
-          <meshStandardMaterial color="#4b5361" flatShading roughness={0.8} />
-        </mesh>
-      ))}
-    </group>
+    <instancedMesh
+      ref={(istanza) => {
+        if (!istanza) return
+        const matrice = new THREE.Matrix4()
+        posizioni.forEach(([x, z], i) => {
+          matrice.makeTranslation(x, 0, z)
+          istanza.setMatrixAt(i, matrice)
+        })
+        istanza.instanceMatrix.needsUpdate = true
+      }}
+      args={[undefined, undefined, posizioni.length]}
+      position={[0, 0.026, 0]}
+      frustumCulled={false}
+    >
+      <boxGeometry args={[0.045, 0.012, 0.038]} />
+      <meshStandardMaterial color="#b9b2a0" flatShading roughness={0.8} />
+    </instancedMesh>
   )
 }
 
-/** Sedia da ufficio con base a cinque razze. */
-function OfficeChair({ color }: { color: string }) {
-  const spokes = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => (i / 5) * Math.PI * 2),
-    [],
-  )
+/** Poltrona direzionale in pelle con base a cinque razze. */
+function Poltrona() {
+  const razze = useMemo(() => Array.from({ length: 5 }, (_, i) => (i / 5) * Math.PI * 2), [])
 
   return (
     <group>
-      {spokes.map((angle, i) => (
-        <group key={i} rotation={[0, angle, 0]}>
+      {razze.map((angolo, i) => (
+        <group key={i} rotation={[0, angolo, 0]}>
           <mesh position={[0, 0.07, 0.24]} castShadow>
             <boxGeometry args={[0.07, 0.05, 0.48]} />
-            <meshStandardMaterial color={PLASTIC} flatShading roughness={0.7} />
+            <meshStandardMaterial color={METALLO} flatShading roughness={0.7} />
           </mesh>
-          <mesh position={[0, 0.035, 0.46]} castShadow>
+          <mesh position={[0, 0.035, 0.46]}>
             <cylinderGeometry args={[0.045, 0.045, 0.07, 6]} />
-            <meshStandardMaterial color="#1d222c" flatShading roughness={0.6} />
+            <meshStandardMaterial color="#14181f" flatShading />
           </mesh>
         </group>
       ))}
-      {/* pistone */}
       <mesh position={[0, 0.3, 0]} castShadow>
         <cylinderGeometry args={[0.055, 0.07, 0.42, 8]} />
-        <meshStandardMaterial color={METAL} flatShading metalness={0.4} roughness={0.5} />
+        <meshStandardMaterial color={OTTONE} flatShading metalness={0.6} roughness={0.4} />
       </mesh>
-      {/* seduta */}
+      {/* seduta e schienale alto, in pelle */}
       <mesh position={[0, 0.54, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.56, 0.11, 0.52]} />
-        <meshStandardMaterial color={PLASTIC} flatShading roughness={0.85} />
+        <boxGeometry args={[0.58, 0.12, 0.54]} />
+        <meshStandardMaterial color={PELLE} flatShading roughness={0.75} />
       </mesh>
-      {/* schienale, inclinato all'indietro */}
-      <group position={[0, 0.6, 0.25]} rotation={[0.16, 0, 0]}>
-        <mesh position={[0, 0.34, 0]} castShadow>
-          <boxGeometry args={[0.54, 0.66, 0.1]} />
-          <meshStandardMaterial color={PLASTIC} flatShading roughness={0.85} />
-        </mesh>
-        {/* poggiatesta nel colore dell'agente */}
-        <mesh position={[0, 0.72, 0]} castShadow>
-          <boxGeometry args={[0.34, 0.14, 0.11]} />
-          <meshStandardMaterial color={color} flatShading roughness={0.7} />
+      <group position={[0, 0.6, 0.26]} rotation={[0.15, 0, 0]}>
+        <mesh position={[0, 0.42, 0]} castShadow>
+          <boxGeometry args={[0.56, 0.82, 0.11]} />
+          <meshStandardMaterial color={PELLE} flatShading roughness={0.75} />
         </mesh>
       </group>
-      {/* braccioli */}
-      {[-0.32, 0.32].map((x) => (
-        <mesh key={x} position={[x, 0.7, 0.04]} castShadow>
-          <boxGeometry args={[0.07, 0.06, 0.4]} />
-          <meshStandardMaterial color="#1d222c" flatShading roughness={0.8} />
+      {[-0.33, 0.33].map((x) => (
+        <mesh key={x} position={[x, 0.72, 0.04]} castShadow>
+          <boxGeometry args={[0.07, 0.06, 0.42]} />
+          <meshStandardMaterial color="#14181f" flatShading />
         </mesh>
       ))}
     </group>
   )
 }
 
-export function WorkstationMesh({ agentKey }: { agentKey: AgentKey }) {
-  const agent = AGENT_BY_KEY[agentKey]
-  const station = WORKSTATIONS[agentKey]
-  const status = useStudioStore((s) => s.agents[agentKey].status)
+/** Lampada da banchiere con paralume verde. */
+function LampadaBanchiere({ acceso }: { acceso: boolean }) {
+  const luce = useRef<THREE.PointLight>(null)
+  const paralume = useRef<THREE.MeshStandardMaterial>(null)
 
-  const screen = useRef<THREE.MeshStandardMaterial>(null)
-  const lamp = useRef<THREE.PointLight>(null)
+  useFrame((_, deltaGrezzo) => {
+    const dt = Math.min(deltaGrezzo, 0.1)
+    if (luce.current) {
+      luce.current.intensity = THREE.MathUtils.damp(luce.current.intensity, acceso ? 2.4 : 0.35, 5, dt)
+    }
+    if (paralume.current) {
+      paralume.current.emissiveIntensity = THREE.MathUtils.damp(
+        paralume.current.emissiveIntensity,
+        acceso ? 0.9 : 0.12,
+        5,
+        dt,
+      )
+    }
+  })
 
-  const working = status === 'working'
-  const lightColor = status === 'error' ? '#ef4444' : agent.color
+  return (
+    <group>
+      <mesh position={[0, 0.02, 0]} castShadow>
+        <cylinderGeometry args={[0.1, 0.12, 0.04, 10]} />
+        <meshStandardMaterial color={OTTONE} metalness={0.7} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, 0.16, 0]}>
+        <cylinderGeometry args={[0.018, 0.018, 0.28, 6]} />
+        <meshStandardMaterial color={OTTONE} metalness={0.7} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, 0.32, 0]} rotation={[Math.PI, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.13, 0.05, 0.12, 12, 1, true]} />
+        <meshStandardMaterial
+          ref={paralume}
+          color="#1f5e3a"
+          emissive="#3fbf72"
+          emissiveIntensity={0.12}
+          side={THREE.DoubleSide}
+          roughness={0.6}
+        />
+      </mesh>
+      <pointLight ref={luce} position={[0, 0.26, 0]} color="#ffd9a0" intensity={0.35} distance={2.6} decay={2} />
+    </group>
+  )
+}
 
-  useFrame((state, rawDelta) => {
-    const dt = Math.min(rawDelta, 0.1)
+/** Telefono fisso con filo a spirale. */
+function Telefono() {
+  const spirale = useMemo(() => {
+    const punti: THREE.Vector3[] = []
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40
+      punti.push(new THREE.Vector3(Math.sin(t * Math.PI * 6) * 0.03, -t * 0.14, 0.12 + t * 0.16))
+    }
+    return new THREE.CatmullRomCurve3(punti)
+  }, [])
+
+  return (
+    <group>
+      <mesh position={[0, 0.03, 0]} castShadow>
+        <boxGeometry args={[0.28, 0.06, 0.22]} />
+        <meshStandardMaterial color="#1b1f28" flatShading roughness={0.7} />
+      </mesh>
+      {/* cornetta */}
+      <mesh position={[0, 0.09, -0.02]} castShadow>
+        <boxGeometry args={[0.3, 0.06, 0.09]} />
+        <meshStandardMaterial color="#12161d" flatShading roughness={0.6} />
+      </mesh>
+      <mesh>
+        <tubeGeometry args={[spirale, 24, 0.012, 5, false]} />
+        <meshStandardMaterial color="#12161d" roughness={0.8} />
+      </mesh>
+    </group>
+  )
+}
+
+export function Workstation({ agentKey }: { agentKey: AgentKey }) {
+  const agente = AGENTE[agentKey]
+  const postazione = POSTAZIONI[agentKey]
+  const stato = useStudioStore((s) => s.agenti[agentKey].status)
+
+  const schermo = useRef<THREE.MeshStandardMaterial>(null)
+  const luce = useRef<THREE.PointLight>(null)
+
+  const alLavoro = stato === 'working'
+  const coloreLuce = stato === 'error' ? '#c02b3a' : agente.colore
+
+  useFrame((state, deltaGrezzo) => {
+    const dt = Math.min(deltaGrezzo, 0.1)
     const t = state.clock.elapsedTime
 
-    // Lo schermo è scuro quando l'agente è inattivo e si illumina mentre lavora.
-    let target = 0.04
-    if (working) target = 1.2 + Math.sin(t * 5.5) * 0.22
-    else if (status === 'waiting') target = 0.75
-    else if (status === 'walking') target = 0.3
-    else if (status === 'done') target = 0.45
-    else if (status === 'error') target = 0.3 + Math.abs(Math.sin(t * 3)) * 0.55
+    // Il CRT si illumina del colore dell'agente solo quando lavora.
+    let obiettivo = 0.03
+    if (alLavoro) obiettivo = 1.15 + Math.sin(t * 5.5) * 0.2
+    else if (stato === 'waiting') obiettivo = 0.7
+    else if (stato === 'walking') obiettivo = 0.25
+    else if (stato === 'done') obiettivo = 0.4
+    else if (stato === 'error') obiettivo = 0.3 + Math.abs(Math.sin(t * 3)) * 0.5
 
-    if (screen.current) {
-      screen.current.emissiveIntensity = THREE.MathUtils.damp(
-        screen.current.emissiveIntensity,
-        target,
+    if (schermo.current) {
+      schermo.current.emissiveIntensity = THREE.MathUtils.damp(
+        schermo.current.emissiveIntensity,
+        obiettivo,
         6,
         dt,
       )
     }
-    if (lamp.current) {
-      // La luce colorata di postazione è accesa solo mentre l'agente è operativo.
-      const lampTarget = working || status === 'waiting' || status === 'error' ? target * 4.2 : 0
-      lamp.current.intensity = THREE.MathUtils.damp(lamp.current.intensity, lampTarget, 5, dt)
+    if (luce.current) {
+      const obiettivoLuce = alLavoro || stato === 'waiting' || stato === 'error' ? obiettivo * 3.6 : 0
+      luce.current.intensity = THREE.MathUtils.damp(luce.current.intensity, obiettivoLuce, 5, dt)
     }
   })
 
-  const [x, z] = station.desk
+  const [x, z] = postazione.scrivania
 
   return (
     <group position={[x, 0, z]}>
-      {/* --- scrivania: piano + gambe --- */}
-      <mesh position={[0, 0.74, 0]} castShadow receiveShadow>
-        <boxGeometry args={[2.3, 0.09, 1.15]} />
-        <meshStandardMaterial color={WOOD} flatShading roughness={0.82} />
+      {/* --- scrivania massiccia con piano in pelle --- */}
+      <mesh position={[0, 0.72, 0]} castShadow receiveShadow>
+        <boxGeometry args={[2.4, 0.1, 1.2]} />
+        <meshStandardMaterial color={LEGNO} flatShading roughness={0.8} />
       </mesh>
-      <mesh position={[0, 0.58, -0.5]} castShadow>
-        <boxGeometry args={[2.2, 0.28, 0.06]} />
-        <meshStandardMaterial color={WOOD_DARK} flatShading roughness={0.85} />
+      <mesh position={[0, 0.775, 0]} receiveShadow>
+        <boxGeometry args={[2.0, 0.012, 0.92]} />
+        <meshStandardMaterial color={PELLE} roughness={0.9} />
       </mesh>
-      {[
-        [-1.05, -0.47],
-        [1.05, -0.47],
-        [-1.05, 0.47],
-        [1.05, 0.47],
-      ].map(([lx, lz], i) => (
-        <mesh key={i} position={[lx, 0.35, lz]} castShadow>
-          <boxGeometry args={[0.09, 0.7, 0.09]} />
-          <meshStandardMaterial color={METAL} flatShading metalness={0.35} roughness={0.55} />
+      {/* fianchi pieni, da scrivania direzionale */}
+      {[-1.08, 1.08].map((fx) => (
+        <mesh key={fx} position={[fx, 0.35, 0]} castShadow>
+          <boxGeometry args={[0.2, 0.7, 1.1]} />
+          <meshStandardMaterial color={LEGNO} flatShading roughness={0.85} />
         </mesh>
       ))}
+      <mesh position={[0, 0.5, -0.52]}>
+        <boxGeometry args={[2.0, 0.42, 0.06]} />
+        <meshStandardMaterial color={LEGNO_SCURO} flatShading roughness={0.85} />
+      </mesh>
 
-      {/* --- monitor su supporto, rivolto verso chi siede --- */}
-      <group position={[0, 0.785, -0.3]}>
-        <mesh position={[0, 0.02, 0]} castShadow>
-          <boxGeometry args={[0.5, 0.04, 0.26]} />
-          <meshStandardMaterial color={METAL} flatShading metalness={0.4} roughness={0.5} />
+      {/* --- monitor CRT color panna --- */}
+      <group position={[0, 0.78, -0.32]}>
+        <mesh position={[0, 0.3, 0]} castShadow>
+          <boxGeometry args={[1.0, 0.6, 0.72]} />
+          <meshStandardMaterial color={PLASTICA} flatShading roughness={0.75} />
         </mesh>
-        <mesh position={[0, 0.2, 0]} castShadow>
-          <boxGeometry args={[0.09, 0.36, 0.08]} />
-          <meshStandardMaterial color={METAL} flatShading metalness={0.4} roughness={0.5} />
+        {/* cornice e schermo a fosfori, rivolti verso la sedia */}
+        <mesh position={[0, 0.32, 0.37]}>
+          <boxGeometry args={[0.86, 0.5, 0.04]} />
+          <meshStandardMaterial color="#c2bba8" flatShading roughness={0.7} />
         </mesh>
-        <group position={[0, 0.66, 0.03]} rotation={[-0.12, 0, 0]}>
-          {/* scocca */}
-          <mesh castShadow>
-            <boxGeometry args={[1.28, 0.78, 0.06]} />
-            <meshStandardMaterial color="#20252f" flatShading roughness={0.6} />
-          </mesh>
-          {/* schermo emissivo, rivolto verso la sedia (+z) */}
-          <mesh position={[0, 0.02, 0.04]}>
-            <planeGeometry args={[1.16, 0.66]} />
-            <meshStandardMaterial
-              ref={screen}
-              color="#0d1017"
-              emissive={lightColor}
-              emissiveIntensity={0.04}
-              roughness={0.35}
-            />
-          </mesh>
-        </group>
+        <mesh position={[0, 0.32, 0.4]}>
+          <planeGeometry args={[0.72, 0.4]} />
+          <meshStandardMaterial
+            ref={schermo}
+            color="#0a0f14"
+            emissive={coloreLuce}
+            emissiveIntensity={0.03}
+            roughness={0.35}
+          />
+        </mesh>
+        {/* piedistallo */}
+        <mesh position={[0, -0.02, 0]}>
+          <boxGeometry args={[0.6, 0.05, 0.5]} />
+          <meshStandardMaterial color={PLASTICA} flatShading roughness={0.8} />
+        </mesh>
       </group>
 
-      {/* --- tastiera davanti al monitor --- */}
-      <group position={[0, 0.79, 0.14]}>
+      {/* --- tastiera e mouse --- */}
+      <group position={[0, 0.79, 0.16]}>
         <mesh castShadow receiveShadow>
-          <boxGeometry args={[0.82, 0.04, 0.3]} />
-          <meshStandardMaterial color={PLASTIC} flatShading roughness={0.8} />
+          <boxGeometry args={[0.84, 0.04, 0.3]} />
+          <meshStandardMaterial color={PLASTICA} flatShading roughness={0.8} />
         </mesh>
-        <Keys />
+        <Tasti />
       </group>
-
-      {/* --- mouse con tappetino --- */}
-      <mesh position={[0.68, 0.787, 0.16]} receiveShadow>
-        <boxGeometry args={[0.36, 0.008, 0.28]} />
-        <meshStandardMaterial color="#2f3644" flatShading roughness={0.95} />
+      <mesh position={[0.72, 0.787, 0.18]} receiveShadow>
+        <boxGeometry args={[0.34, 0.008, 0.26]} />
+        <meshStandardMaterial color="#1d2a22" roughness={0.95} />
       </mesh>
-      <mesh position={[0.68, 0.815, 0.14]} castShadow>
-        <sphereGeometry args={[0.062, 8, 6]} />
-        <meshStandardMaterial color="#d7dbe4" flatShading roughness={0.6} />
+      <mesh position={[0.72, 0.812, 0.16]} castShadow>
+        <boxGeometry args={[0.1, 0.04, 0.15]} />
+        <meshStandardMaterial color={PLASTICA} flatShading roughness={0.7} />
       </mesh>
 
-      {/* --- dettagli sul piano: tazza, fogli, portapenne --- */}
-      <group position={[-0.86, 0.785, 0.22]}>
+      {/* --- telefono, tazza, fogli, portapenne --- */}
+      <group position={[-0.82, 0.78, 0.2]}>
+        <Telefono />
+      </group>
+      <group position={[0.42, 0.78, 0.36]}>
         <mesh position={[0, 0.07, 0]} castShadow>
-          <cylinderGeometry args={[0.085, 0.075, 0.15, 8]} />
-          <meshStandardMaterial color="#e8e2d6" flatShading roughness={0.85} />
-        </mesh>
-        <mesh position={[0.1, 0.07, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-          <torusGeometry args={[0.045, 0.014, 6, 10]} />
-          <meshStandardMaterial color="#e8e2d6" flatShading roughness={0.85} />
+          <cylinderGeometry args={[0.075, 0.065, 0.14, 10]} />
+          <meshStandardMaterial color="#e8e2d2" flatShading roughness={0.7} />
         </mesh>
       </group>
-      <mesh position={[-0.82, 0.81, -0.22]} rotation={[0, 0.22, 0]} castShadow>
-        <boxGeometry args={[0.34, 0.05, 0.44]} />
-        <meshStandardMaterial color="#f2ece0" flatShading roughness={0.95} />
+      <mesh position={[-0.5, 0.8, -0.18]} rotation={[0, 0.18, 0]} castShadow>
+        <boxGeometry args={[0.32, 0.05, 0.42]} />
+        <meshStandardMaterial color="#efe7d4" flatShading roughness={0.95} />
       </mesh>
-      <group position={[0.92, 0.785, -0.3]}>
-        <mesh position={[0, 0.09, 0]} castShadow>
-          <cylinderGeometry args={[0.075, 0.07, 0.18, 6]} />
-          <meshStandardMaterial color={agent.color} flatShading roughness={0.7} />
+      <group position={[0.92, 0.78, -0.3]}>
+        <mesh position={[0, 0.08, 0]} castShadow>
+          <cylinderGeometry args={[0.07, 0.065, 0.16, 8]} />
+          <meshStandardMaterial color={OTTONE} metalness={0.6} roughness={0.4} />
         </mesh>
-        {[-0.025, 0.02].map((dx, i) => (
-          <mesh key={i} position={[dx, 0.21, i * 0.03]} rotation={[0.1 * i, 0, 0.12 * (i ? 1 : -1)]} castShadow>
-            <cylinderGeometry args={[0.012, 0.012, 0.22, 5]} />
-            <meshStandardMaterial color={i ? '#e05a5a' : '#3a6fd8'} flatShading roughness={0.7} />
-          </mesh>
-        ))}
       </group>
 
-      {/* --- targhetta con nome e ruolo --- */}
-      <group position={[-0.6, 0.8, 0.5]} rotation={[-0.34, 0, 0]}>
+      {/* --- lampada da banchiere --- */}
+      <group position={[-0.88, 0.78, -0.3]}>
+        <LampadaBanchiere acceso={alLavoro || stato === 'waiting'} />
+      </group>
+
+      {/* --- targhetta in ottone --- */}
+      <group position={[0.62, 0.79, 0.48]} rotation={[-0.32, 0, 0]}>
         <mesh castShadow>
-          <boxGeometry args={[1.02, 0.28, 0.03]} />
-          <meshStandardMaterial color="#1b2029" flatShading roughness={0.7} />
+          <boxGeometry args={[0.92, 0.24, 0.02]} />
+          <meshStandardMaterial color={OTTONE} metalness={0.75} roughness={0.32} />
         </mesh>
-        {/* 160px * 0.025 * 0.245 ≈ 0,98 unità di scena di larghezza */}
-        <Html transform occlude scale={0.245} position={[0, 0, 0.018]} zIndexRange={[8, 0]}>
-          <div className="nameplate">
-            <strong style={{ color: agent.color }}>{agent.name}</strong>
-            <span>{agent.role}</span>
+        {/* 150px * 0.025 * 0.24 = 0,9 unità di larghezza */}
+        <Html transform occlude scale={0.24} position={[0, 0, 0.013]} zIndexRange={[8, 0]}>
+          <div className="targhetta">
+            <strong>{agente.nome}</strong>
+            <span>{agente.ruolo}</span>
           </div>
         </Html>
       </group>
 
       {/* --- luce di postazione nel colore dell'agente --- */}
       <pointLight
-        ref={lamp}
-        position={[0, 1.75, 0.15]}
-        color={lightColor}
+        ref={luce}
+        position={[0, 1.7, 0.2]}
+        color={coloreLuce}
         intensity={0}
-        distance={6.5}
+        distance={6}
         decay={2}
       />
 
-      {/* --- sedia: lo schienale sta dietro a chi siede, rivolto verso la telecamera --- */}
-      <group position={[0, 0, SEAT_OFFSET]}>
-        <OfficeChair color={agent.color} />
+      {/* --- poltrona --- */}
+      <group position={[0, 0, SEDIA_Z]}>
+        <Poltrona />
       </group>
     </group>
   )

@@ -1,66 +1,69 @@
 import { useState } from 'react'
 import { Html } from '@react-three/drei'
-import { AGENT_BY_KEY } from '../agents/definitions'
+import { AGENTE } from '../agents/definitions'
 import { useStudioStore } from '../store'
 import type { AgentKey } from '../types'
 
 /**
- * Nuvoletta ancorata sopra la testa dell'agente: mostra il RAGIONAMENTO
- * spezzato in passaggi discreti, uno alla volta.
+ * Nuvoletta ancorata sopra il broker: mostra i passaggi del ragionamento uno
+ * alla volta. Può essere aperta una sola nuvoletta per volta (lo store tiene un
+ * unico campo `nuvolettaAperta`).
  */
 export function ReasoningBubble({ agentKey }: { agentKey: AgentKey }) {
-  const agent = AGENT_BY_KEY[agentKey]
-  const steps = useStudioStore((s) => s.agents[agentKey].steps)
-  const error = useStudioStore((s) => s.agents[agentKey].error)
-  const closeBubble = useStudioStore((s) => s.closeBubble)
-  const [index, setIndex] = useState(0)
-  const [shownSteps, setShownSteps] = useState(steps)
+  const agente = AGENTE[agentKey]
+  const passaggi = useStudioStore((s) => s.agenti[agentKey].passaggi)
+  const errore = useStudioStore((s) => s.agenti[agentKey].errore)
+  const chiudi = useStudioStore((s) => s.chiudiNuvoletta)
+
+  const [indice, setIndice] = useState(0)
+  const [mostrati, setMostrati] = useState(passaggi)
 
   // Nuovo ragionamento: si riparte dal primo passaggio.
-  if (shownSteps !== steps) {
-    setShownSteps(steps)
-    setIndex(0)
+  if (mostrati !== passaggi) {
+    setMostrati(passaggi)
+    setIndice(0)
   }
 
-  const total = steps.length
-  const current = total > 0 ? steps[Math.min(index, total - 1)] : ''
+  const totale = passaggi.length
+  const corrente = totale > 0 ? passaggi[Math.min(indice, totale - 1)] : ''
 
   return (
     <Html position={[0, 3.05, 0]} center distanceFactor={7.5} zIndexRange={[40, 20]}>
-      <div className="bubble" style={{ borderColor: agent.color }} onPointerDown={(e) => e.stopPropagation()}>
-        <div className="bubble-head">
-          <strong style={{ color: agent.color }}>{agent.name}</strong>
-          <button
-            type="button"
-            className="bubble-close"
-            onClick={closeBubble}
-            aria-label="Chiudi la nuvoletta"
-          >
+      <div
+        className="nuvoletta"
+        style={{ borderColor: agente.colore }}
+        onPointerDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label={`Ragionamento di ${agente.nome}`}
+      >
+        <div className="nuvoletta-testa">
+          <strong style={{ color: agente.colore }}>{agente.nome}</strong>
+          <button type="button" className="nuvoletta-chiudi" onClick={chiudi} aria-label="Chiudi la nuvoletta">
             ✕
           </button>
         </div>
 
-        {total > 0 ? (
+        {totale > 0 ? (
           <>
-            <p className="bubble-step">{current}</p>
-            <div className="bubble-nav">
+            <p className="nuvoletta-passaggio">{corrente}</p>
+            <div className="nuvoletta-nav">
               <button
                 type="button"
-                className="bubble-arrow"
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
-                disabled={index === 0}
+                className="nuvoletta-freccia"
+                onClick={() => setIndice((i) => Math.max(0, i - 1))}
+                disabled={indice === 0}
                 aria-label="Passaggio precedente"
               >
                 ‹
               </button>
-              <span className="bubble-counter">
-                passaggio {Math.min(index, total - 1) + 1} di {total}
+              <span className="nuvoletta-contatore">
+                passaggio {Math.min(indice, totale - 1) + 1} di {totale}
               </span>
               <button
                 type="button"
-                className="bubble-arrow"
-                onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
-                disabled={index >= total - 1}
+                className="nuvoletta-freccia"
+                onClick={() => setIndice((i) => Math.min(totale - 1, i + 1))}
+                disabled={indice >= totale - 1}
                 aria-label="Passaggio successivo"
               >
                 ›
@@ -68,8 +71,8 @@ export function ReasoningBubble({ agentKey }: { agentKey: AgentKey }) {
             </div>
           </>
         ) : (
-          <p className="bubble-step bubble-empty">
-            {error ?? 'Nessun ragionamento ancora: questo agente non ha lavorato.'}
+          <p className="nuvoletta-passaggio nuvoletta-vuota">
+            {errore ?? 'Nessun ragionamento registrato: questo agente non ha ancora lavorato.'}
           </p>
         )}
       </div>

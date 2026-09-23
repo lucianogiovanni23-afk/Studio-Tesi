@@ -1,55 +1,54 @@
 import type { AgentKey } from '../types'
 
-/** Dimensioni dell'ufficio, in unità di scena. */
-export const ROOM = {
-  halfWidth: 9.5,
-  halfDepth: 8.5,
-  wallHeight: 6.4,
+/** Dimensioni della sala, in unità di scena. */
+export const SALA = {
+  semiLarghezza: 10,
+  semiProfondita: 9,
+  altezza: 7.6,
 }
 
 /** Distanza fra il centro della scrivania e la sedia. */
-export const SEAT_OFFSET = 0.95
-/** Zona di attesa, davanti alle postazioni. */
-export const REST_Z = 3.4
-export const WALK_SPEED = 2.9
+export const SEDIA_Z = 0.95
+/** Zona d'ingresso, dove i broker attendono il turno. */
+export const INGRESSO_Z = 3.6
+export const VELOCITA_PASSO = 2.9
 
-export interface Workstation {
-  index: number
-  /** Centro della scrivania. */
-  desk: [number, number]
-  /** Posizione della sedia: il lavoratore siede dal lato della telecamera. */
-  seat: [number, number]
-  /** Punto di attesa da cui parte la camminata. */
-  rest: [number, number]
-  /** Percorso a tappe dalla zona di attesa alla sedia. */
-  path: [number, number][]
+export interface Postazione {
+  indice: number
+  scrivania: [number, number]
+  sedia: [number, number]
+  attesa: [number, number]
+  percorso: [number, number][]
 }
 
-function build(index: number, deskX: number, deskZ: number): Workstation {
-  const seatZ = deskZ + SEAT_OFFSET
+function crea(indice: number, x: number, z: number): Postazione {
+  const sediaZ = z + SEDIA_Z
   return {
-    index,
-    desk: [deskX, deskZ],
-    seat: [deskX, seatZ],
-    rest: [deskX, REST_Z],
-    path: [
-      [deskX, REST_Z],
-      [deskX, seatZ],
+    indice,
+    scrivania: [x, z],
+    sedia: [x, sediaZ],
+    attesa: [x, INGRESSO_Z],
+    percorso: [
+      [x, INGRESSO_Z],
+      [x, sediaZ],
     ],
   }
 }
 
 /**
  * Due file sfalsate: tre postazioni contro la parete di fondo e due davanti,
- * così la lavagna resta visibile e nessuno copre il collega.
+ * così il tabellone e la lavagna restano visibili.
  */
-export const WORKSTATIONS: Record<AgentKey, Workstation> = {
-  lettore: build(0, -5.4, -5.1),
-  ricercatore: build(1, 0, -5.1),
-  selettore: build(2, 5.4, -5.1),
-  scrittore: build(3, -2.7, -0.7),
-  controllore: build(4, 2.7, -0.7),
+export const POSTAZIONI: Record<AgentKey, Postazione> = {
+  lettore: crea(0, -5.6, -5.4),
+  ricercatore: crea(1, 0, -5.4),
+  selettore: crea(2, 5.6, -5.4),
+  scrittore: crea(3, -2.8, -1.0),
+  controllore: crea(4, 2.8, -1.0),
 }
 
-export const CAMERA_HOME: [number, number, number] = [0, 8.4, 15.2]
-export const CAMERA_TARGET: [number, number, number] = [0, 1.6, -2.6]
+export const CAMERA_CASA: [number, number, number] = [0, 7.4, 15.2]
+export const CAMERA_BERSAGLIO: [number, number, number] = [0, 2.1, -2.8]
+
+/** Posizione della campanella di contrattazione, vicino all'ingresso. */
+export const CAMPANELLA: [number, number, number] = [-8.6, 0, 2.2]

@@ -2,118 +2,127 @@ import { useState } from 'react'
 import { useStudioStore } from '../store'
 
 /**
- * Punto di approvazione umana: la pipeline si ferma qui e lo Scrittore
- * non parte in nessun caso prima che io abbia approvato.
+ * Punto di approvazione umana: la pipeline si ferma qui e lo Scrittore non
+ * parte in nessun caso prima che io abbia approvato.
  */
-export function ApprovalCard({ variant = 'inline' }: { variant?: 'inline' | 'docked' }) {
-  const approvalStatus = useStudioStore((s) => s.approvalStatus)
-  const approvalRound = useStudioStore((s) => s.approvalRound)
-  const selectedSources = useStudioStore((s) => s.selectedSources)
-  const discardedSources = useStudioStore((s) => s.discardedSources)
-  const approvalHistory = useStudioStore((s) => s.approvalHistory)
-  const approveSources = useStudioStore((s) => s.approveSources)
-  const rejectSources = useStudioStore((s) => s.rejectSources)
-  const [reason, setReason] = useState('')
-  const [showDiscarded, setShowDiscarded] = useState(false)
+export function ApprovalCard({ variante = 'in_linea' }: { variante?: 'in_linea' | 'ancorata' }) {
+  const approvazione = useStudioStore((s) => s.approvazione)
+  const giro = useStudioStore((s) => s.giroApprovazione)
+  const fonti = useStudioStore((s) => s.fonti)
+  const selezionate = useStudioStore((s) => s.selezionate)
+  const scartate = useStudioStore((s) => s.scartateDalSelettore)
+  const storico = useStudioStore((s) => s.storicoApprovazioni)
+  const approva = useStudioStore((s) => s.approva)
+  const rifiuta = useStudioStore((s) => s.rifiuta)
 
-  if (approvalStatus !== 'pending') return null
+  const [motivo, setMotivo] = useState('')
+  const [mostraScartate, setMostraScartate] = useState(false)
+
+  if (approvazione !== 'in_attesa') return null
+
+  const perUrl = new Map(fonti.map((f) => [f.url, f]))
 
   return (
-    <section className={`panel approval ${variant === 'docked' ? 'approval-docked' : ''}`}>
-      <h2 className="panel-title">
+    <section
+      className={`pannello approvazione ${variante === 'ancorata' ? 'approvazione-ancorata' : ''}`}
+      aria-live="polite"
+    >
+      <h2 className="pannello-titolo filetto-doppio">
         Serve la tua approvazione
-        <span className="panel-badge panel-badge-hot">giro {approvalRound}</span>
+        <span className="distintivo distintivo-caldo">giro {giro}</span>
       </h2>
 
-      <p className="hint">
-        Il Selettore ha scelto {selectedSources.length} fonti su{' '}
-        {selectedSources.length + discardedSources.length}. Lo Scrittore parte solo dopo la tua
-        approvazione.
+      <p className="nota">
+        Il Selettore ha tenuto {selezionate.length} fonti su {fonti.length}. Lo Scrittore parte solo
+        dopo la tua approvazione.
       </p>
 
-      <ul className="source-list">
-        {selectedSources.map((source) => (
-          <li key={source.url} className="source">
-            <div className="source-head">
-              <strong>{source.title}</strong>
-              {source.verified ? (
-                <span className="tag tag-ok">URL verificato</span>
-              ) : (
-                <span className="tag tag-warn">URL non confermato</span>
-              )}
-            </div>
-            <a className="source-url" href={source.url} target="_blank" rel="noreferrer noopener">
-              {source.url}
-            </a>
-            {source.summary && <p className="source-text">{source.summary}</p>}
-            {source.relevance && <p className="source-text source-why">{source.relevance}</p>}
-          </li>
-        ))}
+      <ul className="elenco-fonti">
+        {selezionate.map((scelta) => {
+          const fonte = perUrl.get(scelta.url)
+          return (
+            <li key={scelta.url} className="fonte">
+              <div className="fonte-testa">
+                <strong>{fonte?.titolo ?? scelta.url}</strong>
+                {fonte && <span className="etichetta-tipo">{fonte.tipo}</span>}
+                <span className="etichetta etichetta-ok">URL verificato</span>
+              </div>
+              <a className="fonte-url" href={scelta.url} target="_blank" rel="noreferrer noopener">
+                {scelta.url}
+              </a>
+              {fonte?.descrizione && <p className="fonte-testo">{fonte.descrizione}</p>}
+              <p className="fonte-testo fonte-motivo">Tenuta perché: {scelta.motivo}</p>
+            </li>
+          )
+        })}
       </ul>
 
-      {discardedSources.length > 0 && (
+      {scartate.length > 0 && (
         <>
           <button
             type="button"
-            className="btn btn-ghost btn-small"
-            onClick={() => setShowDiscarded((v) => !v)}
+            className="bottone bottone-vuoto bottone-piccolo"
+            onClick={() => setMostraScartate((v) => !v)}
           >
-            {showDiscarded ? 'Nascondi' : 'Mostra'} le {discardedSources.length} fonti scartate
+            {mostraScartate ? 'Nascondi' : 'Mostra'} le {scartate.length} fonti scartate
           </button>
-          {showDiscarded && (
-            <ul className="source-list source-list-muted">
-              {discardedSources.map((source) => (
-                <li key={source.url} className="source">
-                  <strong>{source.title}</strong>
-                  <a className="source-url" href={source.url} target="_blank" rel="noreferrer noopener">
-                    {source.url}
-                  </a>
-                  {source.reason && <p className="source-text">Scartata perché: {source.reason}</p>}
-                </li>
-              ))}
+          {mostraScartate && (
+            <ul className="elenco-fonti elenco-fonti-tenue">
+              {scartate.map((s) => {
+                const fonte = perUrl.get(s.url)
+                return (
+                  <li key={s.url} className="fonte">
+                    <strong>{fonte?.titolo ?? s.url}</strong>
+                    <a className="fonte-url" href={s.url} target="_blank" rel="noreferrer noopener">
+                      {s.url}
+                    </a>
+                    <p className="fonte-testo">Scartata perché: {s.motivo}</p>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </>
       )}
 
-      <label className="field">
-        <span className="field-label">Motivo (facoltativo, se non ti convince)</span>
+      <label className="campo-blocco">
+        <span className="campo-etichetta">Motivo (facoltativo, se non ti convince)</span>
         <textarea
-          className="textarea"
+          className="campo area"
           rows={2}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
           placeholder="es. servono più paper accademici e meno articoli divulgativi"
         />
       </label>
 
-      <div className="actions">
+      <div className="azioni">
         <button
           type="button"
-          className="btn btn-primary btn-start"
+          className="bottone bottone-primario bottone-largo"
           onClick={() => {
-            approveSources()
-            setReason('')
+            approva()
+            setMotivo('')
           }}
         >
           Approvo
         </button>
         <button
           type="button"
-          className="btn btn-danger btn-start"
+          className="bottone bottone-pericolo bottone-largo"
           onClick={() => {
-            rejectSources(reason)
-            setReason('')
+            rifiuta(motivo)
+            setMotivo('')
           }}
         >
           Non mi convince
         </button>
       </div>
 
-      {approvalHistory.length > 0 && (
-        <ul className="history">
-          {approvalHistory.map((entry, i) => (
-            <li key={i}>{entry}</li>
+      {storico.length > 0 && (
+        <ul className="storico">
+          {storico.map((voce, i) => (
+            <li key={i}>{voce}</li>
           ))}
         </ul>
       )}

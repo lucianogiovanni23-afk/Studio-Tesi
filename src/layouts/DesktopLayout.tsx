@@ -1,23 +1,25 @@
 import { AgentsPanel } from '../panels/AgentsPanel'
-import { ApiKeyPanel } from '../panels/ApiKeyPanel'
 import { ApprovalCard } from '../panels/ApprovalCard'
 import { ChatPanel } from '../panels/ChatPanel'
 import { Console } from '../panels/Console'
-import { CourseMaterialPanel } from '../panels/CourseMaterialPanel'
+import { SettingsPanel } from '../panels/SettingsPanel'
+import { UploadPanel } from '../panels/UploadPanel'
+import { WriterOptions } from '../panels/WriterOptions'
 import { Scene } from '../scene/Scene'
 
-/** Desktop: scena a sinistra, tutti i pannelli affiancati in una colonna scorrevole. */
+/** Desktop: scena a sinistra (~62%), colonna scorrevole a destra. */
 export function DesktopLayout() {
   return (
     <div className="layout-desktop">
-      <div className="stage">
+      <div className="palco">
         <Scene />
       </div>
-      <aside className="sidebar">
-        <ApiKeyPanel />
-        <CourseMaterialPanel />
+      <aside className="colonna">
+        <SettingsPanel />
+        <UploadPanel />
         <ApprovalCard />
         <AgentsPanel />
+        <WriterOptions />
         <Console />
         <ChatPanel />
       </aside>

@@ -1,0 +1,65 @@
+/**
+ * Palette e tipografia: sala di contrattazione newyorkese fra fine anni '80 e
+ * primi anni '90. Verde bottiglia e blu notte per i fondi, ottone satinato per
+ * bordi e accenti, crema per i testi, rubino e verde fosforo per i segnali.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* fondi */
+  --notte: #0b1220;
+  --notte-2: #101a2c;
+  --bottiglia: #0f2a24;
+  --bottiglia-2: #14362e;
+  --pannello: #12203a;
+  --pannello-2: #16284660;
+  --incavo: #0a1424;
+
+  /* ottone */
+  --ottone: #c9a227;
+  --ottone-chiaro: #e8cc73;
+  --ottone-scuro: #8a6f1c;
+  --ottone-tenue: #c9a22733;
+
+  /* testi */
+  --crema: #f2ead8;
+  --crema-tenue: #c3b9a3;
+  --crema-debole: #8d8677;
+
+  /* segnali */
+  --rubino: #c02b3a;
+  --rubino-chiaro: #e8596a;
+  --fosforo: #4ade80;
+  --fosforo-scuro: #1b5e34;
+  --ambra: #f2b134;
+
+  /* misure */
+  --raggio: 4px;
+  --raggio-grande: 8px;
+  --tocco: 44px;
+  --filetto: 1px solid var(--ottone-tenue);
+
+  --serif: 'Playfair Display', 'Libre Caslon Display', Georgia, 'Times New Roman', serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  color-scheme: dark;
+}
+
+/* Filetto doppio usato sulle intestazioni dei pannelli. */
+.filetto-doppio {
+  border-bottom: 3px double var(--ottone-tenue);
+}
+
+/* Riduzione dei movimenti quando il sistema lo chiede. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

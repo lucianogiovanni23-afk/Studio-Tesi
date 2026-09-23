@@ -1,391 +1,424 @@
-import type { ApiMessage, UserContent } from './api'
-import type { AgentKey, CourseFile, Draft, Source } from '../types'
+import type Anthropic from '@anthropic-ai/sdk'
+import type {
+  CaseFile,
+  CourseFile,
+  Fonte,
+  ImpiantoKey,
+  Opzione,
+  RisultatoLettore,
+} from '../types'
+
+/** Argomento precompilato, modificabile dallo studente. */
+export const ARGOMENTO_PREDEFINITO =
+  'Il rischio climatico come componente del rischio operativo e finanziario in un business fortemente stagionale: il caso Miraya Beach Park, analizzato su più stagioni.'
+
+export const CAPITOLO_PREDEFINITO =
+  'Capitolo 2 — Il rischio operativo e la leva operativa in un\'attività stagionale'
+
+/**
+ * Vincolo di materia condiviso da tutti e cinque gli agenti e dalla chat.
+ * Va inserito nel system prompt di ognuno, senza eccezioni.
+ */
+export const SUBJECT_GUARDRAIL = `VINCOLO DI MATERIA (vale sempre, senza eccezioni)
+Resta esclusivamente nell'ambito della Finanza Aziendale, come definito dal materiale del corso allegato. Non trattare Ragioneria (bilancio in senso contabile/normativo, principi contabili) né Diritto Commerciale o Privato (forme societarie, responsabilità degli amministratori, normativa concorsuale). Se una fonte o un'informazione riguarda principalmente questi ambiti, scartala e dillo esplicitamente.
+
+Criterio operativo: se un tema non è trattato nel materiale del corso caricato, non trattarlo, nemmeno come sfondo o cenno introduttivo.`
+
+/** Richiamo sull'analisi pluriennale, ripetuto agli agenti che toccano i dati. */
+export const VINCOLO_STAGIONI = `VINCOLO SULL'ORIZZONTE TEMPORALE
+L'analisi deve basarsi su PIÙ STAGIONI, non su una sola: usa serie pluriennali (dati meteo storici e risultati per evento su più stagioni) e ragiona sulla variabilità fra una stagione e l'altra. Un'analisi che si fermasse a una singola stagione è da considerarsi incompleta.`
+
+const FORMATO_PASSAGGI = `Nel campo "passaggi" scrivi il metodo che hai seguito, diviso in passaggi brevi e autonomi (da 3 a 6), rivolti allo studente: servono a fargli capire come sei arrivato al risultato. Ogni passaggio è una frase compiuta, leggibile da sola.`
+
+// ---------------------------------------------------------------------------
+// Contesto condiviso
+// ---------------------------------------------------------------------------
 
 /** Oltre questa soglia il testo del materiale viene ridotto a un estratto. */
-const MAX_TEXT_CHARS = 14_000
-/** Tetto complessivo sui PDF allegati a ogni chiamata (base64), per non sforare i limiti. */
-const MAX_PDF_BASE64 = 3_000_000
+const MAX_TESTO_CORSO = 16_000
+/** Tetto complessivo sui PDF allegati a una chiamata (lunghezza base64). */
+const MAX_PDF_BASE64 = 4_000_000
 
-const FORMATO = `Rispondi SEMPRE in italiano e usa ESATTAMENTE questo formato, senza premesse e senza sezioni aggiuntive:
-
-RAGIONAMENTO:
-1. <primo passaggio del tuo ragionamento, una riga>
-2. <secondo passaggio>
-3. <terzo passaggio>
-(da 3 a 5 passaggi numerati, uno per riga, brevi)
-
-RISULTATO:
-<qui solo l'output finale del tuo compito>`
-
-// ---------------------------------------------------------------------------
-// Contesto condiviso: il materiale del corso accompagna OGNI chiamata.
-// ---------------------------------------------------------------------------
-
-export interface SharedContext {
-  thesisTopic: string
-  chapterBrief: string
+export interface ContestoProgetto {
+  argomento: string
+  capitolo: string
   courseFiles: CourseFile[]
+  caseFiles: CaseFile[]
 }
 
-/** Estratto del testo: testa e coda, così non si perde né l'inizio né le conclusioni. */
-function excerpt(text: string, limit: number): string {
-  const clean = text.trim()
-  if (clean.length <= limit) return clean
-  const head = clean.slice(0, Math.floor(limit * 0.65))
-  const tail = clean.slice(-Math.floor(limit * 0.3))
-  return `${head}\n\n[…estratto: parte centrale omessa per non superare i limiti di contesto…]\n\n${tail}`
+function estratto(testo: string, limite: number): string {
+  const pulito = testo.trim()
+  if (pulito.length <= limite) return pulito
+  const testa = pulito.slice(0, Math.floor(limite * 0.65))
+  const coda = pulito.slice(-Math.floor(limite * 0.3))
+  return `${testa}\n\n[…estratto: parte centrale omessa per restare nei limiti di contesto…]\n\n${coda}`
 }
 
-/** Blocchi document (PDF) da allegare alla chiamata, entro il tetto di dimensione. */
-export function buildDocumentBlocks(courseFiles: CourseFile[]): {
-  blocks: UserContent[]
-  skipped: string[]
+/**
+ * Blocchi document con i PDF del corso. L'ultimo porta `cache_control`
+ * ephemeral: i reinvii successivi costano molto meno grazie al prompt caching.
+ */
+export function blocchiPdfCorso(courseFiles: CourseFile[]): {
+  blocchi: Anthropic.ContentBlockParam[]
+  saltati: string[]
 } {
-  const blocks: UserContent[] = []
-  const skipped: string[] = []
+  const blocchi: Anthropic.ContentBlockParam[] = []
+  const saltati: string[] = []
   let budget = MAX_PDF_BASE64
 
   for (const file of courseFiles) {
-    if (file.kind !== 'pdf' || file.status !== 'ready' || !file.base64) continue
+    if (file.kind !== 'pdf' || file.status !== 'pronto' || !file.base64) continue
     if (file.base64.length > budget) {
-      skipped.push(file.name)
+      saltati.push(file.name)
       continue
     }
     budget -= file.base64.length
-    blocks.push({
+    blocchi.push({
       type: 'document',
       source: { type: 'base64', media_type: 'application/pdf', data: file.base64 },
+      title: file.name,
     })
   }
 
-  return { blocks, skipped }
+  if (blocchi.length > 0) {
+    const ultimo = blocchi[blocchi.length - 1] as Anthropic.DocumentBlockParam
+    ultimo.cache_control = { type: 'ephemeral' }
+  }
+
+  return { blocchi, saltati }
 }
 
-/** Testo concatenato dei file .txt/.md, ridotto a estratto se molto lungo. */
-export function buildMaterialText(courseFiles: CourseFile[]): string {
-  const parts = courseFiles
-    .filter((f) => f.kind === 'text' && f.status === 'ready' && f.text)
+export function testoCorso(courseFiles: CourseFile[]): string {
+  const parti = courseFiles
+    .filter((f) => f.kind === 'testo' && f.status === 'pronto' && f.text)
     .map((f) => `--- ${f.name} ---\n${f.text!.trim()}`)
-  if (parts.length === 0) return ''
-  return excerpt(parts.join('\n\n'), MAX_TEXT_CHARS)
+  if (parti.length === 0) return ''
+  return estratto(parti.join('\n\n'), MAX_TESTO_CORSO)
 }
 
-/** Intestazione comune a tutti gli agenti: argomento, capitolo e materiale del corso. */
-export function buildContextHeader(ctx: SharedContext, skippedPdf: string[]): string {
-  const materialText = buildMaterialText(ctx.courseFiles)
-  const pdfNames = ctx.courseFiles
-    .filter((f) => f.kind === 'pdf' && f.status === 'ready')
-    .map((f) => f.name)
+export function riepilogoCaso(caseFiles: CaseFile[]): string {
+  const pronti = caseFiles.filter((f) => f.status === 'pronto')
+  if (pronti.length === 0) {
+    return '(nessun dato del caso caricato: il Ricercatore potrà trovare solo dati meteo pubblici e letteratura, non i dati privati dell\'attività)'
+  }
+  return pronti.map((f) => f.riepilogo).join('\n\n')
+}
 
-  const lines = [
-    'CONTESTO CONDIVISO DEL PROGETTO DI TESI (valido per tutti gli agenti):',
+/** Intestazione con argomento, capitolo e dati del caso: comune a tutti gli agenti. */
+export function intestazioneProgetto(ctx: ContestoProgetto): string {
+  return [
+    `ARGOMENTO DELLA TESI (deciso dallo studente, non modificabile):\n"""\n${ctx.argomento.trim()}\n"""`,
+    `CAPITOLO O SEZIONE DA SCRIVERE:\n"""\n${ctx.capitolo.trim()}\n"""`,
+    `DATI DEL CASO (più stagioni, privati, non reperibili online):\n"""\n${riepilogoCaso(ctx.caseFiles)}\n"""`,
+  ].join('\n\n')
+}
+
+/** Il dossier del Lettore viaggia verso tutti gli agenti successivi. */
+export function dossierTestuale(dossier: RisultatoLettore | null): string {
+  if (!dossier) return '(dossier non disponibile)'
+  return [
+    'CONCETTI CHIAVE DEL CORSO:',
+    ...dossier.concetti_chiave.map(
+      (c) => `- ${c.termine}: ${c.definizione} (dal materiale: ${c.lezione_di_riferimento})`,
+    ),
     '',
-    `ARGOMENTO DELLA TESI (deciso dallo studente, non modificabile):\n"""\n${ctx.thesisTopic.trim()}\n"""`,
+    'COLLEGAMENTI CON L\'ARGOMENTO:',
+    ...dossier.collegamenti_argomento.map((c) => `- ${c}`),
     '',
-    `CAPITOLO O SEZIONE DA SCRIVERE:\n"""\n${ctx.chapterBrief.trim()}\n"""`,
-  ]
-
-  if (pdfNames.length > 0) {
-    lines.push('', `MATERIALE DEL CORSO IN PDF ALLEGATO A QUESTO MESSAGGIO: ${pdfNames.join(', ')}.`)
-  }
-  if (skippedPdf.length > 0) {
-    lines.push(
-      `NOTA: questi PDF non sono allegati in questa chiamata per limiti di contesto: ${skippedPdf.join(', ')}.`,
-    )
-  }
-  if (materialText) {
-    lines.push('', `MATERIALE DEL CORSO IN TESTO:\n"""\n${materialText}\n"""`)
-  }
-  if (pdfNames.length === 0 && !materialText) {
-    lines.push('', 'ATTENZIONE: nessun materiale del corso leggibile è stato allegato.')
-  }
-
-  return lines.join('\n')
+    'METRICHE APPLICABILI (del corso, non indici contabili):',
+    ...dossier.metriche_applicabili.map((m) => `- ${m}`),
+    '',
+    `SINTESI DEI DATI DEL CASO:\n${dossier.sintesi_dati_caso}`,
+  ].join('\n')
 }
 
-/** Messaggio utente completo: PDF allegati + testo del contesto + istruzione dell'agente. */
-export function buildUserMessage(ctx: SharedContext, instruction: string): ApiMessage {
-  const { blocks, skipped } = buildDocumentBlocks(ctx.courseFiles)
-  const content: UserContent[] = [
-    ...blocks,
-    { type: 'text', text: `${buildContextHeader(ctx, skipped)}\n\n${instruction}` },
-  ]
-  return { role: 'user', content }
-}
-
-// ---------------------------------------------------------------------------
-// System prompt dei 5 agenti
-// ---------------------------------------------------------------------------
-
-export const SYSTEM_PROMPTS: Record<AgentKey, string> = {
-  lettore: `Sei il "Lettore", primo agente di una squadra che aiuta uno studente a scrivere un capitolo della sua tesi di laurea in Finanza Aziendale.
-Ricevi l'argomento della tesi scelto dallo studente e il materiale del corso di Finanza Aziendale (PDF delle lezioni e/o appunti in testo).
-Il tuo compito è studiare quel materiale ed estrarre una base solida per la ricerca successiva:
-- i concetti chiave del corso che riguardano l'argomento scelto;
-- la terminologia tecnica da usare, con la definizione usata nel corso;
-- i collegamenti espliciti fra l'argomento della tesi e i contenuti delle lezioni (quali parti del materiale servono e perché);
-- le lacune: cosa l'argomento richiede ma il materiale del corso non copre, e che quindi andrà cercato online.
-Non inventare contenuti che non sono nel materiale: se qualcosa manca, dillo e mettilo fra le lacune.
-
-${FORMATO}
-
-Nella sezione RISULTATO usa esattamente queste quattro intestazioni, in quest'ordine:
-
-Concetti chiave
-<elenco puntato>
-
-Terminologia tecnica
-<elenco puntato "termine — definizione dal corso">
-
-Collegamenti con l'argomento della tesi
-<elenco puntato>
-
-Lacune da colmare con la ricerca
-<elenco puntato>`,
-
-  ricercatore: `Sei il "Ricercatore", secondo agente di una squadra che aiuta uno studente a scrivere un capitolo della sua tesi di laurea in Finanza Aziendale.
-Hai a disposizione il tool di ricerca web: DEVI usarlo davvero. È assolutamente vietato scrivere una fonte che non provenga dai risultati della ricerca: ogni URL che riporti deve essere un URL reale restituito dal tool. Non inventare, non ricostruire a memoria, non modificare gli URL.
-Cerca informazioni, dataset, paper accademici, articoli e dati aggiornati pertinenti all'argomento della tesi, tenendo conto della base preparata dal Lettore e delle lacune che ha segnalato.
-Fai più ricerche mirate con query diverse (in italiano e in inglese) prima di rispondere. Punta a 6-10 fonti di buona qualità, privilegiando paper, pubblicazioni accademiche, banche dati, autorità di vigilanza e fonti istituzionali rispetto a blog generalisti.
-
-${FORMATO}
-
-Nella sezione RISULTATO elenca le fonti usando ESATTAMENTE questo schema a blocchi, ripetuto per ogni fonte e senza altro testo fra un blocco e l'altro:
-
-[FONTE]
-TITOLO: <titolo della pagina o del paper>
-URL: <URL completo e reale, così come restituito dalla ricerca, che inizia con http>
-CONTENUTO: <una o due frasi su cosa contiene davvero>
-RILEVANZA: <una frase su perché è utile per questo capitolo di tesi>
-
-Se la ricerca non restituisce risultati utili, scrivi nella sezione RISULTATO la riga "NESSUNA FONTE TROVATA" seguita dalla spiegazione, senza inventare fonti.`,
-
-  selettore: `Sei il "Selettore", terzo agente di una squadra che aiuta uno studente a scrivere un capitolo della sua tesi di laurea in Finanza Aziendale.
-Ricevi l'elenco delle fonti trovate dal Ricercatore e devi tenere SOLO quelle davvero pertinenti al progetto di tesi e al capitolo da scrivere, scartando le altre.
-Valuta: pertinenza rispetto all'argomento e al capitolo, autorevolezza della fonte, attualità dei dati, coerenza con il taglio del corso di Finanza Aziendale, e il fatto che non siano doppioni.
-Non puoi aggiungere fonti che non siano nell'elenco del Ricercatore, e non puoi modificarne gli URL.
-Nella sezione RAGIONAMENTO motiva brevemente sia le fonti tenute sia quelle scartate.
-
-${FORMATO}
-
-Nella sezione RISULTATO usa ESATTAMENTE questo schema a blocchi, uno per ogni fonte dell'elenco ricevuto, senza altro testo fra i blocchi:
-
-[TENUTA]
-TITOLO: <titolo>
-URL: <URL identico a quello ricevuto>
-MOTIVO: <perché la tieni, una frase>
-
-[SCARTATA]
-TITOLO: <titolo>
-URL: <URL identico a quello ricevuto>
-MOTIVO: <perché la scarti, una frase>
-
-Se ritieni che le fonti pertinenti disponibili non siano sufficienti per scrivere il capitolo, aggiungi in fondo alla sezione RISULTATO la riga [NUOVA RICERCA] seguita da una riga che spiega quali ricerche mancano: il Ricercatore farà un altro giro.`,
-
-  scrittore: `Sei lo "Scrittore", quarto agente di una squadra che aiuta uno studente a scrivere un capitolo della sua tesi di laurea in Finanza Aziendale.
-Scrivi il capitolo o la sezione richiesta usando l'argomento della tesi, il materiale del corso, la base preparata dal Lettore e SOLO le fonti selezionate e approvate dallo studente.
-Devi produrre TRE opzioni di scrittura differenti per taglio e approccio (per esempio: impostazione teorico-formale; impostazione applicata con esempi e dati; impostazione critica e comparativa). Tutte e tre devono essere in italiano accademico universitario, pertinenti alla materia, coerenti con le fonti approvate e prive di affermazioni non supportate.
-Ogni opzione deve essere un testo completo e autosufficiente, articolato in paragrafi, di almeno 450 parole, con i riferimenti alle fonti indicati fra parentesi tonde con titolo e URL.
-
-${FORMATO}
-
-Nella sezione RISULTATO usa ESATTAMENTE questo schema, senza altro testo fra i blocchi:
-
-[OPZIONE 1]
-APPROCCIO: <una riga che descrive il taglio scelto>
-TESTO:
-<il testo completo dell'opzione 1>
-
-[OPZIONE 2]
-APPROCCIO: <una riga>
-TESTO:
-<il testo completo dell'opzione 2>
-
-[OPZIONE 3]
-APPROCCIO: <una riga>
-TESTO:
-<il testo completo dell'opzione 3>`,
-
-  controllore: `Sei il "Controllore", quinto agente di una squadra che aiuta uno studente a scrivere un capitolo della sua tesi di laurea in Finanza Aziendale.
-Sorvegli la qualità del lavoro degli altri agenti: verifichi che le fonti siano reali e pertinenti e che i testi prodotti siano accademicamente corretti e coerenti con le fonti approvate.
-Sii concreto e severo ma utile: segnala problemi specifici, non giudizi generici.
-
-Rispondi SEMPRE in italiano e usa ESATTAMENTE questo formato:
-
-RAGIONAMENTO:
-1. <primo passaggio del controllo>
-2. <secondo passaggio>
-(da 3 a 5 passaggi numerati, uno per riga)
-
-RISULTATO:
-<il referto del controllo>
-
-STATO: OK
-(oppure "STATO: PROBLEMA" se hai rilevato almeno un problema rilevante)`,
-}
-
-// ---------------------------------------------------------------------------
-// Istruzioni specifiche per ogni passo della pipeline
-// ---------------------------------------------------------------------------
-
-function sourceList(sources: Source[]): string {
-  if (sources.length === 0) return '(nessuna fonte)'
-  return sources
+export function elencoFonti(fonti: Fonte[]): string {
+  if (fonti.length === 0) return '(nessuna fonte)'
+  return fonti
     .map(
-      (s, i) =>
-        `${i + 1}. TITOLO: ${s.title}\n   URL: ${s.url}\n   CONTENUTO: ${s.summary || '(non specificato)'}\n   RILEVANZA: ${s.relevance || '(non specificata)'}`,
+      (f, i) =>
+        `${i + 1}. [${f.tipo}] ${f.titolo}\n   URL: ${f.url}\n   Contenuto: ${f.descrizione}\n   Rilevanza: ${f.perche_rilevante}`,
     )
     .join('\n')
 }
 
-export function lettoreInstruction(): string {
-  return 'COMPITO: studia il materiale del corso qui allegato e prepara la base di lavoro per l\'argomento di tesi indicato sopra.'
+// ---------------------------------------------------------------------------
+// System prompt dei cinque agenti
+// ---------------------------------------------------------------------------
+
+function system(corpo: string): string {
+  return `${corpo}\n\n${SUBJECT_GUARDRAIL}\n\n${FORMATO_PASSAGGI}`
 }
 
-export function ricercatoreInstruction(lettoreResult: string, previousAttempt?: string): string {
-  const base = `BASE PREPARATA DAL LETTORE:\n"""\n${lettoreResult || '(non disponibile)'}\n"""\n\nCOMPITO: usa il tool di ricerca web per trovare fonti reali e aggiornate utili a questo capitolo di tesi. Ogni URL che riporti deve provenire dai risultati della ricerca.`
-  if (!previousAttempt) return base
-  return `${base}\n\nATTENZIONE: è un nuovo giro di ricerca. Il Selettore ha ritenuto insufficienti le fonti del giro precedente per questo motivo:\n"""\n${previousAttempt}\n"""\nCerca fonti NUOVE e diverse da quelle già trovate, con query differenti.`
+export const SYSTEM_LETTORE = system(
+  `Sei il "Lettore", primo agente di una squadra che aiuta uno studente a scrivere un capitolo della sua tesi di laurea triennale in Finanza Aziendale.
+Ricevi l'argomento, il materiale del corso (PDF delle lezioni e appunti) e il riepilogo dei dati privati del caso.
+Il tuo compito è produrre un DOSSIER DEL CORSO che servirà a tutti gli agenti successivi: concetti chiave con la definizione usata a lezione, collegamenti fra l'argomento e il materiale, metriche applicabili e una sintesi di cosa mostrano i dati del caso.
+Le metriche devono essere quelle di Finanza Aziendale viste nel corso (per esempio grado di leva operativa, leva finanziaria, misure di rischio e rendimento): non indici di bilancio in senso contabile.
+Non inventare contenuti che non sono nel materiale: se un concetto necessario manca, dillo nei collegamenti.
+
+${VINCOLO_STAGIONI}`,
+)
+
+export const SYSTEM_RICERCATORE = system(
+  `Sei il "Ricercatore", secondo agente della squadra.
+Hai a disposizione il tool di ricerca web e DEVI usarlo davvero: è vietato riportare una fonte che non provenga dai risultati della ricerca. Ogni URL deve essere copiato esattamente da un risultato: non ricostruirlo a memoria, non modificarlo, non accorciarlo.
+Cerca: letteratura accademica sul rischio climatico e meteorologico nelle attività stagionali, serie storiche meteo pluriennali per l'area del caso, dati di settore sul turismo balneare e sui parchi acquatici, studi sul rischio operativo e sulla leva operativa.
+Fai più ricerche mirate, in italiano e in inglese, prima di consegnare.
+Scarta le fonti prevalentemente contabili, normative o giuridiche e dichiarale in "fonti_scartate" spiegando il motivo.
+Quando hai finito, chiama il tool submit_ricercatore per consegnare l'elenco: è l'unico modo di consegnare il risultato.
+
+${VINCOLO_STAGIONI}`,
+)
+
+export const SYSTEM_SELETTORE = system(
+  `Sei il "Selettore", terzo agente della squadra.
+Ricevi l'elenco delle fonti trovate dal Ricercatore (già filtrate: contiene solo fonti con URL verificato) e tieni SOLO quelle davvero utili al capitolo.
+Criteri, in ordine: aderenza alla sola Finanza Aziendale come definita dal materiale del corso; pertinenza rispetto all'argomento e al capitolo; autorevolezza; utilità per un'analisi su più stagioni; assenza di doppioni.
+L'aderenza alla materia è un criterio esplicito: una fonte autorevole ma prevalentemente contabile, normativa o giuridica va scartata, e il motivo va scritto.
+Non puoi aggiungere fonti che non siano nell'elenco ricevuto, né modificarne gli URL: usa gli URL esattamente come li ricevi.
+Imposta "copertura_sufficiente" a false se le fonti pertinenti non bastano a scrivere il capitolo: in quel caso il Ricercatore farà un nuovo giro mirato.
+
+${VINCOLO_STAGIONI}`,
+)
+
+export const SYSTEM_SCRITTORE = system(
+  `Sei lo "Scrittore", quarto agente della squadra.
+Scrivi il capitolo richiesto in italiano accademico universitario, adatto a una tesi di laurea triennale in Finanza Aziendale.
+Usa il dossier del corso, i PDF delle lezioni allegati, i dati del caso e SOLO le fonti approvate dallo studente: nessuna fonte al di fuori di quelle.
+Cita nel testo in forma autore-anno quando la fonte lo consente, altrimenti con il titolo, e riporta in "fonti_citate" solo URL presenti fra le fonti approvate.
+Il testo deve essere articolato in paragrafi con titoletto, completo e autosufficiente. Conta le parole e riportale nel campo "parole".
+Non inserire affermazioni non supportate né dalle fonti approvate né dal materiale del corso.
+
+${VINCOLO_STAGIONI}`,
+)
+
+export const SYSTEM_CONTROLLORE = system(
+  `Sei il "Controllore", quinto agente della squadra: sorvegli la qualità del lavoro degli altri.
+Sei severo ma utile: segnali problemi specifici, con il punto preciso in cui si trovano, mai giudizi generici.
+Compili una checklist con quattro voci obbligatorie, ognuna con il proprio id:
+- "fonti_verificate": tutte le fonti usate hanno un URL confermato dalla ricerca web (il dato te lo fornisce il controllo automatico, fidati di quello);
+- "perimetro_materia": nessuno sconfinamento in Ragioneria o in Diritto Commerciale/Privato; se ne trovi, indica l'agente e il punto;
+- "coerenza_fonti": le tre opzioni dello Scrittore sono coerenti con le fonti approvate e non affermano cose che quelle fonti non sostengono;
+- "piu_stagioni": l'argomento è trattato su più stagioni e non su una sola.
+Poi valuti separatamente ciascuna delle tre opzioni (punti di forza e criticità): un problema in una non deve penalizzare le altre.
+Nel campo "agente" indica a chi attribuire il problema, oppure "nessuno" se la voce è a posto.
+
+${VINCOLO_STAGIONI}`,
+)
+
+// ---------------------------------------------------------------------------
+// Messaggi utente
+// ---------------------------------------------------------------------------
+
+export function messaggioLettore(ctx: ContestoProgetto): Anthropic.MessageParam {
+  const { blocchi, saltati } = blocchiPdfCorso(ctx.courseFiles)
+  const testo = testoCorso(ctx.courseFiles)
+  const nomiPdf = ctx.courseFiles
+    .filter((f) => f.kind === 'pdf' && f.status === 'pronto')
+    .map((f) => f.name)
+
+  const parti = [intestazioneProgetto(ctx)]
+  if (nomiPdf.length > 0) parti.push(`PDF DEL CORSO ALLEGATI: ${nomiPdf.join(', ')}.`)
+  if (saltati.length > 0) {
+    parti.push(`NOTA: questi PDF non sono allegati per limiti di contesto: ${saltati.join(', ')}.`)
+  }
+  if (testo) parti.push(`MATERIALE DEL CORSO IN TESTO:\n"""\n${testo}\n"""`)
+  parti.push(
+    'COMPITO: leggi il materiale del corso e i dati del caso e produci il dossier che userà tutta la squadra.',
+  )
+
+  return {
+    role: 'user',
+    content: [...blocchi, { type: 'text', text: parti.join('\n\n') }],
+  }
 }
 
-export function selettoreInstruction(
-  lettoreResult: string,
-  found: Source[],
-  rejectionReason: string,
-  previousSelection: string,
-): string {
-  const parts = [
-    `BASE PREPARATA DAL LETTORE:\n"""\n${lettoreResult || '(non disponibile)'}\n"""`,
-    `ELENCO COMPLETO DELLE FONTI TROVATE DAL RICERCATORE:\n"""\n${sourceList(found)}\n"""`,
+export function messaggioRicercatore(
+  ctx: ContestoProgetto,
+  dossier: RisultatoLettore | null,
+  motivoNuovoGiro?: string,
+): Anthropic.MessageParam {
+  const parti = [
+    intestazioneProgetto(ctx),
+    `DOSSIER DEL CORSO PREPARATO DAL LETTORE:\n"""\n${dossierTestuale(dossier)}\n"""`,
   ]
 
-  if (rejectionReason !== '' || previousSelection !== '') {
-    parts.push(
-      `LA TUA SELEZIONE PRECEDENTE È STATA RIFIUTATA DALLO STUDENTE.\nSelezione precedente:\n"""\n${previousSelection || '(non disponibile)'}\n"""\nMotivo del rifiuto indicato dallo studente:\n"""\n${rejectionReason.trim() || '(nessun motivo specificato: rivedi comunque la selezione con occhio critico e cambia qualcosa)'}\n"""\nCOMPITO: rivedi la selezione tenendo conto del motivo. Puoi tenere fonti che prima avevi scartato e scartare fonti che prima avevi tenuto, ma solo fra quelle dell'elenco del Ricercatore. Se davvero non ci sono abbastanza fonti pertinenti, chiudi con [NUOVA RICERCA].`,
+  if (motivoNuovoGiro) {
+    parti.push(
+      `NUOVO GIRO DI RICERCA. Il giro precedente non è bastato per questo motivo:\n"""\n${motivoNuovoGiro}\n"""\nCerca fonti NUOVE e diverse da quelle già trovate, con query differenti e più mirate.`,
+    )
+  }
+
+  parti.push(
+    'COMPITO: usa la ricerca web per trovare fonti reali e aggiornate utili a questo capitolo, poi consegna chiamando submit_ricercatore.',
+  )
+
+  return { role: 'user', content: parti.join('\n\n') }
+}
+
+export function messaggioSelettore(
+  ctx: ContestoProgetto,
+  dossier: RisultatoLettore | null,
+  fonti: Fonte[],
+  motivoRifiuto: string,
+  selezionePrecedente: string,
+): Anthropic.MessageParam {
+  const parti = [
+    intestazioneProgetto(ctx),
+    `DOSSIER DEL CORSO:\n"""\n${dossierTestuale(dossier)}\n"""`,
+    `FONTI TROVATE DAL RICERCATORE (tutte con URL verificato):\n"""\n${elencoFonti(fonti)}\n"""`,
+  ]
+
+  if (motivoRifiuto || selezionePrecedente) {
+    parti.push(
+      `LA TUA SELEZIONE PRECEDENTE È STATA RIFIUTATA DALLO STUDENTE.\nSelezione precedente:\n"""\n${selezionePrecedente || '(non disponibile)'}\n"""\nMotivo indicato:\n"""\n${motivoRifiuto.trim() || '(nessun motivo specificato: rivedi comunque la scelta con occhio critico e cambia qualcosa)'}\n"""\nCOMPITO: rivedi la selezione tenendo conto del motivo, scegliendo solo fra le fonti dell'elenco qui sopra.`,
     )
   } else {
-    parts.push(
-      'COMPITO: seleziona le fonti da usare per il capitolo, scartando le non pertinenti, e motiva ogni scelta.',
-    )
+    parti.push('COMPITO: seleziona le fonti da usare per il capitolo e motiva ogni scelta.')
   }
 
-  return parts.join('\n\n')
+  return { role: 'user', content: parti.join('\n\n') }
 }
 
-export function scrittoreInstruction(lettoreResult: string, selected: Source[]): string {
-  return `BASE PREPARATA DAL LETTORE:\n"""\n${lettoreResult || '(non disponibile)'}\n"""\n\nFONTI SELEZIONATE E APPROVATE DALLO STUDENTE (usa solo queste):\n"""\n${sourceList(selected)}\n"""\n\nCOMPITO: scrivi il capitolo o la sezione indicata sopra, in tre opzioni differenti per taglio e approccio.`
+export const IMPIANTI: Record<ImpiantoKey, { etichetta: string; istruzione: string }> = {
+  A: {
+    etichetta: 'Impianto teorico-deduttivo',
+    istruzione:
+      'Imposta il capitolo in modo teorico-deduttivo: parti dalla teoria del corso (definizioni, modelli, relazioni fra le grandezze) e scendi progressivamente al caso, che serve come applicazione. La struttura argomentativa va dal generale al particolare.',
+  },
+  B: {
+    etichetta: 'Impianto empirico',
+    istruzione:
+      'Imposta il capitolo in modo empirico: parti dai dati del caso sulle diverse stagioni, descrivi cosa mostrano e interpretali con gli strumenti teorici del corso. La teoria entra per spiegare i dati, non prima di essi.',
+  },
+  C: {
+    etichetta: 'Impianto critico-comparativo',
+    istruzione:
+      'Imposta il capitolo in modo critico-comparativo: confronta approcci diversi alla misurazione del rischio in contesti stagionali, discutine i limiti e le ipotesi implicite, e mostra cosa ciascuno coglie o trascura nel caso in esame.',
+  },
 }
 
-export function supervisorSourcesInstruction(
-  found: Source[],
-  unverified: Source[],
-  searchErrors: string[],
-): string {
-  const parts = [
-    `FONTI RIPORTATE DAL RICERCATORE:\n"""\n${sourceList(found)}\n"""`,
-    `CONTROLLO AUTOMATICO DEGLI URL: ${
-      unverified.length === 0
-        ? 'tutti gli URL riportati corrispondono a risultati reali del tool di ricerca web.'
-        : `questi URL NON compaiono fra i risultati reali della ricerca e potrebbero essere inventati:\n${unverified.map((s) => `- ${s.title} — ${s.url}`).join('\n')}`
-    }`,
+export function messaggioScrittore(
+  ctx: ContestoProgetto,
+  dossier: RisultatoLettore | null,
+  fontiApprovate: Fonte[],
+  impianto: ImpiantoKey,
+): Anthropic.MessageParam {
+  // Allo Scrittore i PDF tornano (con caching) per la precisione terminologica.
+  const { blocchi, saltati } = blocchiPdfCorso(ctx.courseFiles)
+
+  const parti = [
+    intestazioneProgetto(ctx),
+    `DOSSIER DEL CORSO:\n"""\n${dossierTestuale(dossier)}\n"""`,
+    `FONTI APPROVATE DALLO STUDENTE (usa solo queste):\n"""\n${elencoFonti(fontiApprovate)}\n"""`,
   ]
-  if (searchErrors.length > 0) {
-    parts.push(`ERRORI DEL TOOL DI RICERCA WEB:\n${searchErrors.map((e) => `- ${e}`).join('\n')}`)
+  if (saltati.length > 0) {
+    parti.push(`NOTA: questi PDF non sono allegati per limiti di contesto: ${saltati.join(', ')}.`)
   }
-  parts.push(
-    'COMPITO: valuta l\'affidabilità di questo giro di ricerca. Nella sezione RISULTATO scrivi un referto breve (massimo 8 righe) sulle fonti sospette o mancanti e su cosa conviene fare. Chiudi con la riga STATO.',
+  parti.push(
+    `IMPOSTAZIONE RICHIESTA — ${IMPIANTI[impianto].etichetta}\n${IMPIANTI[impianto].istruzione}`,
+    'COMPITO: scrivi il capitolo indicato sopra con questa impostazione.',
   )
-  return parts.join('\n\n')
+
+  return { role: 'user', content: [...blocchi, { type: 'text', text: parti.join('\n\n') }] }
 }
 
-export function supervisorDraftsInstruction(drafts: Draft[], selected: Source[]): string {
-  const draftText = drafts
-    .map((d, i) => `[OPZIONE ${i + 1}] APPROCCIO: ${d.approach}\n${d.text}`)
-    .join('\n\n')
+export function messaggioControllore(
+  ctx: ContestoProgetto,
+  fontiApprovate: Fonte[],
+  opzioni: Opzione[],
+  esitoVerificaUrl: string,
+): Anthropic.MessageParam {
+  const testoOpzioni = opzioni
+    .map((o) => {
+      if (!o.risultato) return `[OPZIONE ${o.impianto}] non prodotta: ${o.errore ?? 'errore sconosciuto'}`
+      const corpo = o.risultato.paragrafi
+        .map((p) => `### ${p.titoletto}\n${p.testo}`)
+        .join('\n\n')
+      return `[OPZIONE ${o.impianto}] ${o.etichetta} — "${o.risultato.titolo}" (${o.risultato.parole} parole)\n${corpo}`
+    })
+    .join('\n\n---\n\n')
 
-  return `FONTI APPROVATE DALLO STUDENTE:\n"""\n${sourceList(selected)}\n"""\n\nTRE OPZIONI PRODOTTE DALLO SCRITTORE:\n"""\n${draftText}\n"""\n\nCOMPITO: valuta ognuna delle tre opzioni per coerenza con le fonti approvate, correttezza accademica e pertinenza al capitolo richiesto. Non bloccare le opzioni valide a causa di una sbagliata: giudica ciascuna separatamente.
-
-Nella sezione RISULTATO usa ESATTAMENTE questo schema:
-
-[VALUTAZIONE OPZIONE 1]
-ESITO: OK
-NOTE: <giudizio in una o due frasi; se ESITO è PROBLEMA spiega il problema specifico>
-
-[VALUTAZIONE OPZIONE 2]
-ESITO: OK
-NOTE: <...>
-
-[VALUTAZIONE OPZIONE 3]
-ESITO: OK
-NOTE: <...>
-
-Usa "ESITO: PROBLEMA" solo quando l'opzione ha un difetto evidente (afferma cose non supportate dalle fonti, è fuori tema, non è scrittura accademica, o è palesemente incompleta). Chiudi con la riga STATO.`
+  return {
+    role: 'user',
+    content: [
+      intestazioneProgetto(ctx),
+      `FONTI APPROVATE:\n"""\n${elencoFonti(fontiApprovate)}\n"""`,
+      `CONTROLLO AUTOMATICO DEGLI URL (eseguito in codice, non dal modello):\n${esitoVerificaUrl}`,
+      `OPZIONI PRODOTTE DALLO SCRITTORE:\n"""\n${testoOpzioni}\n"""`,
+      'COMPITO: compila la checklist a quattro voci e valuta separatamente ogni opzione prodotta.',
+    ].join('\n\n'),
+  }
 }
 
 // ---------------------------------------------------------------------------
 // Chat sul progetto
 // ---------------------------------------------------------------------------
 
-export const CHAT_SYSTEM = `Sei l'assistente di "Studio tesi", un'applicazione in cui una squadra di cinque agenti AI (Lettore, Ricercatore, Selettore, Scrittore, Controllore) aiuta uno studente a scrivere un capitolo della sua tesi di laurea in Finanza Aziendale.
-Sei un esperto di finanza aziendale e di scrittura accademica, e conosci nel dettaglio questo specifico progetto di tesi: ne ricevi lo stato aggiornato a ogni messaggio.
+export const SYSTEM_CHAT_BASE = `Sei l'assistente di "Studio tesi", un'applicazione in cui cinque agenti AI aiutano uno studente a scrivere un capitolo della sua tesi di laurea triennale in Finanza Aziendale.
+Sei un esperto di Finanza Aziendale e di scrittura accademica e conosci questo specifico progetto: ne ricevi lo stato aggiornato a ogni domanda.
 
-Rispondi in italiano, in modo diretto e concreto, a tre famiglie di domande:
-1. MERITO DELLA TESI: di cosa parla il materiale del corso, se le fonti selezionate sono valide, che taglio dare al capitolo, quale delle tre opzioni dello Scrittore è più solida e perché, che obiezioni farebbe un relatore, quali altre fonti cercare. Qui entra nel merito disciplinare: modelli, formule, ipotesi, limiti, letteratura.
-2. STATO DELL'ESECUZIONE: cosa sta facendo ora ogni agente, a che punto è la pipeline, perché il Selettore ha rifatto la selezione.
+Rispondi in italiano, entrando nel merito, a tre famiglie di domande:
+1. MERITO DELLA TESI: contenuti del materiale del corso e dei dati del caso, solidità delle fonti, taglio da dare al capitolo, quale delle tre opzioni è più solida e perché, obiezioni prevedibili del relatore, quali altre fonti cercare. Qui parla da studioso: modelli, ipotesi, limiti, misure.
+2. STATO DELL'ESECUZIONE: cosa sta facendo ogni agente, a che punto è la pipeline, perché il Selettore ha rifatto la scelta.
 3. PROCESSI TECNICI: cosa dice la console di diagnostica, perché una chiamata è stata ritentata, cosa significa un errore.
 
-Usa lo stato del progetto che ricevi come fonte di verità: non inventare fonti, output o eventi che non compaiono lì. Se un'informazione non è ancora disponibile, dillo e spiega cosa manca. Quando dai un giudizio accademico, motivalo.`
+Usa lo stato del progetto come unica fonte di verità: non inventare fonti, testi o eventi che non compaiono lì. Se un'informazione non è ancora disponibile, dillo e spiega cosa manca.
 
-export interface ChatContext {
-  thesisTopic: string
-  chapterBrief: string
-  materialSummary: string
-  foundSources: Source[]
-  selectedSources: Source[]
-  drafts: Draft[]
-  agentStates: string
-  recentLogs: string
-  approvalInfo: string
+${SUBJECT_GUARDRAIL}`
+
+export interface StatoPerChat {
+  argomento: string
+  capitolo: string
+  dossier: RisultatoLettore | null
+  riepilogoCaso: string
+  fontiApprovate: Fonte[]
+  opzioni: Opzione[]
+  statiAgenti: string
+  console: string
+  approvazione: string
 }
 
-/** Fotografia dello stato del progetto allegata a ogni messaggio della chat. */
-export function buildChatContext(ctx: ChatContext): string {
-  const draftBlock =
-    ctx.drafts.length === 0
-      ? '(lo Scrittore non ha ancora prodotto le bozze)'
-      : ctx.drafts
-          .map(
-            (d, i) =>
-              `[OPZIONE ${i + 1}] approccio: ${d.approach}\nverdetto del Controllore: ${
-                d.review ? (d.review.ok ? `OK — ${d.review.note}` : `PROBLEMA — ${d.review.note}`) : 'non ancora valutata'
-              }\ntesto:\n${d.text.slice(0, 2500)}`,
-          )
+/** Fotografia dello stato, rigenerata a ogni domanda e messa nel system. */
+export function contestoChat(s: StatoPerChat): string {
+  const opzioni =
+    s.opzioni.length === 0
+      ? '(lo Scrittore non ha ancora prodotto le opzioni)'
+      : s.opzioni
+          .map((o) => {
+            if (!o.risultato) return `[OPZIONE ${o.impianto}] ${o.etichetta}: non prodotta (${o.errore ?? 'errore'})`
+            const corpo = o.risultato.paragrafi.map((p) => `${p.titoletto}: ${p.testo}`).join('\n')
+            return `[OPZIONE ${o.impianto}] ${o.etichetta} — "${o.risultato.titolo}" (${o.risultato.parole} parole)\n${corpo.slice(0, 3000)}`
+          })
           .join('\n\n')
 
-  return `STATO ATTUALE DEL PROGETTO DI TESI
+  return `STATO ATTUALE DEL PROGETTO
 
-ARGOMENTO: ${ctx.thesisTopic.trim() || '(non ancora indicato)'}
-CAPITOLO DA SCRIVERE: ${ctx.chapterBrief.trim() || '(non ancora indicato)'}
+ARGOMENTO: ${s.argomento.trim() || '(non indicato)'}
+CAPITOLO DA SCRIVERE: ${s.capitolo.trim() || '(non indicato)'}
 
-ESTRATTO DEL MATERIALE DEL CORSO:
+DOSSIER DEL CORSO:
 """
-${ctx.materialSummary || '(nessun materiale caricato)'}
+${dossierTestuale(s.dossier)}
 """
 
-FONTI TROVATE DAL RICERCATORE:
-${ctx.foundSources.length === 0 ? '(nessuna)' : sourceList(ctx.foundSources)}
+DATI DEL CASO:
+"""
+${s.riepilogoCaso}
+"""
 
-FONTI SELEZIONATE:
-${ctx.selectedSources.length === 0 ? '(nessuna)' : sourceList(ctx.selectedSources)}
+FONTI APPROVATE:
+${s.fontiApprovate.length === 0 ? '(nessuna)' : elencoFonti(s.fontiApprovate)}
 
-APPROVAZIONE UMANA: ${ctx.approvalInfo}
+APPROVAZIONE UMANA: ${s.approvazione}
 
-BOZZE DELLO SCRITTORE:
-${draftBlock}
+OPZIONI DELLO SCRITTORE:
+${opzioni}
 
 STATO DEGLI AGENTI:
-${ctx.agentStates}
+${s.statiAgenti}
 
-ULTIME RIGHE DELLA CONSOLE DI DIAGNOSTICA:
-${ctx.recentLogs || '(console vuota)'}`
+ULTIME RIGHE DELLA CONSOLE:
+${s.console || '(console vuota)'}`
 }

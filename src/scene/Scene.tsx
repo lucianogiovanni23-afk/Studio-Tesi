@@ -1,39 +1,47 @@
-import { Suspense, useRef } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { AGENTS } from '../agents/definitions'
+import { AGENTI } from '../agents/definitions'
 import { useCoarsePointer } from '../hooks/useLayoutMode'
 import { useStudioStore } from '../store'
-import { CameraRig, type OrbitControlsLike } from './CameraRig'
-import { Office } from './Office'
-import { CAMERA_HOME, CAMERA_TARGET } from './layout'
+import { CameraRig, type ControlliOrbita } from './CameraRig'
+import { TradingFloor } from './TradingFloor'
+import { CAMERA_BERSAGLIO, CAMERA_CASA } from './layout'
 
 export function Scene() {
-  const controls = useRef<OrbitControlsLike | null>(null)
-  const coarse = useCoarsePointer()
-  const focusCamera = useStudioStore((s) => s.focusCamera)
-  const cameraFocus = useStudioStore((s) => s.cameraFocus)
-  const closeBubble = useStudioStore((s) => s.closeBubble)
+  const controlli = useRef<ControlliOrbita | null>(null)
+  const grossolano = useCoarsePointer()
+  const inquadra = useStudioStore((s) => s.inquadra)
+  const fuoco = useStudioStore((s) => s.fuocoCamera)
+  const chiudiNuvoletta = useStudioStore((s) => s.chiudiNuvoletta)
+
+  const ridotto = useMemo(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true,
+    [],
+  )
 
   return (
-    <div className="scene">
+    <div className="scena">
       <Canvas
         shadows
         dpr={[1, 2]}
-        camera={{ position: CAMERA_HOME, fov: coarse ? 44 : 40, near: 0.1, far: 120 }}
+        camera={{ position: CAMERA_CASA, fov: grossolano ? 44 : 40, near: 0.1, far: 140 }}
         // Il canvas non deve catturare lo scroll della pagina su iPad.
         style={{ touchAction: 'pan-y' }}
-        onPointerMissed={() => closeBubble()}
+        onPointerMissed={() => chiudiNuvoletta()}
       >
-        <color attach="background" args={['#1b2130']} />
-        <fog attach="fog" args={['#1b2130', 26, 52]} />
+        <color attach="background" args={['#070b12']} />
+        <fog attach="fog" args={['#070b12', 26, 56]} />
 
-        <ambientLight intensity={0.6} color="#c2cce4" />
-        <hemisphereLight args={['#dbe3f7', '#3a2c1e', 0.5]} />
+        {/* luce calda da ufficio serale */}
+        <ambientLight intensity={0.6} color="#d9c9a8" />
+        <hemisphereLight args={['#e8d7b4', '#12301f', 0.55]} />
         <directionalLight
-          position={[8, 13, 9]}
-          intensity={1.15}
-          color="#fff3e0"
+          position={[7, 12, 8]}
+          intensity={0.95}
+          color="#ffe6bd"
           castShadow
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
@@ -45,55 +53,53 @@ export function Scene() {
           shadow-camera-far={44}
           shadow-bias={-0.0005}
         />
-        {/* luce di riempimento frontale, senza ombre */}
-        <directionalLight position={[-8, 6, 11]} intensity={0.4} color="#9fb6e8" />
+        <directionalLight position={[-8, 6, 11]} intensity={0.3} color="#8fb0d8" />
 
         <Suspense fallback={null}>
-          <Office />
+          <TradingFloor />
         </Suspense>
 
-        <CameraRig controls={controls} />
+        <CameraRig controlli={controlli} />
 
         <OrbitControls
-          ref={controls as never}
-          target={CAMERA_TARGET}
+          ref={controlli as never}
+          target={CAMERA_BERSAGLIO}
           enablePan={false}
-          minDistance={coarse ? 9 : 7}
-          maxDistance={coarse ? 26 : 32}
-          minPolarAngle={Math.PI / (coarse ? 5.2 : 6)}
-          maxPolarAngle={Math.PI / (coarse ? 2.6 : 2.35)}
-          minAzimuthAngle={-Math.PI / (coarse ? 6 : 4)}
-          maxAzimuthAngle={Math.PI / (coarse ? 6 : 4)}
-          enableDamping
+          enableDamping={!ridotto}
           dampingFactor={0.08}
+          minDistance={grossolano ? 9 : 7}
+          maxDistance={grossolano ? 26 : 32}
+          minPolarAngle={Math.PI / (grossolano ? 5.2 : 6)}
+          maxPolarAngle={Math.PI / (grossolano ? 2.6 : 2.35)}
+          minAzimuthAngle={-Math.PI / (grossolano ? 6 : 4)}
+          maxAzimuthAngle={Math.PI / (grossolano ? 6 : 4)}
         />
       </Canvas>
 
-      <div className="scene-tools">
+      <div className="scena-comandi">
         <button
           type="button"
-          className={`chip ${cameraFocus === null ? 'chip-on' : ''}`}
-          onClick={() => focusCamera(null)}
+          className={`gettone ${fuoco === null ? 'gettone-attivo' : ''}`}
+          onClick={() => inquadra(null)}
         >
           Vista d'insieme
         </button>
-        {AGENTS.map((agent) => (
+        {AGENTI.map((a) => (
           <button
-            key={agent.key}
+            key={a.key}
             type="button"
-            className={`chip ${cameraFocus === agent.key ? 'chip-on' : ''}`}
-            style={{ borderColor: cameraFocus === agent.key ? agent.color : undefined }}
-            onClick={() => focusCamera(agent.key)}
+            className={`gettone ${fuoco === a.key ? 'gettone-attivo' : ''}`}
+            style={{ borderColor: fuoco === a.key ? a.colore : undefined }}
+            onClick={() => inquadra(a.key)}
           >
-            <span className="chip-dot" style={{ background: agent.color }} />
-            {agent.name}
+            <span className="gettone-punto" style={{ background: a.colore }} />
+            {a.nome}
           </button>
         ))}
       </div>
 
-      <p className="scene-hint">
-        Trascina per ruotare · pizzica o usa la rotella per lo zoom · tocca un agente per aprire la
-        sua nuvoletta di ragionamento
+      <p className="scena-nota">
+        Trascina per ruotare · pizzica o rotella per lo zoom · tocca un broker per il suo ragionamento
       </p>
     </div>
   )
