@@ -8,6 +8,7 @@ import { Skyline } from './Skyline'
 import { TradingBell } from './TradingBell'
 import { Workstation } from './Workstation'
 import { SALA } from './layout'
+import { useQualita } from './qualita'
 
 const PANNELLATURA = '#3d2718'
 const PANNELLATURA_CHIARA = '#4d3320'
@@ -72,6 +73,7 @@ function Finestrone({ x, larghezza }: { x: number; larghezza: number }) {
 
 /** Plafoniera a soffitto. */
 function Plafoniera({ x, z }: { x: number; z: number }) {
+  const qualita = useQualita()
   return (
     <group position={[x, SALA.altezza - 0.22, z]}>
       <mesh castShadow>
@@ -82,7 +84,9 @@ function Plafoniera({ x, z }: { x: number; z: number }) {
         <planeGeometry args={[2.4, 0.56]} />
         <meshStandardMaterial color="#fdf3dd" emissive="#ffe9c2" emissiveIntensity={1.3} />
       </mesh>
-      <pointLight position={[0, -0.5, 0]} color="#ffe0b0" intensity={11} distance={12} decay={2} />
+      {qualita === 'completa' && (
+        <pointLight position={[0, -0.5, 0]} color="#ffe0b0" intensity={11} distance={12} decay={2} />
+      )}
     </group>
   )
 }
@@ -91,6 +95,7 @@ function Plafoniera({ x, z }: { x: number; z: number }) {
 function Lavagna() {
   const approvazione = useStudioStore((s) => s.approvazione)
   const opzioni = useStudioStore((s) => s.opzioni)
+  const opzioneAttiva = useStudioStore((s) => s.opzioneAttiva)
   const fonti = useStudioStore((s) => s.fonti)
   const selezionate = useStudioStore((s) => s.selezionate)
   const approvate = useMemo(() => {
@@ -99,8 +104,8 @@ function Lavagna() {
   }, [fonti, selezionate])
   const inEsecuzione = useStudioStore((s) => s.inEsecuzione)
 
-  const scelta = opzioni.find((o) => o.stato === 'ok' && o.valutazione && o.valutazione.criticita.length === 0)
-    ?? opzioni.find((o) => o.stato === 'ok')
+  const scelta =
+    opzioni.find((o) => o.stato === 'ok' && o.impianto === opzioneAttiva) ?? opzioni.find((o) => o.stato === 'ok')
 
   const approvato = approvazione === 'approvata'
 
@@ -122,9 +127,9 @@ function Lavagna() {
             <>
               <div className="lavagna-titolo">{scelta.risultato.titolo}</div>
               <p className="lavagna-sottotitolo">
-                {scelta.etichetta} · {scelta.risultato.parole} parole
+                {scelta.etichetta} · {scelta.parole} parole
               </p>
-              <p className="lavagna-testo">{scelta.risultato.paragrafi[0]?.testo.slice(0, 620)}…</p>
+              <p className="lavagna-testo">{scelta.risultato.paragrafi[0]?.testo.replace(/\s*\[(?:F|C)\d+\]/gi, '').slice(0, 620)}…</p>
             </>
           ) : approvato && approvate.length > 0 ? (
             <>

@@ -5,7 +5,24 @@ export type AgentKey = 'lettore' | 'ricercatore' | 'selettore' | 'scrittore' | '
 export type AgentStatus = 'idle' | 'walking' | 'working' | 'waiting' | 'done' | 'error'
 
 // ---------------------------------------------------------------------------
-// Risultati strutturati dei cinque agenti (tool use / output strutturato)
+// Materiale del corso: passaggi estratti dai PDF
+// ---------------------------------------------------------------------------
+
+/** Porzione di testo del corso, con file e pagine di provenienza. */
+export interface Passaggio {
+  id: string
+  fileId: string
+  file: string
+  /** Prima e ultima pagina coperte dal passaggio. */
+  pagine: [number, number]
+  testo: string
+}
+
+/** Quanto materiale del corso leggono gli agenti a ogni chiamata. */
+export type Profondita = 'sintetica' | 'standard' | 'estesa'
+
+// ---------------------------------------------------------------------------
+// Risultati strutturati degli agenti
 // ---------------------------------------------------------------------------
 
 export interface ConcettoChiave {
@@ -29,19 +46,18 @@ export interface Fonte {
   tipo: TipoFonte
   descrizione: string
   perche_rilevante: string
-  /** Impostata in codice: l'URL compare nei blocchi web_search_tool_result. */
+  /** Impostata in codice: l'URL compare fra i risultati reali della ricerca. */
   verificata: boolean
+  /** Citazioni letterali confermate in codice sul testo scaricato della pagina. */
+  estratti: string[]
+  /** true se la pagina è stata effettivamente scaricata e letta. */
+  letta: boolean
 }
 
 export interface FonteScartata {
   titolo: string
   url: string
   motivo: string
-}
-
-export interface RisultatoRicercatore {
-  fonti: Fonte[]
-  fonti_scartate: FonteScartata[]
 }
 
 export interface SceltaFonte {
@@ -55,16 +71,48 @@ export interface RisultatoSelettore {
   copertura_sufficiente: boolean
 }
 
+export interface SezioneScaletta {
+  titoletto: string
+  obiettivo: string
+  punti: string[]
+  /** Riferimenti previsti: F1, F2… per le fonti, C1, C2… per il corso. */
+  riferimenti: string[]
+}
+
+export interface Scaletta {
+  titolo_capitolo: string
+  sezioni: SezioneScaletta[]
+  nota_metodo: string
+}
+
+export type EsitoTestuale = 'verificato' | 'approssimato' | 'non_trovato' | 'rif_sconosciuto'
+export type Giudizio = 'supportata' | 'parziale' | 'non_supportata'
+
+export interface VerificaCitazione {
+  /** Controllo deterministico in codice: l'estratto compare alla lettera nella fonte? */
+  testuale: EsitoTestuale
+  /** Giudizio del Controllore: l'estratto sostiene davvero l'affermazione? */
+  giudizio?: Giudizio
+  nota?: string
+}
+
+export interface Citazione {
+  /** F1, F2… per le fonti web, C1, C2… per i passaggi del corso. */
+  rif: string
+  affermazione: string
+  estratto: string
+  verifica?: VerificaCitazione
+}
+
 export interface Paragrafo {
   titoletto: string
   testo: string
+  citazioni: Citazione[]
 }
 
 export interface RisultatoScrittore {
   titolo: string
   paragrafi: Paragrafo[]
-  fonti_citate: string[]
-  parole: number
 }
 
 export type ImpiantoKey = 'A' | 'B' | 'C'
@@ -79,9 +127,14 @@ export interface Opzione {
   etichetta: string
   passaggi: string[]
   risultato: RisultatoScrittore | null
+  parole: number
   stato: 'in_corso' | 'ok' | 'errore'
   errore: string | null
   valutazione: ValutazioneOpzione | null
+  /** Versioni precedenti di ogni paragrafo, per annullare una rifinitura. */
+  storico: Record<number, Paragrafo[]>
+  /** Indice del paragrafo in rifinitura, se ce n'è uno. */
+  rifinisce: number | null
 }
 
 export type EsitoVoce = 'ok' | 'problema' | 'non_applicabile'
@@ -91,13 +144,20 @@ export interface VoceChecklist {
   voce: string
   esito: EsitoVoce
   dettaglio: string
-  /** Agente a cui attribuire il problema, per il bottone "rigenera". */
   agente: AgentKey | null
+}
+
+export interface GiudizioCitazione {
+  /** Formato "A.2.1": opzione, paragrafo, citazione. */
+  id: string
+  giudizio: Giudizio
+  nota: string
 }
 
 export interface RisultatoControllore {
   checklist: VoceChecklist[]
   valutazioni: { opzione: ImpiantoKey; punti_di_forza: string[]; criticita: string[] }[]
+  giudizi: GiudizioCitazione[]
 }
 
 /** Involucro comune: ogni agente consegna i passaggi del ragionamento più il risultato. */
@@ -106,15 +166,29 @@ export interface Consegna<T> {
   risultato: T
 }
 
+/** Testo di riferimento citabile dallo Scrittore, con la sua etichetta. */
+export interface Riferimento {
+  etichetta: string
+  tipo: 'fonte' | 'corso'
+  titolo: string
+  /** URL per le fonti, "file, p. x–y" per il corso. */
+  collocazione: string
+  testo: string
+}
+
+/** Prefisso comune a tutte le chiamate dello Scrittore: identico byte per byte, per il caching. */
+export interface PrefissoScrittore {
+  testo: string
+  riferimenti: Riferimento[]
+}
+
 // ---------------------------------------------------------------------------
 // Stato runtime di un agente
 // ---------------------------------------------------------------------------
 
 export interface AgentRuntime {
   status: AgentStatus
-  /** Micro-etichetta sempre visibile sopra la testa. */
   microLabel: string
-  /** Ragionamento già diviso in passaggi, per le nuvolette. */
   passaggi: string[]
   errore: string | null
   arrived: boolean
@@ -125,7 +199,7 @@ export interface AgentRuntime {
 // File caricati
 // ---------------------------------------------------------------------------
 
-export type UploadStatus = 'lettura' | 'pronto' | 'errore'
+export type UploadStatus = 'lettura' | 'estrazione' | 'pronto' | 'errore'
 
 export interface CourseFile {
   id: string
@@ -135,13 +209,18 @@ export interface CourseFile {
   /** 0-100, calcolata sui byte letti da FileReader.onprogress. */
   progress: number
   status: UploadStatus
+  pagine?: number
+  paginaCorrente?: number
+  /** Numero di passaggi estratti e salvati nel corpus. */
+  passaggi?: number
+  /** PDF senza testo selezionabile: si invia com'è, e il modello lo legge dalle immagini. */
+  scansionato?: boolean
+  /** Solo per i PDF scansionati, in memoria: non viene salvato su disco. */
   base64?: string
-  text?: string
   errore?: string
 }
 
 export interface CaseTable {
-  /** Nome del foglio (Excel) o del file (CSV). */
   foglio: string
   colonne: string[]
   righe: Record<string, string>[]
@@ -156,13 +235,31 @@ export interface CaseFile {
   progress: number
   status: UploadStatus
   tabelle: CaseTable[]
-  /** Riepilogo testuale inviato agli agenti. */
   riepilogo: string
   errore?: string
 }
 
 // ---------------------------------------------------------------------------
-// Console di diagnostica
+// Costi
+// ---------------------------------------------------------------------------
+
+export interface VoceUso {
+  at: number
+  esecuzione: number
+  /** Agente o "chat". */
+  chi: AgentKey | 'chat'
+  modello: string
+  input: number
+  output: number
+  scritturaCache: number
+  letturaCache: number
+  ricerche: number
+  letture: number
+  costo: number
+}
+
+// ---------------------------------------------------------------------------
+// Console e interfaccia
 // ---------------------------------------------------------------------------
 
 export type LogKind = 'ok' | 'avviso' | 'riparazione' | 'fallimento' | 'info'
@@ -175,10 +272,6 @@ export interface LogEntry {
   messaggio: string
 }
 
-// ---------------------------------------------------------------------------
-// Approvazione e chat
-// ---------------------------------------------------------------------------
-
 export type ApprovalStatus = 'inattiva' | 'in_attesa' | 'approvata' | 'rifiutata'
 
 export interface ChatMessage {
@@ -186,9 +279,12 @@ export interface ChatMessage {
   content: string
 }
 
-/** Voce della banda ticker in cima alla pagina. */
 export interface TickerItem {
   id: number
   testo: string
   segno: '▲' | '▼' | '●'
 }
+
+export type Passo = 'materiale' | 'ricerca' | 'fonti' | 'scaletta' | 'capitolo'
+export type Vista = 'lavoro' | 'console' | 'chat' | 'costi'
+export type ModalitaScena = 'auto' | 'completa' | 'ridotta' | 'spenta'

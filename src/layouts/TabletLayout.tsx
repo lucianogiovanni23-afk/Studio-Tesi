@@ -1,77 +1,32 @@
-import { useState } from 'react'
-import { AgentsPanel } from '../panels/AgentsPanel'
 import { ApprovalCard } from '../panels/ApprovalCard'
-import { ChatPanel } from '../panels/ChatPanel'
-import { Console } from '../panels/Console'
-import { SettingsPanel } from '../panels/SettingsPanel'
-import { UploadPanel } from '../panels/UploadPanel'
-import { WriterOptions } from '../panels/WriterOptions'
+import { OutlineCard } from '../panels/OutlineCard'
+import { Workspace } from '../panels/Workspace'
 import { Scene } from '../scene/Scene'
+import type { QualitaScena } from '../scene/qualita'
 import { useStudioStore } from '../store'
 
-type Scheda = 'materiale' | 'agenti' | 'console' | 'chat'
-
-const SCHEDE: { id: Scheda; etichetta: string }[] = [
-  { id: 'materiale', etichetta: 'Materiale' },
-  { id: 'agenti', etichetta: 'Agenti' },
-  { id: 'console', etichetta: 'Console' },
-  { id: 'chat', etichetta: 'Chat' },
-]
-
 /**
- * iPad: scena a tutta larghezza in alto (~45%), sotto una barra a schede
- * grande. La card di approvazione diventa un pannello fisso in basso.
+ * iPad in verticale: scena in alto, sotto l'area di lavoro a schede. Le
+ * decisioni (fonti e scaletta) diventano un pannello fisso in basso, sempre a
+ * portata di dito qualunque scheda sia aperta.
  */
-export function TabletLayout() {
-  const [scheda, setScheda] = useState<Scheda>('materiale')
-  const nonVisti = useStudioStore((s) => s.logNonVisti)
-  const erroriNonVisti = useStudioStore((s) => s.erroriNonVisti)
-  const serveDecisione = useStudioStore((s) => s.approvazione === 'in_attesa')
+export function TabletLayout({ qualita }: { qualita: QualitaScena }) {
+  const attesaFonti = useStudioStore((s) => s.approvazione === 'in_attesa')
+  const attesaScaletta = useStudioStore((s) => s.approvazioneScaletta === 'in_attesa')
 
   return (
     <div className="layout-tablet">
-      <div className="palco palco-tablet">
-        <Scene />
-      </div>
+      {qualita !== 'spenta' && (
+        <div className={`palco palco-tablet ${qualita === 'ridotta' ? 'palco-basso' : ''}`}>
+          <Scene key={qualita} qualita={qualita} />
+        </div>
+      )}
 
-      <nav className="barra-schede" role="tablist" aria-label="Sezioni">
-        {SCHEDE.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            role="tab"
-            aria-selected={scheda === s.id}
-            className={`scheda-barra ${scheda === s.id ? 'scheda-barra-attiva' : ''}`}
-            onClick={() => setScheda(s.id)}
-          >
-            {s.etichetta}
-            {s.id === 'console' && nonVisti > 0 && (
-              <span className={`pastiglia ${erroriNonVisti > 0 ? 'pastiglia-errore' : ''}`}>{nonVisti}</span>
-            )}
-          </button>
-        ))}
-      </nav>
+      <Workspace approvazioniAncorate />
 
-      <div className={`sezione ${serveDecisione ? 'sezione-con-ancora' : ''}`}>
-        {scheda === 'materiale' && (
-          <>
-            <SettingsPanel />
-            <UploadPanel />
-          </>
-        )}
-        {scheda === 'agenti' && (
-          <>
-            <AgentsPanel />
-            <WriterOptions />
-          </>
-        )}
-        {scheda === 'console' && <Console />}
-        {scheda === 'chat' && <ChatPanel />}
-      </div>
-
-      {serveDecisione && (
+      {(attesaFonti || attesaScaletta) && (
         <div className="ancora">
-          <ApprovalCard variante="ancorata" />
+          {attesaFonti ? <ApprovalCard variante="ancorata" /> : <OutlineCard variante="ancorata" />}
         </div>
       )}
     </div>

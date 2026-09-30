@@ -1,9 +1,20 @@
 import { useMemo, useRef, useState } from 'react'
 import { leggiCsv, leggiExcel, riepilogaTabelle, totaleRighe } from '../agents/caseData'
-import { annullaEsecuzione, avviaSquadra } from '../agents/pipeline'
+import {
+  aggiungiAlCorpus,
+  arrayBufferInBase64,
+  estraiPdf,
+  pagineDaTesto,
+  rimuoviDalCorpus,
+  suddividi,
+} from '../agents/corpus'
 import { logAvviso, logInfo, logOk } from '../agents/supervisor'
-import { materialePronto, siPuoAvviare, useStudioStore } from '../store'
+import { daRicaricare as vaRicaricato, useStudioStore } from '../store'
 import type { CaseFile, CourseFile } from '../types'
+import { useStatisticheCorpus } from './useCorpus'
+
+/** Oltre questa dimensione un PDF scansionato non può essere allegato alle richieste. */
+const MAX_SCANSIONATO = 15 * 1024 * 1024
 
 const ACCETTA_CORSO = '.pdf,.txt,.md,application/pdf,text/plain,text/markdown'
 const ACCETTA_CASO = '.csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -136,17 +147,10 @@ export function UploadPanel() {
   const rimuoviCourseFile = useStudioStore((s) => s.rimuoviCourseFile)
   const rimuoviCaseFile = useStudioStore((s) => s.rimuoviCaseFile)
   const inEsecuzione = useStudioStore((s) => s.inEsecuzione)
-  const erroreGlobale = useStudioStore((s) => s.erroreGlobale)
-  const ripresaDa = useStudioStore((s) => s.ripresaDa)
-  const apiKey = useStudioStore((s) => s.apiKey)
-  const puoAvviare = useStudioStore(siPuoAvviare)
-  const pronto = useStudioStore(materialePronto)
+  const statistiche = useStatisticheCorpus()
   // Derivato con useMemo: un selettore che costruisce un array nuovo a ogni
   // chiamata farebbe ri-renderizzare all'infinito.
-  const daRicaricare = useMemo(
-    () => courseFiles.filter((f) => f.kind === 'pdf' && f.status === 'pronto' && !f.base64),
-    [courseFiles],
-  )
+  const daRicaricare = useMemo(() => courseFiles.filter(vaRicaricato), [courseFiles])
 
   const [scartati, setScartati] = useState<string[]>([])
   const [anteprima, setAnteprima] = useState<string | null>(null)
@@ -178,30 +182,62 @@ export function UploadPanel() {
     setScartati(cattivi)
     if (cattivi.length > 0) logAvviso(null, `File ignorati (formato non supportato): ${cattivi.join(', ')}.`)
 
+    // Uno alla volta: l'estrazione del testo è pesante e su iPad la memoria è poca.
     for (const voce of buoni) {
+      const aggiorna = (patch: Partial<CourseFile>) => useStudioStore.getState().aggiornaCourseFile(voce.id, patch)
       try {
+        let pagine: string[]
+        let scansionato = false
+        let base64: string | undefined
+
         if (voce.kind === 'pdf') {
-          const risultato = (await leggiConProgresso(voce.file, 'dataURL', (p) =>
-            useStudioStore.getState().aggiornaCourseFile(voce.id, { progress: p }),
-          )) as string
-          const base64 = risultato.slice(risultato.indexOf(',') + 1)
-          if (!base64) throw new Error('PDF vuoto o illeggibile.')
-          useStudioStore.getState().aggiornaCourseFile(voce.id, { status: 'pronto', progress: 100, base64 })
+          const buffer = (await leggiConProgresso(voce.file, 'buffer', (p) => aggiorna({ progress: p }))) as ArrayBuffer
+          aggiorna({ status: 'estrazione' })
+          const esito = await estraiPdf(buffer, (corrente, totale) =>
+            aggiorna({ paginaCorrente: corrente, pagine: totale }),
+          )
+          pagine = esito.pagine
+          scansionato = esito.scansionato
+          if (scansionato) {
+            if (voce.file.size > MAX_SCANSIONATO) {
+              throw new Error(
+                'PDF senza testo selezionabile (scansione) e troppo grande per essere inviato come immagini. Esportalo con il riconoscimento del testo (OCR) e ricaricalo.',
+              )
+            }
+            base64 = arrayBufferInBase64(buffer)
+          }
         } else {
-          const testo = (await leggiConProgresso(voce.file, 'testo', (p) =>
-            useStudioStore.getState().aggiornaCourseFile(voce.id, { progress: p }),
-          )) as string
+          const testo = (await leggiConProgresso(voce.file, 'testo', (p) => aggiorna({ progress: p }))) as string
           if (!testo.trim()) throw new Error('File di testo vuoto.')
-          useStudioStore.getState().aggiornaCourseFile(voce.id, { status: 'pronto', progress: 100, text: testo })
+          pagine = pagineDaTesto(testo)
         }
-        logOk(null, `Materiale del corso: "${voce.file.name}" caricato (${formatta(voce.file.size)}).`)
+
+        const passaggi = scansionato ? [] : suddividi(voce.id, voce.file.name, pagine)
+        if (!scansionato && passaggi.length === 0) throw new Error('Nessun testo leggibile nel file.')
+        await aggiungiAlCorpus(voce.id, passaggi)
+
+        aggiorna({
+          status: 'pronto',
+          progress: 100,
+          pagine: pagine.length,
+          paginaCorrente: pagine.length,
+          passaggi: passaggi.length,
+          scansionato,
+          base64,
+        })
+        logOk(
+          null,
+          scansionato
+            ? `Materiale del corso: "${voce.file.name}" è una scansione (${pagine.length} pagine): verrà letto dalle immagini.`
+            : `Materiale del corso: "${voce.file.name}" letto — ${pagine.length} pagine, ${passaggi.length} passaggi.`,
+        )
       } catch (err) {
         const messaggio = err instanceof Error ? err.message : 'Lettura non riuscita.'
-        useStudioStore.getState().aggiornaCourseFile(voce.id, { status: 'errore', progress: 100, errore: messaggio })
+        aggiorna({ status: 'errore', progress: 100, errore: messaggio })
         logAvviso(null, `Materiale del corso: "${voce.file.name}" — ${messaggio}`)
       }
     }
-    logInfo(null, 'Materiale del corso pronto: il Lettore ne ricaverà il dossier condiviso.')
+    logInfo(null, 'Materiale del corso indicizzato: a ogni chiamata gli agenti ricevono i passaggi più pertinenti.')
   }
 
   const gestisciCaso = async (lista: FileList | null) => {
@@ -273,26 +309,27 @@ export function UploadPanel() {
     }
   }
 
+  // Lettura dei byte e estrazione del testo pesano metà ciascuna.
+  const avanzamento = (f: CourseFile) => {
+    if (f.status === 'pronto' || f.status === 'errore') return 100
+    if (f.status === 'lettura') return Math.round(f.progress / 2)
+    return 50 + Math.round(((f.paginaCorrente ?? 0) / Math.max(1, f.pagine ?? 1)) * 50)
+  }
   const complessivoCorso =
     courseFiles.length === 0
       ? 0
-      : Math.round(courseFiles.reduce((s, f) => s + f.progress, 0) / courseFiles.length)
-
-  const mancano: string[] = []
-  if (!apiKey.trim()) mancano.push('la chiave API')
-  if (!pronto) mancano.push('il materiale del corso al 100%')
-  if (!argomento.trim()) mancano.push("l'argomento della tesi")
-  if (!capitolo.trim()) mancano.push('il capitolo da scrivere')
+      : Math.round(courseFiles.reduce((s, f) => s + avanzamento(f), 0) / courseFiles.length)
+  const scansionati = courseFiles.filter((f) => f.scansionato).length
 
   const fileAnteprima = caseFiles.find((f) => f.id === anteprima)
 
   return (
     <section className="pannello pannello-materiale">
-      <h2 className="pannello-titolo filetto-doppio">Passo 1 — Materiale e dati</h2>
+      <h2 className="pannello-titolo filetto-doppio">Materiale e dati</h2>
 
       <AreaCaricamento
         titolo="Materiale del corso — Finanza Aziendale"
-        descrizione="PDF delle lezioni e appunti in .txt / .md. Trascina i file qui oppure usa il pulsante."
+        descrizione="PDF delle lezioni, dispense e appunti in .txt / .md, anche molti insieme. Il testo viene estratto nel browser, diviso in passaggi con file e pagina e salvato sul dispositivo: a ogni chiamata gli agenti ricevono solo i passaggi più pertinenti."
         obbligatorio
         accetta={ACCETTA_CORSO}
         etichettaBottone="Carica il materiale del corso"
@@ -303,16 +340,17 @@ export function UploadPanel() {
         <>
           <div className="testa-progresso">
             <span>
-              Caricamento complessivo: <strong>{complessivoCorso}%</strong>
+              Lettura complessiva: <strong>{complessivoCorso}%</strong>
             </span>
             <span className="nota">
-              {courseFiles.filter((f) => f.kind === 'pdf').length} PDF ·{' '}
-              {courseFiles.filter((f) => f.kind === 'testo').length} testo
+              {courseFiles.length} file · {statistiche.passaggi} passaggi ·{' '}
+              {Math.round(statistiche.caratteri / 1000)} mila caratteri
+              {scansionati > 0 ? ` · ${scansionati} scansioni` : ''}
             </span>
           </div>
           <BarraProgresso percento={complessivoCorso} />
 
-          <ul className="elenco-file">
+          <ul className={`elenco-file ${courseFiles.length > 8 ? 'elenco-lungo' : ''}`}>
             {courseFiles.map((f) => (
               <li key={f.id} className={`riga-file riga-${f.status}`}>
                 <span className="spunta" aria-hidden>
@@ -322,13 +360,23 @@ export function UploadPanel() {
                   {f.name}
                 </span>
                 <span className="meta-file">
-                  {f.kind === 'pdf' ? 'PDF' : 'testo'} · {formatta(f.size)}
+                  {f.status === 'estrazione'
+                    ? `estraggo il testo: pagina ${f.paginaCorrente ?? 0} di ${f.pagine ?? '…'}`
+                    : f.status === 'pronto'
+                      ? f.scansionato
+                        ? `scansione · ${f.pagine} pagine · letta dalle immagini`
+                        : `${f.pagine ?? '?'} pagine · ${f.passaggi ?? 0} passaggi`
+                      : `${f.kind === 'pdf' ? 'PDF' : 'testo'} · ${formatta(f.size)}`}
                 </span>
-                <span className="percentuale">{f.progress}%</span>
+                <span className="percentuale">{avanzamento(f)}%</span>
                 <button
                   type="button"
                   className="bottone bottone-minuscolo"
-                  onClick={() => rimuoviCourseFile(f.id)}
+                  onClick={() => {
+                    // Il corpus in memoria si aggiorna subito, prima che l'elenco cambi.
+                    void rimuoviDalCorpus(f.id)
+                    rimuoviCourseFile(f.id)
+                  }}
                   disabled={inEsecuzione}
                   aria-label={`Rimuovi ${f.name}`}
                 >
@@ -343,8 +391,8 @@ export function UploadPanel() {
 
       {daRicaricare.length > 0 && (
         <p className="allerta allerta-avviso">
-          Dopo il ricaricamento della pagina i PDF vanno ricaricati: il testo non viene salvato su
-          disco. File da ricaricare: {daRicaricare.map((f) => f.name).join(', ')}.
+          I PDF scansionati non vengono salvati sul dispositivo: dopo un ricaricamento della pagina
+          vanno ricaricati. File da ricaricare: {daRicaricare.map((f) => f.name).join(', ')}.
         </p>
       )}
 
@@ -460,42 +508,6 @@ export function UploadPanel() {
           disabled={inEsecuzione}
         />
       </label>
-
-      <div className="azioni">
-        <button
-          type="button"
-          className="bottone bottone-primario bottone-largo"
-          onClick={() => void avviaSquadra()}
-          disabled={!puoAvviare}
-        >
-          {inEsecuzione ? 'Seduta in corso…' : 'Avvia la squadra'}
-        </button>
-        {inEsecuzione ? (
-          <button type="button" className="bottone bottone-vuoto" onClick={annullaEsecuzione}>
-            Interrompi
-          </button>
-        ) : (
-          ripresaDa && (
-            <button
-              type="button"
-              className="bottone bottone-vuoto"
-              onClick={() => void avviaSquadra(ripresaDa)}
-            >
-              Riprendi dal {ripresaDa}
-            </button>
-          )
-        )}
-      </div>
-
-      {!inEsecuzione && mancano.length > 0 && (
-        <p className="nota">Per avviare la squadra manca: {mancano.join(', ')}.</p>
-      )}
-
-      {erroreGlobale && (
-        <p className="allerta allerta-errore" role="alert">
-          {erroreGlobale}
-        </p>
-      )}
     </section>
   )
 }

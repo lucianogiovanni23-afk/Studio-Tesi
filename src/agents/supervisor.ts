@@ -105,9 +105,10 @@ export function installaHookControllore(): () => void {
 /** Se l'app risulta occupata ma non c'è nessuna richiesta in volo, si sblocca. */
 function ripristinaSeBloccata() {
   const s = useStudioStore.getState()
-  if (!s.inEsecuzione && !s.chatInCorso) return
+  const rifinitura = s.opzioni.some((o) => o.rifinisce !== null)
+  if (!s.inEsecuzione && !s.chatInCorso && !rifinitura) return
   if (inVolo > 0) return
-  if (s.approvazione === 'in_attesa') return
+  if (s.approvazione === 'in_attesa' || s.approvazioneScaletta === 'in_attesa') return
 
   logRiparazione('controllore', 'Interfaccia bloccata dopo un errore: controlli riabilitati.')
   s.sbloccaInterfaccia()

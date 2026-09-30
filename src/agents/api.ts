@@ -1,22 +1,23 @@
 import Anthropic from '@anthropic-ai/sdk'
+import type { AgentKey } from '../types'
+import { normalizzaUso, sommaUsi, type UsoNormalizzato } from './costs'
 import type { JsonSchema } from './schemas'
 
 /**
  * Unico punto di contatto con l'API Anthropic.
  *
- * Usa l'SDK ufficiale con `dangerouslyAllowBrowser`: è l'SDK stesso a mettere
- * gli header richiesti (x-api-key, anthropic-version, content-type e
- * anthropic-dangerous-direct-browser-access), e in cambio otteniamo le classi
- * d'errore tipizzate invece di confrontare stringhe.
+ * Usa l'SDK ufficiale con `dangerouslyAllowBrowser`: è l'SDK a mettere gli
+ * header richiesti (x-api-key, anthropic-version, content-type e
+ * anthropic-dangerous-direct-browser-access), e in cambio si ottengono le
+ * classi d'errore tipizzate invece di confrontare stringhe.
  */
-
-export type ModelId = string
 
 /** Valori predefiniti, modificabili dal pannello impostazioni. */
 export const MODELLI_PREDEFINITI = {
   lettore: 'claude-sonnet-5',
   ricercatore: 'claude-sonnet-5',
-  selettore: 'claude-sonnet-5',
+  // La selezione è un compito semplice: basta il modello più economico.
+  selettore: 'claude-haiku-4-5',
   scrittore: 'claude-opus-5-5',
   controllore: 'claude-sonnet-5',
   chat: 'claude-sonnet-5',
@@ -26,24 +27,35 @@ export type ModelSlot = keyof typeof MODELLI_PREDEFINITI
 
 export const MODELLI_DISPONIBILI: { id: string; nome: string; nota: string }[] = [
   { id: 'claude-opus-5-5', nome: 'Claude Opus 5.5', nota: 'La più alta qualità di scrittura' },
-  { id: 'claude-opus-5', nome: 'Claude Opus 5', nota: 'Molto capace, leggermente più caro' },
+  { id: 'claude-opus-5', nome: 'Claude Opus 5', nota: 'Molto capace, più caro' },
   { id: 'claude-sonnet-5', nome: 'Claude Sonnet 5', nota: 'Equilibrato: veloce e conveniente' },
   { id: 'claude-haiku-4-5', nome: 'Claude Haiku 4.5', nota: 'Il più rapido ed economico' },
 ]
 
+/** Haiku 4.5 non accetta il parametro effort: su quel modello va omesso. */
+export function supportaEffort(modello: string): boolean {
+  return !modello.startsWith('claude-haiku')
+}
+
 /**
- * Versione del tool di ricerca web.
- * La documentazione elenca tre varianti: web_search_20250305 (base),
- * web_search_20260209 (filtro dinamico) e web_search_20260318 (controllo
- * dell'inclusione in risposta). Usiamo la più recente con
- * `allowed_callers: ['direct']`: senza filtro dinamico ogni risultato arriva
- * come blocco web_search_tool_result, che è esattamente ciò su cui si basa la
- * verifica deterministica degli URL.
+ * Ricerca web e lettura delle pagine, alle versioni più recenti documentate.
+ * Con `allowed_callers: ['direct']` si rinuncia al filtro dinamico: così ogni
+ * risultato e ogni pagina letta tornano nella risposta, ed è su quei testi che
+ * il codice verifica URL ed estratti citati.
  */
 export const WEB_SEARCH_TOOL = {
   type: 'web_search_20260318',
   name: 'web_search',
   max_uses: 8,
+  allowed_callers: ['direct'],
+} as const
+
+export const WEB_FETCH_TOOL = {
+  type: 'web_fetch_20260318',
+  name: 'web_fetch',
+  max_uses: 6,
+  // Limita il costo di pagine molto lunghe (non si applica ai PDF).
+  max_content_tokens: 12_000,
   allowed_callers: ['direct'],
 } as const
 
@@ -110,10 +122,10 @@ export function toApiError(err: unknown): ApiError {
 
   if (err instanceof Anthropic.BadRequestError) {
     const testo = (err.message ?? '').toLowerCase()
-    if (testo.includes('web search') && (testo.includes('not enabled') || testo.includes('disabled'))) {
+    if ((testo.includes('web search') || testo.includes('web fetch')) && (testo.includes('not enabled') || testo.includes('disabled'))) {
       return new ApiError(
         'ricerca_web_disabilitata',
-        "La ricerca web è disattivata per la tua organizzazione. Un amministratore la riattiva dalla Console Anthropic, in Settings → Privacy. È attiva per impostazione predefinita: se vedi questo messaggio, qualcuno l'ha disattivata.",
+        "La ricerca o la lettura web è disattivata per la tua organizzazione. Un amministratore la riattiva dalla Console Anthropic, in Settings → Privacy. È attiva per impostazione predefinita: se vedi questo messaggio, qualcuno l'ha disattivata.",
         400,
         false,
       )
@@ -121,7 +133,7 @@ export function toApiError(err: unknown): ApiError {
     if (testo.includes('prompt is too long') || testo.includes('context') || testo.includes('exceed')) {
       return new ApiError(
         'contesto_troppo_lungo',
-        'Il materiale supera la finestra di contesto del modello. Riduci i PDF caricati (meno pagine o meno file) e riavvia: preferisco fermarmi piuttosto che tagliare il testo di nascosto.',
+        'Il materiale supera la finestra di contesto del modello. Scegli la profondità di lettura "sintetica" o carica meno PDF scansionati: preferisco fermarmi piuttosto che tagliare il testo di nascosto.',
         400,
         false,
       )
@@ -185,10 +197,7 @@ export function toApiError(err: unknown): ApiError {
 export function creaClient(apiKey: string): Anthropic {
   const chiave = apiKey.trim()
   if (!chiave) {
-    throw new ApiError(
-      'chiave_mancante',
-      'Manca la chiave API Anthropic: incollala nel pannello impostazioni.',
-    )
+    throw new ApiError('chiave_mancante', 'Manca la chiave API Anthropic: incollala nel pannello impostazioni.')
   }
   return new Anthropic({
     apiKey: chiave,
@@ -198,110 +207,131 @@ export function creaClient(apiKey: string): Anthropic {
   })
 }
 
-export type Contenuto = Anthropic.ContentBlockParam
+// ---------------------------------------------------------------------------
+// Registrazione dei consumi
+// ---------------------------------------------------------------------------
+
+export type Chi = AgentKey | 'chat'
+type Registratore = (chi: Chi, modello: string, uso: UsoNormalizzato) => void
+let registratore: Registratore | null = null
+
+/** Lo store si registra qui, così questo modulo resta indipendente dall'interfaccia. */
+export function impostaRegistratoreUso(fn: Registratore) {
+  registratore = fn
+}
+
+function registra(chi: Chi | undefined, modello: string, uso: UsoNormalizzato) {
+  if (chi && registratore) registratore(chi, modello, uso)
+}
+
+// ---------------------------------------------------------------------------
+// Chiamate
+// ---------------------------------------------------------------------------
+
 export type Messaggio = Anthropic.MessageParam
+export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export interface ChiamataBase {
   client: Anthropic
-  model: ModelId
+  model: string
   system: Anthropic.TextBlockParam[]
   messages: Messaggio[]
   maxTokens: number
-  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  effort?: Effort
   signal?: AbortSignal
+  /** A chi addebitare i token nel riepilogo dei costi. */
+  chi?: Chi
 }
 
-/**
- * Chiamata con output strutturato: la risposta è JSON valido e conforme allo
- * schema, dentro un blocco di testo. Niente parsing di etichette testuali.
- */
-export async function chiamataStrutturata<T>(
-  opts: ChiamataBase & { schema: JsonSchema },
-): Promise<{ dati: T; usage: Anthropic.Usage }> {
+function outputConfig(model: string, effort: Effort | undefined, schema?: JsonSchema) {
+  const config: Anthropic.OutputConfig = {}
+  if (effort && supportaEffort(model)) config.effort = effort
+  if (schema) config.format = { type: 'json_schema', schema }
+  return Object.keys(config).length > 0 ? { output_config: config } : {}
+}
+
+function testoDi(risposta: Anthropic.Message): string {
+  return risposta.content
+    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
+}
+
+function leggiJson<T>(risposta: Anthropic.Message): T {
+  if (risposta.stop_reason === 'max_tokens') {
+    throw new ApiError(
+      'richiesta_non_valida',
+      'La risposta è stata troncata dal limite di token prima di completare il JSON. Riprovo chiedendo un testo più compatto.',
+      null,
+      true,
+    )
+  }
+  if (risposta.stop_reason === 'refusal') {
+    throw new ApiError('richiesta_non_valida', 'Il modello ha rifiutato la richiesta.', null, false)
+  }
+  const testo = testoDi(risposta)
+  if (!testo) throw new ApiError('sconosciuto', "L'API ha risposto senza contenuto: nessun JSON da leggere.", null, true)
+  try {
+    return JSON.parse(testo) as T
+  } catch {
+    throw new ApiError('sconosciuto', 'La risposta non è JSON valido nonostante lo schema richiesto.', null, true)
+  }
+}
+
+/** Output strutturato: la risposta è JSON conforme allo schema, senza parsing di etichette. */
+export async function chiamataStrutturata<T>(opts: ChiamataBase & { schema: JsonSchema }): Promise<T> {
   const risposta = await opts.client.messages.create(
     {
       model: opts.model,
       max_tokens: opts.maxTokens,
       system: opts.system,
       messages: opts.messages,
-      output_config: {
-        ...(opts.effort ? { effort: opts.effort } : {}),
-        format: { type: 'json_schema', schema: opts.schema },
-      },
+      ...outputConfig(opts.model, opts.effort, opts.schema),
     },
     { signal: opts.signal },
   )
-
-  if (risposta.stop_reason === 'max_tokens') {
-    throw new ApiError(
-      'richiesta_non_valida',
-      'La risposta è stata troncata dal limite di token prima di completare il JSON. Riprovo con istruzioni più sintetiche.',
-      null,
-      true,
-    )
-  }
-
-  const testo = risposta.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim()
-
-  if (!testo) {
-    throw new ApiError('sconosciuto', "L'API ha risposto senza contenuto: nessun JSON da leggere.", null, true)
-  }
-
-  try {
-    return { dati: JSON.parse(testo) as T, usage: risposta.usage }
-  } catch {
-    throw new ApiError('sconosciuto', 'La risposta non è JSON valido nonostante lo schema richiesto.', null, true)
-  }
+  registra(opts.chi, opts.model, normalizzaUso(risposta.usage))
+  return leggiJson<T>(risposta)
 }
 
 /**
- * Come sopra ma in streaming: serve allo Scrittore, che produce capitoli lunghi
- * e senza streaming rischierebbe il timeout HTTP.
+ * Come sopra ma in streaming: serve allo Scrittore, che produce testi lunghi e
+ * senza streaming rischierebbe il timeout HTTP. `onAvvio` scatta quando il
+ * modello ha iniziato a generare, cioè quando il prefisso è già in cache: è il
+ * momento giusto per far partire le chiamate gemelle che lo rileggono.
  */
 export async function chiamataStrutturataStream<T>(
-  opts: ChiamataBase & { schema: JsonSchema },
-): Promise<{ dati: T; usage: Anthropic.Usage }> {
+  opts: ChiamataBase & { schema: JsonSchema; onAvvio?: () => void },
+): Promise<T> {
   const stream = opts.client.messages.stream(
     {
       model: opts.model,
       max_tokens: opts.maxTokens,
       system: opts.system,
       messages: opts.messages,
-      output_config: {
-        ...(opts.effort ? { effort: opts.effort } : {}),
-        format: { type: 'json_schema', schema: opts.schema },
-      },
+      ...outputConfig(opts.model, opts.effort, opts.schema),
     },
     { signal: opts.signal },
   )
 
-  const risposta = await stream.finalMessage()
-  const testo = risposta.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim()
-
-  if (risposta.stop_reason === 'max_tokens') {
-    throw new ApiError(
-      'richiesta_non_valida',
-      'Il capitolo è stato troncato dal limite di token. Riprovo chiedendo un testo più compatto.',
-      null,
-      true,
-    )
+  let avviato = false
+  const avvia = () => {
+    if (avviato) return
+    avviato = true
+    opts.onAvvio?.()
   }
-  if (!testo) {
-    throw new ApiError('sconosciuto', "L'API ha risposto senza contenuto.", null, true)
-  }
+  stream.on('streamEvent', (evento) => {
+    if (evento.type === 'content_block_start') avvia()
+  })
 
   try {
-    return { dati: JSON.parse(testo) as T, usage: risposta.usage }
-  } catch {
-    throw new ApiError('sconosciuto', 'La risposta non è JSON valido nonostante lo schema richiesto.', null, true)
+    const risposta = await stream.finalMessage()
+    registra(opts.chi, opts.model, normalizzaUso(risposta.usage))
+    return leggiJson<T>(risposta)
+  } finally {
+    // Anche in caso d'errore le chiamate in attesa non devono restare bloccate.
+    avvia()
   }
 }
 
@@ -311,18 +341,14 @@ export interface RisultatoStrumenti {
   /** Input del tool di consegna, se il modello lo ha chiamato. */
   consegna: unknown | null
   messaggi: Messaggio[]
-  usage: Anthropic.Usage
 }
 
-const MAX_CONTINUAZIONI = 6
+const MAX_CONTINUAZIONI = 8
 
 /**
- * Chiamata con strumenti server (ricerca web) più un tool di consegna.
- *
- * Gestisce `stop_reason: "pause_turn"`, che l'API restituisce quando un turno di
- * ricerca è lungo: in quel caso il messaggio dell'assistente va rispedito
- * invariato — compresi gli `encrypted_content` dei risultati, che l'API
- * decifra per ricostruire il contesto.
+ * Chiamata con strumenti server (ricerca e lettura web) più un tool di consegna.
+ * Gestisce `stop_reason: "pause_turn"`: il messaggio dell'assistente va
+ * rispedito invariato, compresi gli `encrypted_content` dei risultati.
  */
 export async function chiamataConStrumenti(
   opts: ChiamataBase & {
@@ -334,69 +360,61 @@ export async function chiamataConStrumenti(
   const messaggi: Messaggio[] = [...opts.messages]
   const blocchi: Anthropic.ContentBlock[] = []
   let consegna: unknown | null = null
-  let usage: Anthropic.Usage | null = null
+  let uso = normalizzaUso(null)
 
-  for (let giro = 0; giro < MAX_CONTINUAZIONI; giro++) {
-    const risposta = await opts.client.messages.create(
-      {
-        model: opts.model,
-        max_tokens: opts.maxTokens,
-        system: opts.system,
-        messages: messaggi,
-        tools: opts.tools as Anthropic.ToolUnion[],
-        ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}),
-        ...(opts.effort ? { output_config: { effort: opts.effort } } : {}),
-      },
-      { signal: opts.signal },
-    )
+  try {
+    for (let giro = 0; giro < MAX_CONTINUAZIONI; giro++) {
+      const risposta = await opts.client.messages.create(
+        {
+          model: opts.model,
+          max_tokens: opts.maxTokens,
+          system: opts.system,
+          messages: messaggi,
+          tools: opts.tools as Anthropic.ToolUnion[],
+          ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}),
+          ...outputConfig(opts.model, opts.effort),
+        },
+        { signal: opts.signal },
+      )
 
-    blocchi.push(...risposta.content)
-    usage = risposta.usage
+      uso = sommaUsi(uso, normalizzaUso(risposta.usage))
+      blocchi.push(...risposta.content)
 
-    for (const blocco of risposta.content) {
-      if (blocco.type === 'tool_use' && blocco.name === opts.nomeToolConsegna) {
-        consegna = blocco.input
+      for (const blocco of risposta.content) {
+        if (blocco.type === 'tool_use' && blocco.name === opts.nomeToolConsegna) consegna = blocco.input
       }
-    }
 
-    if (risposta.stop_reason === 'pause_turn') {
-      // Turno lungo messo in pausa: si prosegue rimandando il messaggio così com'è.
       messaggi.push({ role: 'assistant', content: risposta.content })
-      continue
+      if (risposta.stop_reason === 'pause_turn') continue
+      return { blocchi, consegna, messaggi }
     }
-
-    messaggi.push({ role: 'assistant', content: risposta.content })
-    return { blocchi, consegna, messaggi, usage }
+  } finally {
+    registra(opts.chi, opts.model, uso)
   }
 
   throw new ApiError(
     'sconosciuto',
-    'La ricerca web non si è conclusa dopo diverse continuazioni. Riprovo con una richiesta più mirata.',
+    'La ricerca non si è conclusa dopo diverse continuazioni. Riprovo con una richiesta più mirata.',
     null,
     true,
   )
 }
 
 /** Chat in streaming: invoca `onTesto` a ogni frammento ricevuto. */
-export async function chiamataChatStream(
-  opts: ChiamataBase & { onTesto: (frammento: string) => void },
-): Promise<string> {
+export async function chiamataChatStream(opts: ChiamataBase & { onTesto: (frammento: string) => void }): Promise<string> {
   const stream = opts.client.messages.stream(
     {
       model: opts.model,
       max_tokens: opts.maxTokens,
       system: opts.system,
       messages: opts.messages,
+      ...outputConfig(opts.model, opts.effort),
     },
     { signal: opts.signal },
   )
 
   stream.on('text', (frammento) => opts.onTesto(frammento))
   const risposta = await stream.finalMessage()
-
-  return risposta.content
-    .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-    .trim()
+  registra(opts.chi, opts.model, normalizzaUso(risposta.usage))
+  return testoDi(risposta)
 }

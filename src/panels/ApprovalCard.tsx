@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStudioStore } from '../store'
+import { FonteCard } from './FonteCard'
 
 /**
- * Punto di approvazione umana: la pipeline si ferma qui e lo Scrittore non
- * parte in nessun caso prima che io abbia approvato.
+ * Punto di approvazione umana sulle fonti: la pipeline si ferma qui e la
+ * scaletta non parte prima che io abbia approvato.
  */
 export function ApprovalCard({ variante = 'in_linea' }: { variante?: 'in_linea' | 'ancorata' }) {
   const approvazione = useStudioStore((s) => s.approvazione)
@@ -17,10 +18,11 @@ export function ApprovalCard({ variante = 'in_linea' }: { variante?: 'in_linea' 
 
   const [motivo, setMotivo] = useState('')
   const [mostraScartate, setMostraScartate] = useState(false)
+  const perUrl = useMemo(() => new Map(fonti.map((f) => [f.url, f])), [fonti])
 
   if (approvazione !== 'in_attesa') return null
 
-  const perUrl = new Map(fonti.map((f) => [f.url, f]))
+  const citabili = selezionate.filter((s) => (perUrl.get(s.url)?.estratti.length ?? 0) > 0).length
 
   return (
     <section
@@ -28,30 +30,25 @@ export function ApprovalCard({ variante = 'in_linea' }: { variante?: 'in_linea' 
       aria-live="polite"
     >
       <h2 className="pannello-titolo filetto-doppio">
-        Serve la tua approvazione
+        Approva le fonti
         <span className="distintivo distintivo-caldo">giro {giro}</span>
       </h2>
 
       <p className="nota">
-        Il Selettore ha tenuto {selezionate.length} fonti su {fonti.length}. Lo Scrittore parte solo
-        dopo la tua approvazione.
+        Il Selettore ha tenuto {selezionate.length} fonti su {fonti.length}; {citabili} hanno estratti
+        verificati e potranno essere citate. La scaletta parte solo dopo la tua approvazione.
       </p>
 
       <ul className="elenco-fonti">
         {selezionate.map((scelta) => {
           const fonte = perUrl.get(scelta.url)
-          return (
+          return fonte ? (
+            <FonteCard key={scelta.url} fonte={fonte} motivo={scelta.motivo} />
+          ) : (
             <li key={scelta.url} className="fonte">
-              <div className="fonte-testa">
-                <strong>{fonte?.titolo ?? scelta.url}</strong>
-                {fonte && <span className="etichetta-tipo">{fonte.tipo}</span>}
-                <span className="etichetta etichetta-ok">URL verificato</span>
-              </div>
               <a className="fonte-url" href={scelta.url} target="_blank" rel="noreferrer noopener">
                 {scelta.url}
               </a>
-              {fonte?.descrizione && <p className="fonte-testo">{fonte.descrizione}</p>}
-              <p className="fonte-testo fonte-motivo">Tenuta perché: {scelta.motivo}</p>
             </li>
           )
         })}
@@ -105,7 +102,7 @@ export function ApprovalCard({ variante = 'in_linea' }: { variante?: 'in_linea' 
             setMotivo('')
           }}
         >
-          Approvo
+          Approvo le fonti
         </button>
         <button
           type="button"

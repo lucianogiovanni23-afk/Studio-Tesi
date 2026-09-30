@@ -1,30 +1,56 @@
 import { useState } from 'react'
 import { rigeneraOpzione } from '../agents/pipeline'
 import { useStudioStore } from '../store'
-import type { ImpiantoKey, Opzione } from '../types'
+import type { Opzione } from '../types'
+import { ChapterView, RiepilogoCitazioni } from './ChapterView'
+import { testoPerCopia } from './citazioniUi'
 
-function testoCompleto(o: Opzione): string {
-  if (!o.risultato) return ''
-  return [
-    o.risultato.titolo,
-    '',
-    ...o.risultato.paragrafi.flatMap((p) => [p.titoletto, p.testo, '']),
-    'Fonti citate:',
-    ...o.risultato.fonti_citate,
-  ].join('\n')
+export function Valutazione({ opzione }: { opzione: Opzione }) {
+  const v = opzione.valutazione
+  if (!v) return null
+  return (
+    <div className={`allerta ${v.criticita.length === 0 ? 'allerta-ok' : 'allerta-avviso'}`}>
+      <strong>Controllore.</strong>
+      {v.punti_di_forza.length > 0 && (
+        <>
+          <p className="valutazione-titolo">Punti di forza</p>
+          <ul className="elenco-semplice">
+            {v.punti_di_forza.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {v.criticita.length > 0 && (
+        <>
+          <p className="valutazione-titolo">Criticità</p>
+          <ul className="elenco-semplice">
+            {v.criticita.map((c, i) => (
+              <li key={i}>{c}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
 }
 
 export function WriterOptions() {
   const opzioni = useStudioStore((s) => s.opzioni)
-  const [attiva, setAttiva] = useState<ImpiantoKey>('A')
-  const [copiata, setCopiata] = useState<ImpiantoKey | null>(null)
+  const attiva = useStudioStore((s) => s.opzioneAttiva)
+  const setAttiva = useStudioStore((s) => s.setOpzioneAttiva)
+  const apriLettura = useStudioStore((s) => s.apriLettura)
+  const prefisso = useStudioStore((s) => s.prefissoScrittore)
+  const inEsecuzione = useStudioStore((s) => s.inEsecuzione)
+  const [copiata, setCopiata] = useState<string | null>(null)
 
   if (opzioni.length === 0) return null
   const corrente = opzioni.find((o) => o.impianto === attiva) ?? opzioni[0]
+  const rifinituraInCorso = opzioni.some((o) => o.rifinisce !== null)
 
   const copia = async (o: Opzione) => {
     try {
-      await navigator.clipboard?.writeText(testoCompleto(o))
+      await navigator.clipboard?.writeText(testoPerCopia(o, prefisso?.riferimenti ?? []))
       setCopiata(o.impianto)
       window.setTimeout(() => setCopiata(null), 2000)
     } catch {
@@ -36,25 +62,27 @@ export function WriterOptions() {
     <section className="pannello">
       <h2 className="pannello-titolo filetto-doppio">Le tre opzioni dello Scrittore</h2>
 
-      <div className="schede">
+      <div className="schede" role="tablist">
         {opzioni.map((o) => (
           <button
             key={o.impianto}
             type="button"
-            className={`scheda ${o.impianto === attiva ? 'scheda-attiva' : ''} ${
+            role="tab"
+            aria-selected={o.impianto === corrente.impianto}
+            className={`scheda ${o.impianto === corrente.impianto ? 'scheda-attiva' : ''} ${
               o.stato === 'errore' ? 'scheda-guasta' : ''
             }`}
             onClick={() => setAttiva(o.impianto)}
           >
             Opzione {o.impianto}
-            {o.stato === 'errore' ? ' ⚠' : o.valutazione && o.valutazione.criticita.length === 0 ? ' ✓' : ''}
+            {o.stato === 'in_corso' ? ' …' : o.stato === 'errore' ? ' ⚠' : o.valutazione && o.valutazione.criticita.length === 0 ? ' ✓' : ''}
           </button>
         ))}
       </div>
 
       <p className="impianto">{corrente.etichetta}</p>
 
-      {corrente.stato === 'in_corso' && <p className="nota">In scrittura…</p>}
+      {corrente.stato === 'in_corso' && <p className="nota in-corso">In scrittura…</p>}
 
       {corrente.stato === 'errore' && (
         <>
@@ -66,6 +94,7 @@ export function WriterOptions() {
               type="button"
               className="bottone bottone-primario bottone-piccolo"
               onClick={() => void rigeneraOpzione(corrente.impianto)}
+              disabled={inEsecuzione}
             >
               Rigenera questa opzione
             </button>
@@ -73,77 +102,34 @@ export function WriterOptions() {
         </>
       )}
 
-      {corrente.valutazione && (
-        <div
-          className={`allerta ${corrente.valutazione.criticita.length === 0 ? 'allerta-ok' : 'allerta-avviso'}`}
-        >
-          <strong>Controllore.</strong>
-          {corrente.valutazione.punti_di_forza.length > 0 && (
-            <>
-              <p className="valutazione-titolo">Punti di forza</p>
-              <ul className="elenco-semplice">
-                {corrente.valutazione.punti_di_forza.map((p, i) => (
-                  <li key={i}>{p}</li>
-                ))}
-              </ul>
-            </>
-          )}
-          {corrente.valutazione.criticita.length > 0 && (
-            <>
-              <p className="valutazione-titolo">Criticità</p>
-              <ul className="elenco-semplice">
-                {corrente.valutazione.criticita.map((c, i) => (
-                  <li key={i}>{c}</li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-      )}
+      <Valutazione opzione={corrente} />
 
       {corrente.risultato && (
         <>
           <div className="azioni">
             <button
               type="button"
-              className="bottone bottone-vuoto bottone-piccolo"
-              onClick={() => void copia(corrente)}
+              className="bottone bottone-primario bottone-piccolo"
+              onClick={() => apriLettura(corrente.impianto)}
             >
-              {copiata === corrente.impianto ? 'Copiato ✓' : 'Copia questa opzione'}
+              Leggi su carta
             </button>
-            <span className="contatore">{corrente.risultato.parole} parole</span>
+            <button type="button" className="bottone bottone-vuoto bottone-piccolo" onClick={() => void copia(corrente)}>
+              {copiata === corrente.impianto ? 'Copiato ✓' : 'Copia'}
+            </button>
             <button
               type="button"
               className="bottone bottone-vuoto bottone-piccolo"
               onClick={() => void rigeneraOpzione(corrente.impianto)}
+              disabled={inEsecuzione || rifinituraInCorso}
             >
               Rigenera
             </button>
+            <span className="contatore">{corrente.parole} parole</span>
+            <RiepilogoCitazioni opzione={corrente} />
           </div>
 
-          <article className="capitolo">
-            <h3 className="capitolo-titolo">{corrente.risultato.titolo}</h3>
-            {corrente.risultato.paragrafi.map((p, i) => (
-              <section key={i}>
-                <h4 className="capitolo-sottotitolo">{p.titoletto}</h4>
-                <p className="capitolo-testo">{p.testo}</p>
-              </section>
-            ))}
-            {corrente.risultato.fonti_citate.length > 0 && (
-              <>
-                <h4 className="capitolo-sottotitolo">Fonti citate</h4>
-                <ul className="elenco-semplice">
-                  {corrente.risultato.fonti_citate.map((u) => (
-                    <li key={u}>
-                      <a href={u} target="_blank" rel="noreferrer noopener">
-                        {u}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </article>
+          <ChapterView opzione={corrente} />
 
           {corrente.passaggi.length > 0 && (
             <details className="dettagli">

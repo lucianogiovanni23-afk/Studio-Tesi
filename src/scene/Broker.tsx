@@ -11,6 +11,22 @@ import { ReasoningBubble } from './ReasoningBubble'
 type Posa = 'idle' | 'walking' | 'working' | 'waiting' | 'done' | 'error'
 
 const INCARNATO = '#e8c9a8'
+const CAPELLI = '#2c2118'
+const LABBRA = '#8a4a44'
+
+/** Espressione del viso per ogni posa: sopracciglia e curvatura della bocca. */
+const ESPRESSIONE: Record<Posa, { ciglio: number; altezza: number; sorriso: number }> = {
+  idle: { ciglio: 0, altezza: 0.11, sorriso: 0.3 },
+  walking: { ciglio: 0, altezza: 0.11, sorriso: 0.35 },
+  // concentrato: sopracciglia aggrottate, bocca dritta
+  working: { ciglio: -0.28, altezza: 0.1, sorriso: 0 },
+  // in attesa: sopracciglia alzate, mezzo sorriso interrogativo
+  waiting: { ciglio: 0.14, altezza: 0.13, sorriso: 0.15 },
+  // soddisfatto: sorriso pieno
+  done: { ciglio: 0.05, altezza: 0.135, sorriso: 1 },
+  // preoccupato: sopracciglia a tetto, bocca all'ingiù
+  error: { ciglio: 0.38, altezza: 0.12, sorriso: -1 },
+}
 const CAMICIA = '#eae6dc'
 const SCURO = '#161a23'
 
@@ -170,6 +186,12 @@ export function Broker({ agentKey }: { agentKey: AgentKey }) {
   const ancaDx = useRef<THREE.Group>(null)
   const ginocchioSx = useRef<THREE.Group>(null)
   const ginocchioDx = useRef<THREE.Group>(null)
+  const occhioSx = useRef<THREE.Mesh>(null)
+  const occhioDx = useRef<THREE.Mesh>(null)
+  const ciglioSx = useRef<THREE.Mesh>(null)
+  const ciglioDx = useRef<THREE.Mesh>(null)
+  const angoloSx = useRef<THREE.Mesh>(null)
+  const angoloDx = useRef<THREE.Mesh>(null)
 
   const avanzamento = useRef(0)
   const direzioneCorpo = useRef(0)
@@ -285,6 +307,20 @@ export function Broker({ agentKey }: { agentKey: AgentKey }) {
 
         testaX = 0.34
         inclinazione = 0.2
+
+        // Il Lettore annuisce mentre legge; il Controllore ogni tanto si
+        // appoggia allo schienale e ricontrolla, a braccia conserte.
+        if (agentKey === 'lettore') testaX += Math.sin(t * 2.2) * 0.06 * ampiezza
+        if (agentKey === 'controllore' && Math.sin(t * 0.26) > 0.7) {
+          spallaXSx = -0.9
+          spallaXDx = -0.9
+          gomitoXSx = -1.6
+          gomitoXDx = -1.6
+          spallaZ = 0.1
+          inclinazione = -0.08
+          testaX = 0.12
+          testaY = Math.sin(t * 0.9) * 0.25 * ampiezza
+        }
         break
       }
       case 'waiting': {
@@ -310,6 +346,14 @@ export function Broker({ agentKey }: { agentKey: AgentKey }) {
         testaX = -0.06
         saliscendi = Math.sin(t * 1.5) * 0.028 * ampiezza
         oscillazione = Math.sin(t * 0.7) * 0.03 * ampiezza
+
+        // Ogni tanto alza il pugno per il lavoro chiuso, e annuisce.
+        if (Math.sin(t * 0.45) > 0.86) {
+          spallaXDx = -2.7
+          gomitoXDx = -0.35 - Math.abs(Math.sin(t * 7)) * 0.3 * ampiezza
+          spallaZ = 0.2
+          testaX = -0.12 + Math.sin(t * 5) * 0.06 * ampiezza
+        }
         break
       }
       case 'error': {
@@ -321,6 +365,8 @@ export function Broker({ agentKey }: { agentKey: AgentKey }) {
         gomitoXDx = -1.5
         testaX = 0.28
         oscillazione = Math.sin(t * 1.6) * 0.05 * ampiezza
+        // Scuote la testa, a intervalli.
+        if (Math.sin(t * 0.6) > 0.5) testaY = Math.sin(t * 7) * 0.22 * ampiezza
         break
       }
       default: {
@@ -365,6 +411,35 @@ export function Broker({ agentKey }: { agentKey: AgentKey }) {
     smorza(ancaDx, 'x', ancaXDx)
     smorza(ginocchioSx, 'x', ginocchioXSx)
     smorza(ginocchioDx, 'x', ginocchioXDx)
+
+    // --- espressione del viso -------------------------------------------------
+    const e = ESPRESSIONE[posa]
+    const smorzaMesh = (rif: { current: THREE.Mesh | null }, fn: (m: THREE.Mesh) => void) => {
+      if (rif.current) fn(rif.current)
+    }
+    smorzaMesh(ciglioSx, (m) => {
+      m.rotation.z = THREE.MathUtils.damp(m.rotation.z, e.ciglio, 8, dt)
+      m.position.y = THREE.MathUtils.damp(m.position.y, e.altezza, 8, dt)
+    })
+    smorzaMesh(ciglioDx, (m) => {
+      m.rotation.z = THREE.MathUtils.damp(m.rotation.z, -e.ciglio, 8, dt)
+      m.position.y = THREE.MathUtils.damp(m.position.y, e.altezza, 8, dt)
+    })
+    smorzaMesh(angoloSx, (m) => {
+      m.rotation.z = THREE.MathUtils.damp(m.rotation.z, -0.55 * e.sorriso, 8, dt)
+      m.position.y = THREE.MathUtils.damp(m.position.y, -0.125 + 0.014 * e.sorriso, 8, dt)
+    })
+    smorzaMesh(angoloDx, (m) => {
+      m.rotation.z = THREE.MathUtils.damp(m.rotation.z, 0.55 * e.sorriso, 8, dt)
+      m.position.y = THREE.MathUtils.damp(m.position.y, -0.125 + 0.014 * e.sorriso, 8, dt)
+    })
+
+    // Battito di ciglia: breve, a intervalli irregolari per ogni broker.
+    const ciclo = (t * 0.31 + sfasamento * 0.17) % 1
+    const chiuso = !ridotto && (ciclo < 0.03 || (posa === 'working' && ciclo > 0.5 && ciclo < 0.52))
+    const apertura = chiuso ? 0.12 : 1
+    if (occhioSx.current) occhioSx.current.scale.y = apertura
+    if (occhioDx.current) occhioDx.current.scale.y = apertura
   })
 
   return (
@@ -437,14 +512,37 @@ export function Broker({ agentKey }: { agentKey: AgentKey }) {
           </RoundedBox>
           <mesh position={[0, 0.21, -0.02]} castShadow>
             <boxGeometry args={[0.48, 0.14, 0.46]} />
-            <meshStandardMaterial color="#2c2118" flatShading roughness={0.8} />
+            <meshStandardMaterial color={CAPELLI} flatShading roughness={0.8} />
           </mesh>
-          {[-0.11, 0.11].map((x) => (
-            <mesh key={x} position={[x, 0.02, 0.225]}>
-              <boxGeometry args={[0.07, 0.07, 0.03]} />
-              <meshStandardMaterial color={SCURO} />
-            </mesh>
-          ))}
+          {/* occhi, sopracciglia e bocca: cambiano con lo stato */}
+          <mesh ref={occhioSx} position={[-0.11, 0.02, 0.225]}>
+            <boxGeometry args={[0.07, 0.07, 0.03]} />
+            <meshStandardMaterial color={SCURO} />
+          </mesh>
+          <mesh ref={occhioDx} position={[0.11, 0.02, 0.225]}>
+            <boxGeometry args={[0.07, 0.07, 0.03]} />
+            <meshStandardMaterial color={SCURO} />
+          </mesh>
+          <mesh ref={ciglioSx} position={[-0.11, 0.11, 0.235]}>
+            <boxGeometry args={[0.12, 0.028, 0.03]} />
+            <meshStandardMaterial color={CAPELLI} flatShading />
+          </mesh>
+          <mesh ref={ciglioDx} position={[0.11, 0.11, 0.235]}>
+            <boxGeometry args={[0.12, 0.028, 0.03]} />
+            <meshStandardMaterial color={CAPELLI} flatShading />
+          </mesh>
+          <mesh position={[0, -0.13, 0.228]}>
+            <boxGeometry args={[0.08, 0.026, 0.03]} />
+            <meshStandardMaterial color={LABBRA} flatShading />
+          </mesh>
+          <mesh ref={angoloSx} position={[-0.06, -0.125, 0.228]}>
+            <boxGeometry args={[0.06, 0.026, 0.03]} />
+            <meshStandardMaterial color={LABBRA} flatShading />
+          </mesh>
+          <mesh ref={angoloDx} position={[0.06, -0.125, 0.228]}>
+            <boxGeometry args={[0.06, 0.026, 0.03]} />
+            <meshStandardMaterial color={LABBRA} flatShading />
+          </mesh>
           <DettaglioTesta agente={agente} />
         </group>
 

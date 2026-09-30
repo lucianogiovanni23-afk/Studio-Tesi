@@ -7,13 +7,20 @@ import { useStudioStore } from '../store'
 import { CameraRig, type ControlliOrbita } from './CameraRig'
 import { TradingFloor } from './TradingFloor'
 import { CAMERA_BERSAGLIO, CAMERA_CASA } from './layout'
+import { ContestoQualita } from './qualita'
 
-export function Scene() {
+export function Scene({ qualita }: { qualita: 'completa' | 'ridotta' }) {
+  const completa = qualita === 'completa'
   const controlli = useRef<ControlliOrbita | null>(null)
   const grossolano = useCoarsePointer()
   const inquadra = useStudioStore((s) => s.inquadra)
   const fuoco = useStudioStore((s) => s.fuocoCamera)
   const chiudiNuvoletta = useStudioStore((s) => s.chiudiNuvoletta)
+  // Mentre si estrae il testo dei PDF la scena si ferma: il thread principale
+  // serve a pdf.js, e nessun agente può lavorare finché il materiale non è pronto.
+  const estrazione = useStudioStore((s) =>
+    s.courseFiles.some((f) => f.status === 'lettura' || f.status === 'estrazione'),
+  )
 
   const ridotto = useMemo(
     () =>
@@ -25,8 +32,10 @@ export function Scene() {
   return (
     <div className="scena">
       <Canvas
-        shadows
-        dpr={[1, 2]}
+        frameloop={estrazione ? 'demand' : 'always'}
+        shadows={completa}
+        dpr={completa ? [1, 2] : 1}
+        gl={{ antialias: completa, powerPreference: completa ? 'high-performance' : 'low-power' }}
         camera={{ position: CAMERA_CASA, fov: grossolano ? 44 : 40, near: 0.1, far: 140 }}
         // Il canvas non deve catturare lo scroll della pagina su iPad.
         style={{ touchAction: 'pan-y' }}
@@ -36,13 +45,14 @@ export function Scene() {
         <fog attach="fog" args={['#070b12', 26, 56]} />
 
         {/* luce calda da ufficio serale */}
-        <ambientLight intensity={0.6} color="#d9c9a8" />
-        <hemisphereLight args={['#e8d7b4', '#12301f', 0.55]} />
+        {/* senza plafoniere accese, la versione ridotta compensa con più luce ambiente */}
+        <ambientLight intensity={completa ? 0.6 : 0.95} color="#d9c9a8" />
+        <hemisphereLight args={['#e8d7b4', '#12301f', completa ? 0.55 : 0.8]} />
         <directionalLight
           position={[7, 12, 8]}
-          intensity={0.95}
+          intensity={completa ? 0.95 : 1.2}
           color="#ffe6bd"
-          castShadow
+          castShadow={completa}
           shadow-mapSize-width={2048}
           shadow-mapSize-height={2048}
           shadow-camera-left={-16}
@@ -55,9 +65,11 @@ export function Scene() {
         />
         <directionalLight position={[-8, 6, 11]} intensity={0.3} color="#8fb0d8" />
 
-        <Suspense fallback={null}>
-          <TradingFloor />
-        </Suspense>
+        <ContestoQualita.Provider value={qualita}>
+          <Suspense fallback={null}>
+            <TradingFloor />
+          </Suspense>
+        </ContestoQualita.Provider>
 
         <CameraRig controlli={controlli} />
 

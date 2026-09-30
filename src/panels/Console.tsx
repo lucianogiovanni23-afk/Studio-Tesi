@@ -24,14 +24,10 @@ function orario(at: number): string {
   return `${d.toLocaleTimeString('it-IT', { hour12: false })}.${String(d.getMilliseconds()).padStart(3, '0')}`
 }
 
-/** Console di diagnostica del Controllore: chiusa di default, con i contatori. */
+/** Console di diagnostica del Controllore, nella sua scheda. */
 export function Console() {
   const log = useStudioStore((s) => s.log)
-  const aperta = useStudioStore((s) => s.consoleAperta)
-  const setAperta = useStudioStore((s) => s.setConsoleAperta)
   const svuota = useStudioStore((s) => s.svuotaLog)
-  const nonVisti = useStudioStore((s) => s.logNonVisti)
-  const erroriNonVisti = useStudioStore((s) => s.erroriNonVisti)
   const sblocca = useStudioStore((s) => s.sbloccaInterfaccia)
   const [copiato, setCopiato] = useState(false)
 
@@ -55,30 +51,15 @@ export function Console() {
 
   return (
     <section className="pannello console">
-      <button
-        type="button"
-        className="console-interruttore"
-        onClick={() => setAperta(!aperta)}
-        aria-expanded={aperta}
-      >
-        <span className="console-freccia" aria-hidden>
-          {aperta ? '▾' : '▸'}
-        </span>
-        <span className="console-titolo">Console del Controllore</span>
+      <h2 className="pannello-titolo filetto-doppio">
+        Console del Controllore
         <span className="console-contatori">
           <span className="conteggio">{log.length} eventi</span>
           {errori > 0 && <span className="conteggio conteggio-errore">{errori} errori</span>}
-          {!aperta && nonVisti > 0 && (
-            <span className="conteggio conteggio-nuovo">
-              {nonVisti} nuovi{erroriNonVisti > 0 ? ` · ${erroriNonVisti} ✕` : ''}
-            </span>
-          )}
         </span>
-      </button>
+      </h2>
 
-      {aperta && (
-        <>
-          <div className="azioni azioni-console">
+      <div className="azioni azioni-console">
             <button type="button" className="bottone bottone-minuscolo" onClick={() => void copia()}>
               {copiato ? 'Copiato ✓' : 'Copia log'}
             </button>
@@ -107,8 +88,6 @@ export function Console() {
               </li>
             ))}
           </ol>
-        </>
-      )}
     </section>
   )
 }

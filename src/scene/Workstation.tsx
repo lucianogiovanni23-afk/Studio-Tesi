@@ -6,9 +6,10 @@ import { AGENTE } from '../agents/definitions'
 import { useStudioStore } from '../store'
 import type { AgentKey } from '../types'
 import { POSTAZIONI, SEDIA_Z } from './layout'
+import { useQualita } from './qualita'
 
 const LEGNO = '#5a3922'
-const LEGNO_SCURO = '#40281763'
+const LEGNO_SCURO = '#402817'
 const PELLE = '#1f3b2e'
 const OTTONE = '#c9a227'
 const PLASTICA = '#d8d2c0'
@@ -92,6 +93,7 @@ function Poltrona() {
 
 /** Lampada da banchiere con paralume verde. */
 function LampadaBanchiere({ acceso }: { acceso: boolean }) {
+  const qualita = useQualita()
   const luce = useRef<THREE.PointLight>(null)
   const paralume = useRef<THREE.MeshStandardMaterial>(null)
 
@@ -131,7 +133,9 @@ function LampadaBanchiere({ acceso }: { acceso: boolean }) {
           roughness={0.6}
         />
       </mesh>
-      <pointLight ref={luce} position={[0, 0.26, 0]} color="#ffd9a0" intensity={0.35} distance={2.6} decay={2} />
+      {qualita === 'completa' && (
+        <pointLight ref={luce} position={[0, 0.26, 0]} color="#ffd9a0" intensity={0.35} distance={2.6} decay={2} />
+      )}
     </group>
   )
 }
