@@ -13,7 +13,7 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 | Fase | Contenuto | Stato |
 |---|---|---|
 | 1. Fondamenta | indice, capitoli, versioni, glossario; dominio olio/Calabria; scena 3D moderna; modi computer/iPad; Salva/Apri progetto; materiale del corso e quadro teorico | **fatta** |
-| 2. Biblioteca e ricerca | cataloghi accademici, fonti istituzionali, web verificato, schede di lettura, tabella della letteratura | da fare |
+| 2. Biblioteca e ricerca | cataloghi accademici, fonti istituzionali, web verificato, schede di lettura, tabella della letteratura | **fatta** |
 | 3. Scrittura | scaletta da approvare, bozze, riscritture, alternative, citazioni verificate | da fare |
 | 4. Revisione | osservazioni del relatore, coerenza fra capitoli, bibliografia, chat | da fare |
 | 5. Sincronizzazione | facoltativa, opzioni da proporre prima | da fare |
@@ -45,6 +45,54 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
   caso aziendale facoltativo, modo d'uso, scena, modelli, costi per mese / agente / azione con il
   risparmio della cache, registro degli eventi.
 - Biblioteca, Ricerca, Revisione e Chat mostrano cosa arriverà nelle fasi successive.
+
+## Cosa c'è nella fase 2
+
+- **Ricerca**: scrivi una domanda; il Bibliotecario prepara le query (italiano, inglese, spagnolo) e
+  cerca, nell'ordine:
+  1. nei **cataloghi accademici gratuiti** — OpenAlex, Crossref, Semantic Scholar — chiamati
+     direttamente dal browser, senza costi: autori, anno, rivista, DOI e abstract arrivano dai
+     cataloghi e non possono essere inventati; i doppioni (stesso DOI o titolo) si uniscono;
+  2. nei **siti istituzionali** (ISMEA, ISTAT, CREA, ARPACAL e Centro funzionale della Calabria,
+     Copernicus, Commissione europea, EEA, MASAF, Consiglio oleicolo internazionale, FAO, Banca
+     d'Italia) con `web_search` limitato a quei domini;
+  3. sul **web generico**, anche in spagnolo e inglese.
+
+  Poi la **selezione** (Haiku 4.5) consiglia cosa tenere, assegna i temi e scarta con il motivo
+  le fonti prevalentemente contabili, giuridiche o agronomiche. Prima della ricerca l'app mostra
+  la stima del costo; durante, l'avanzamento passo per passo. **Nulla entra in biblioteca senza la
+  tua approvazione**, una per una o "approva i consigliati".
+- **Controlli in codice sulle fonti web**: ogni URL deve comparire fra i risultati reali della
+  ricerca o fra le pagine lette con `web_fetch`, altrimenti la fonte è esclusa e segnalata; ogni
+  estratto viene confrontato con il testo scaricato e quelli non ritrovati sono scartati e contati.
+  Lo storico delle ricerche elenca query, risposte dei cataloghi, esclusi e motivi.
+- **Prova dei cataloghi**: un bottone verifica dal browser che ciascun catalogo risponda; se uno
+  non risponde (rete, CORS, 429) la ricerca continua con gli altri e lo dice.
+- **Biblioteca** che si accumula nel tempo: fonti dalle ricerche e **PDF di paper** caricati da te
+  (se il PDF contiene un DOI, i metadati arrivano da Crossref). Per ogni fonte: stato (da leggere,
+  letta, usata), tag per tema (raccolta, frantoio, prezzi, eventi meteo, strumenti di copertura),
+  capitoli in cui è usata, metadati modificabili, PDF allegabile per avere il testo completo.
+- **Schede di lettura** preparate dal Bibliotecario (domanda, metodo, risultati, rilevanza, frasi
+  chiave) e correggibili da te. Le frasi chiave sono verificate in codice sul testo della fonte:
+  quelle non ritrovate vengono scartate; anche quelle aggiunte a mano ricevono il bollino verde,
+  ambra o rosso. Se c'è solo l'abstract, la scheda lo dichiara.
+- **Tabella della letteratura** con fonte in stile autore-anno, temi, metodo, risultati e stato,
+  scaricabile in CSV per Excel.
+- La colonna "Fonti utili" della scrittura propone le fonti della biblioteca più vicine alla
+  sezione; il cruscotto segnala i risultati da approvare; lo scaffale 3D mostra un libro per fonte.
+
+### Verifiche sulla documentazione (fase 2)
+
+- `web_search_20260318` e `web_fetch_20260318` esistono e accettano `allowed_callers: ["direct"]`:
+  senza questa impostazione la ricerca passerebbe dal filtro dinamico e i risultati non
+  tornerebbero tutti nella risposta, quindi non sarebbero verificabili in codice.
+- `web_fetch` legge solo URL già comparsi nella conversazione (messaggi, risultati di ricerca):
+  è una protezione in più contro gli URL inventati.
+- Il vecchio Ricercatore forzava la consegna con `tool_choice: {type: "tool"}`, che su Sonnet 5.5
+  e Opus 5.5 dà 400. Ora il tool di consegna ha `strict: true`, `tool_choice` resta automatico e,
+  se il modello non consegna, l'app glielo chiede con un messaggio esplicito.
+- Dall'ambiente cloud in cui ho sviluppato, i cataloghi sono bloccati dalla rete: sono stati
+  collaudati con risposte simulate. Nel tuo browser usa "Prova i cataloghi" per la verifica reale.
 
 ## Computer e iPad: una sola app con due modi
 
@@ -105,6 +153,11 @@ npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-
 npm run lint
 ```
 
+Il collaudo della fase 2 aggiunge 39 controlli con cataloghi e API simulati: un catalogo che
+risponde 429, una fonte con URL inventato, un estratto che non c'è nella pagina, un turno sospeso
+con `pause_turn`, una consegna dimenticata al primo tentativo, una fonte contabile da scartare,
+schede con frasi inventate, un PDF con DOI, la tabella e il CSV, iPad.
+
 Il collaudo della fase 1 è stato fatto con Playwright sulla build servita in locale sotto
 `/Studio-Tesi/`, con l'API Anthropic simulata: 46 controlli fra cruscotto, approvazione
 dell'indice, chiave, estrazione di PDF e appunti, quadro teorico (header, modello, output
@@ -118,10 +171,10 @@ ridotto, senza errori in console.
 src/
   domain/      dominio della tesi, progetto iniziale, suggerimenti, etichette
   agents/      api, costi, corpus (pdf.js + BM25), citazioni, verifica URL, supervisore,
-               prompt, schemi, Lettore del corso
-  io/          Salva/Apri progetto
+               prompt, schemi, Lettore del corso, cataloghi, Bibliotecario, schede
+  io/          Salva/Apri progetto, PDF dei paper
   scene/       scena 3D (ambiente, uliveto, scaffale, capitoli, agenti, telecamera)
-  screens/     cruscotto, scrittura, corso, glossario, impostazioni, schermate in arrivo
+  screens/     cruscotto, scrittura, ricerca, biblioteca, corso, glossario, impostazioni, in arrivo
   components/  conferme in linea, nuvolette, barra degli agenti, costi, modalità carta
   store.ts     Zustand + IndexedDB
 ```

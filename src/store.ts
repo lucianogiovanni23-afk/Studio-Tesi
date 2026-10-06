@@ -17,12 +17,15 @@ import type {
   AgentKey,
   AgentRuntime,
   Autore,
+  Candidato,
   Capitolo,
   CourseFile,
+  Fonte,
   ModelSlot,
   Preferenze,
   Progetto,
   QuadroTeorico,
+  RegistroRicerca,
   Schermata,
   Sezione,
   StatoCapitolo,
@@ -135,6 +138,14 @@ export interface StatoStudio {
   aggiungiVoce: (v: Omit<VoceGlossario, 'id'>) => void
   aggiornaVoce: (id: string, patch: Partial<Omit<VoceGlossario, 'id'>>) => void
   rimuoviVoce: (id: string) => void
+
+  // biblioteca e ricerca
+  registraRicerca: (r: RegistroRicerca, candidati: Candidato[]) => void
+  decidiCandidato: (id: string, approva: boolean) => void
+  aggiornaCandidato: (id: string, patch: Partial<Fonte>) => void
+  aggiungiFonte: (f: Fonte) => void
+  aggiornaFonte: (id: string, patch: Partial<Fonte>) => void
+  rimuoviFonte: (id: string) => void
 
   // materiale del corso
   aggiungiCourseFile: (f: CourseFile) => void
@@ -294,6 +305,27 @@ export const useStudio = create<StatoStudio>()(
         conProgetto(set, (p) => ({ glossario: p.glossario.map((v) => (v.id === id ? { ...v, ...patch } : v)) })),
       rimuoviVoce: (id) => conProgetto(set, (p) => ({ glossario: p.glossario.filter((v) => v.id !== id) })),
 
+      registraRicerca: (r, candidati) =>
+        conProgetto(set, (p) => ({
+          ricerche: [r, ...p.ricerche].slice(0, 50),
+          inAttesa: [...p.inAttesa, ...candidati],
+        })),
+      decidiCandidato: (id, approva) =>
+        conProgetto(set, (p) => {
+          const c = p.inAttesa.find((x) => x.id === id)
+          const inAttesa = p.inAttesa.filter((x) => x.id !== id)
+          if (!c || !approva || giàInBiblioteca(p.fonti, c.fonte)) return { inAttesa }
+          return { inAttesa, fonti: [...p.fonti, { ...c.fonte, aggiuntaIl: adesso() }] }
+        }),
+      aggiornaCandidato: (id, patch) =>
+        conProgetto(set, (p) => ({
+          inAttesa: p.inAttesa.map((c) => (c.id === id ? { ...c, fonte: { ...c.fonte, ...patch } } : c)),
+        })),
+      aggiungiFonte: (f) => conProgetto(set, (p) => ({ fonti: [...p.fonti, f] })),
+      aggiornaFonte: (id, patch) =>
+        conProgetto(set, (p) => ({ fonti: p.fonti.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
+      rimuoviFonte: (id) => conProgetto(set, (p) => ({ fonti: p.fonti.filter((f) => f.id !== id) })),
+
       aggiungiCourseFile: (f) => conProgetto(set, (p) => ({ courseFiles: [...p.courseFiles, f] })),
       aggiornaCourseFile: (id, patch) =>
         conProgetto(set, (p) => ({ courseFiles: p.courseFiles.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
@@ -392,6 +424,16 @@ export function contaParoleTesto(testo: string): number {
 
 export function paroleCapitolo(c: Capitolo): number {
   return c.sezioni.reduce((n, s) => n + contaParoleTesto(s.testo), 0)
+}
+
+/** Una fonte è già in biblioteca se ha lo stesso DOI, lo stesso URL o lo stesso titolo. */
+export function giàInBiblioteca(fonti: Fonte[], f: Pick<Fonte, 'doi' | 'url' | 'titolo'>): boolean {
+  const titolo = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const url = (u: string) => u.toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/[/?#]+$/, '')
+  return fonti.some(
+    (x) =>
+      (f.doi && x.doi === f.doi) || (f.url && x.url && url(x.url) === url(f.url)) || (f.titolo && titolo(x.titolo) === titolo(f.titolo)),
+  )
 }
 
 export function estrazioneInCorso(p: Progetto): boolean {

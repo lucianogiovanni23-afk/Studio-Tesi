@@ -241,3 +241,29 @@ export const INDICE_INIZIALE: CapitoloIniziale[] = [
     ],
   },
 ]
+
+/** Siti istituzionali in cui il Bibliotecario cerca prima del web generico. */
+export const DOMINI_ISTITUZIONALI = [
+  'ismea.it',
+  'ismeamercati.it',
+  'istat.it',
+  'crea.gov.it',
+  'arpacal.it',
+  'cfd.calabria.it',
+  'regione.calabria.it',
+  'copernicus.eu',
+  'ec.europa.eu',
+  'eea.europa.eu',
+  'masaf.gov.it',
+  'internationaloliveoil.org',
+  'fao.org',
+  'bancaditalia.it',
+]
+
+export const ETICHETTA_TEMA = {
+  raccolta: 'raccolta',
+  frantoio: 'frantoio',
+  prezzi: 'prezzi',
+  eventi_meteo: 'eventi meteo',
+  strumenti_copertura: 'strumenti di copertura',
+} as const

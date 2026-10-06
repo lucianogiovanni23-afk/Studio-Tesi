@@ -1,45 +1,4 @@
 import { InArrivo } from '../components/InArrivo'
-import { FONTI_PRIORITARIE, VARIETA, ZONE } from '../domain/dominio'
-import { useStudio } from '../store'
-
-export function Biblioteca() {
-  const fonti = useStudio((s) => s.progetto.fonti.length)
-  return (
-    <InArrivo titolo="Biblioteca" fase={2}>
-      <p>
-        La biblioteca si accumula nel tempo: PDF di paper che carichi tu, fonti web, fonti dai cataloghi accademici e
-        fonti istituzionali. Ogni fonte avrà una scheda di lettura correggibile (domanda, metodo, risultati, rilevanza,
-        frasi chiave verificate), i tag per tema (raccolta, frantoio, prezzi, eventi meteo, strumenti di copertura), lo
-        stato (da leggere, letta, usata nel capitolo) e una tabella della letteratura.
-      </p>
-      <p className="nota">Fonti attualmente in biblioteca: {fonti}.</p>
-    </InArrivo>
-  )
-}
-
-export function Ricerca() {
-  return (
-    <InArrivo titolo="Ricerca" fase={2}>
-      <p>
-        Scriverai una domanda di ricerca; il Bibliotecario cercherà prima nei cataloghi accademici gratuiti (OpenAlex,
-        Crossref, Semantic Scholar), poi nei siti istituzionali, poi sul web. Ogni URL sarà controllato in codice contro
-        i risultati reali e gli estratti contro il testo scaricato. Approverai tu i risultati prima che entrino in
-        biblioteca.
-      </p>
-      <p>Fonti da cercare per prime:</p>
-      <ul className="elenco-semplice">
-        {FONTI_PRIORITARIE.map((f) => (
-          <li key={f.nome}>
-            <strong>{f.nome}</strong>: {f.cosa}
-          </li>
-        ))}
-      </ul>
-      <p className="nota">
-        Zone: {ZONE.join(', ')}. Varietà: {VARIETA.join(', ')}.
-      </p>
-    </InArrivo>
-  )
-}
 
 export function Revisione() {
   return (

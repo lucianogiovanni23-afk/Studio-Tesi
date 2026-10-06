@@ -46,6 +46,8 @@ export function progettoIniziale(): Progetto {
     indiceApprovatoIl: null,
     glossario: glossarioIniziale(),
     fonti: [],
+    inAttesa: [],
+    ricerche: [],
     osservazioni: [],
     courseFiles: [],
     quadro: null,

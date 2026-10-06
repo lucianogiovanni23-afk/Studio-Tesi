@@ -69,3 +69,77 @@ export const SCHEMA_QUADRO = consegna(
     ),
   }),
 )
+
+const TEMI = ['raccolta', 'frantoio', 'prezzi', 'eventi_meteo', 'strumenti_copertura']
+
+export const SCHEMA_PIANO = consegna(
+  oggetto({
+    query_cataloghi: elenco(
+      1,
+      'Da 4 a 6 query brevi (3-6 parole) per i cataloghi accademici, in inglese, italiano e spagnolo, senza operatori booleani.',
+    ),
+    query_web: elenco(1, 'Da 2 a 4 query per la ricerca web, in italiano, con zone o varietà quando utile.'),
+  }),
+)
+
+/**
+ * Tool di consegna del Bibliotecario. Con `strict: true` gli argomenti
+ * rispettano lo schema; la chiamata non viene forzata (tool_choice "auto"),
+ * perché i modelli più recenti rifiutano il tool_choice forzato.
+ */
+export const TOOL_CONSEGNA_FONTI = {
+  name: 'consegna_fonti',
+  description:
+    'Consegna le fonti trovate e lette. Chiamalo una volta sola, alla fine, dopo aver letto le pagine con web_fetch.',
+  strict: true,
+  input_schema: oggetto({
+    passaggi: elenco(1, 'Il metodo seguito, in 3-6 passaggi brevi per lo studente.'),
+    fonti: {
+      type: 'array',
+      minItems: 0,
+      items: oggetto({
+        titolo: stringa,
+        url: { type: 'string', description: 'URL copiato esattamente da un risultato di ricerca o da una pagina letta.' },
+        ente_o_autori: { type: 'string', description: 'Ente che pubblica (per esempio ISMEA) o autori, come compaiono nella pagina.' },
+        anno: { type: 'string', description: 'Anno di pubblicazione se indicato nella pagina, altrimenti stringa vuota.' },
+        descrizione: stringa,
+        perche_rilevante: stringa,
+        estratti: elenco(0, 'Da 2 a 4 frasi COPIATE ALLA LETTERA dal testo della pagina letta. Nessuna parafrasi.'),
+      }),
+    },
+    fonti_scartate: {
+      type: 'array',
+      minItems: 0,
+      items: oggetto({ titolo: stringa, url: stringa, motivo: stringa }),
+    },
+  }),
+} as const
+
+export const SCHEMA_SELEZIONE = consegna(
+  oggetto({
+    valutazioni: {
+      type: 'array',
+      minItems: 0,
+      items: oggetto({
+        id: { type: 'string', description: 'Identificativo del candidato, per esempio "R7".' },
+        decisione: { type: 'string', enum: ['tenere', 'scartare'] },
+        pertinenza: { type: 'string', enum: ['alta', 'media', 'bassa'] },
+        temi: { type: 'array', minItems: 0, items: { type: 'string', enum: TEMI } },
+        motivo: { type: 'string', description: 'Una frase. Se scarti per materia, di\' quale ambito (contabile, giuridico, agronomico).' },
+      }),
+    },
+  }),
+)
+
+export const SCHEMA_SCHEDA = consegna(
+  oggetto({
+    domanda: { type: 'string', description: 'La domanda di ricerca della fonte.' },
+    metodo: { type: 'string', description: 'Dati e metodo usati, in breve.' },
+    risultati: { type: 'string', description: 'I risultati principali, con i numeri quando ci sono.' },
+    rilevanza: {
+      type: 'string',
+      description: 'Perché serve alla tesi: punto di vista (raccolta o frantoio) e capitolo in cui usarla.',
+    },
+    frasi_chiave: elenco(0, 'Da 2 a 5 frasi COPIATE ALLA LETTERA dal testo della fonte. Nessuna parafrasi.'),
+  }),
+)

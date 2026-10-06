@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { AGENTE } from '../agents/agenti'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
+import { autoreAnno } from '../domain/bibliografia'
 import { ETICHETTA_STATO } from '../domain/etichette'
 import { useLargo } from '../hooks/useLayoutMode'
 import { useModoUso } from '../hooks/useModoUso'
@@ -175,6 +176,20 @@ function Utili({ sez }: { sez: Sezione }) {
   const vai = useStudio((s) => s.vai)
   const testoMinuscolo = (sez.titolo + ' ' + sez.obiettivo).toLowerCase()
 
+  // Fonti della biblioteca più vicine al titolo e all'obiettivo della sezione.
+  const utili = useMemo(() => {
+    const parole = testoMinuscolo.split(/[^a-zàèéìòù]+/).filter((w) => w.length > 4)
+    return fonti
+      .map((f) => {
+        const corpo = `${f.titolo} ${f.abstract} ${f.temi.join(' ')} ${f.scheda?.rilevanza ?? ''}`.toLowerCase()
+        return { f, peso: parole.filter((w) => corpo.includes(w.slice(0, -1))).length }
+      })
+      .filter((x) => x.peso > 0)
+      .sort((a, b) => b.peso - a.peso)
+      .slice(0, 6)
+      .map((x) => x.f)
+  }, [fonti, testoMinuscolo])
+
   const concetti = useMemo(() => {
     if (!quadro) return []
     return quadro.concetti
@@ -189,11 +204,24 @@ function Utili({ sez }: { sez: Sezione }) {
       <h3>Fonti utili</h3>
       {fonti.length === 0 ? (
         <p className="nota">
-          La biblioteca è vuota. Dalla fase 2 qui compariranno le fonti adatte a questa sezione; dalla fase 3 dovrai
-          approvarle prima della stesura.
+          La biblioteca è vuota.{' '}
+          <button type="button" className="link" onClick={() => vai('ricerca')}>
+            Fai una ricerca
+          </button>
+          . Dalla fase 3 dovrai approvare le fonti della sezione prima della stesura.
         </p>
+      ) : utili.length === 0 ? (
+        <p className="nota">Nessuna fonte della biblioteca sembra legata a questa sezione.</p>
       ) : (
-        <p className="nota">{fonti.length} fonti in biblioteca.</p>
+        <ul className="elenco-concetti">
+          {utili.map((f) => (
+            <li key={f.id}>
+              <strong>{autoreAnno(f)}</strong>
+              <span>{f.titolo}</span>
+              <small>{f.scheda ? (f.scheda.corretta ? 'scheda rivista' : 'scheda da rivedere') : 'senza scheda'}</small>
+            </li>
+          ))}
+        </ul>
       )}
 
       <h3>Dal corso</h3>

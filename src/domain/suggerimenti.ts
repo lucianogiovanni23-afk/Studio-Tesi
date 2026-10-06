@@ -59,6 +59,16 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
     })
   }
 
+  if (p.inAttesa.length > 0) {
+    fuori.push({
+      id: 'in-attesa',
+      testo: `${p.inAttesa.length} risultat${p.inAttesa.length === 1 ? 'o' : 'i'} di ricerca da approvare prima che entrino in biblioteca.`,
+      tono: 'urgente',
+      vai: 'ricerca',
+      etichetta: 'Ricerca',
+    })
+  }
+
   const daLeggere = p.fonti.filter((f) => f.stato === 'da_leggere').length
   if (daLeggere > 0) {
     fuori.push({

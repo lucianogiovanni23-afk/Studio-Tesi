@@ -1665,3 +1665,365 @@ details summary {
 .marchio > div {
   min-width: 0;
 }
+
+/* ------------------------------------------------------------------ */
+/* Biblioteca e ricerca                                               */
+/* ------------------------------------------------------------------ */
+
+.temi {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tema {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 550;
+  background: var(--colore-tema-chiaro);
+  color: var(--colore-tema);
+}
+
+button.tema {
+  cursor: pointer;
+}
+
+.tema-spento {
+  background: transparent;
+  border-color: var(--bordo);
+  color: var(--inchiostro-3);
+}
+
+.tema-attivo {
+  border-color: var(--colore-tema);
+}
+
+.tema-raccolta {
+  --colore-tema: #4f6a1e;
+  --colore-tema-chiaro: #e7ecd3;
+}
+.tema-frantoio {
+  --colore-tema: #8a6a10;
+  --colore-tema-chiaro: #f6ebc8;
+}
+.tema-prezzi {
+  --colore-tema: #93402c;
+  --colore-tema-chiaro: #f6e1da;
+}
+.tema-eventi_meteo {
+  --colore-tema: #2f6f9f;
+  --colore-tema-chiaro: #e3eff8;
+}
+.tema-strumenti_copertura {
+  --colore-tema: #4a5664;
+  --colore-tema-chiaro: #e6e9ed;
+}
+
+.campo-stretto {
+  width: auto;
+}
+
+.dettagli-piccoli {
+  margin-top: 10px;
+}
+
+.passi-ricerca {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.passi-ricerca li {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--crema-2);
+}
+
+.passi-ricerca small {
+  display: block;
+  color: var(--inchiostro-2);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.passo-icona {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--crema-2);
+  font-weight: 700;
+  flex: none;
+}
+
+.passo-corso .passo-icona {
+  background: var(--oro-chiaro);
+  color: #7a5d0c;
+}
+.passo-ok .passo-icona {
+  background: #e4efd8;
+  color: var(--verde-ok);
+}
+.passo-avviso .passo-icona {
+  background: #f8ecc9;
+  color: var(--ambra);
+}
+.passo-errore .passo-icona {
+  background: #f6dcd6;
+  color: var(--rosso);
+}
+.passo-saltato {
+  opacity: 0.55;
+}
+
+.testo-errore {
+  color: var(--rosso);
+}
+
+.elenco-candidati,
+.elenco-fonti,
+.storico,
+.frasi-chiave {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.candidato {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--crema-2);
+}
+
+.candidato-sconsigliato {
+  opacity: 0.75;
+}
+
+.candidato-testa {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pastiglia-origine,
+.verifica,
+.consiglio {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--crema-2);
+}
+
+.verifica {
+  background: #e4efd8;
+  color: var(--verde-ok);
+}
+
+.consiglio-tenere {
+  background: var(--oliva);
+  color: var(--bianco);
+}
+
+.consiglio-scartare {
+  background: #f6dcd6;
+  color: var(--rosso);
+}
+
+.candidato-titolo {
+  margin: 4px 0 2px;
+  font-family: var(--serif);
+  font-size: 1.05rem;
+}
+
+.candidato-titolo a,
+.dettaglio-fonte a {
+  color: var(--inchiostro);
+}
+
+.motivo {
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--inchiostro-2);
+}
+
+.estratti-candidato,
+.frasi-chiave {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+}
+
+.estratti-candidato li,
+.frasi-chiave li {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  padding: 4px 0;
+}
+
+.frasi-chiave li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.abstract {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  background: var(--crema);
+  padding: 10px 12px;
+  border-radius: var(--raggio-piccolo);
+}
+
+.candidato-piede {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.azioni-candidato {
+  display: flex;
+  gap: 6px;
+}
+
+.storico li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--crema-2);
+}
+
+.url-escluso {
+  color: var(--inchiostro-3);
+  overflow-wrap: anywhere;
+}
+
+.filtri {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 700px) {
+  .filtri {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fonte-voce {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-bottom-color: var(--crema-2);
+  background: none;
+  padding: 10px 8px;
+  border-radius: var(--raggio-piccolo);
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.fonte-voce:hover {
+  background: var(--crema);
+}
+
+.fonte-scelta {
+  background: var(--oliva-chiaro);
+  border-color: var(--oliva);
+}
+
+.fonte-rimando {
+  font-weight: 650;
+  color: var(--oliva-scuro);
+}
+
+.fonte-titolo {
+  font-family: var(--serif);
+}
+
+.fonte-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--inchiostro-3);
+}
+
+.stato-fonte {
+  font-weight: 600;
+}
+
+.stato-fonte-da_leggere {
+  color: var(--ambra);
+}
+.stato-fonte-letta {
+  color: var(--cielo);
+}
+.stato-fonte-usata {
+  color: var(--verde-ok);
+}
+
+.colonna-unica {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dettaglio-fonte details {
+  margin: 10px 0;
+}
+
+.scheda {
+  border-top: 1px solid var(--bordo);
+  margin-top: 14px;
+}
+
+.tabella-letteratura th,
+.tabella-letteratura td {
+  white-space: normal;
+  text-align: left;
+  vertical-align: top;
+  min-width: 120px;
+}
+
+.tabella-letteratura td:nth-child(2) {
+  min-width: 220px;
+}
+
+.tabella-letteratura td:nth-child(4),
+.tabella-letteratura td:nth-child(5) {
+  min-width: 240px;
+}
+
+.riga-cliccabile {
+  cursor: pointer;
+}
+
+.riga-cliccabile:hover {
+  background: var(--crema);
+}
+
+.modo-ipad .tema,
+.modo-ipad .pastiglia-origine,
+.modo-ipad .verifica,
+.modo-ipad .consiglio,
+.modo-ipad .fonte-meta,
+.modo-ipad .passi-ricerca small,
+.modo-ipad .motivo {
+  font-size: 15px;
+}
+
+.modo-ipad button.tema {
+  min-height: 44px;
+}

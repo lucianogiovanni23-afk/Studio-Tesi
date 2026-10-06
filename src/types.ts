@@ -108,14 +108,27 @@ export interface SchedaLettura {
   metodo: string
   risultati: string
   rilevanza: string
-  /** Frasi copiate dalla fonte e verificate in codice. */
-  frasiChiave: string[]
+  /** Frasi copiate dalla fonte, con l'esito del confronto in codice. */
+  frasiChiave: EstrattoVerificato[]
+  /** true quando lo studente l'ha rivista e corretta. */
   corretta: boolean
+  /** Preparata sul testo completo o solo sull'abstract. */
+  base: 'testo' | 'abstract'
+  preparataIl: string
+}
+
+export type OrigineFonte = 'openalex' | 'crossref' | 'semanticscholar' | 'istituzionale' | 'web' | 'pdf'
+
+/** Estratto letterale di una pagina letta, con l'esito del confronto in codice. */
+export interface EstrattoVerificato {
+  testo: string
+  esito: EsitoTestuale
 }
 
 export interface Fonte {
   id: string
   tipo: 'pdf' | 'web' | 'catalogo' | 'istituzionale'
+  origine: OrigineFonte
   titolo: string
   autori: string[]
   anno: number | null
@@ -123,14 +136,53 @@ export interface Fonte {
   doi: string
   url: string
   lingua: string
+  abstract: string
+  /** Estratti letterali verificati sul testo della pagina letta (fonti web e istituzionali). */
+  estratti: EstrattoVerificato[]
   temi: TemaFonte[]
   stato: StatoFonte
-  /** Capitoli in cui è usata. */
+  /** Id dei capitoli in cui è usata. */
   usataIn: string[]
   scheda: SchedaLettura | null
-  /** Testo estratto (PDF caricati o pagine lette), usato per verificare le citazioni. */
+  /** Testo estratto (PDF caricati o pagine lette), usato per verificare schede e citazioni. */
   testo: string
+  /** Da quale testo è stata preparata la scheda. */
+  testoCompleto: boolean
   aggiuntaIl: string
+}
+
+export interface ConsiglioSelezione {
+  decisione: 'tenere' | 'scartare'
+  pertinenza: 'alta' | 'media' | 'bassa'
+  motivo: string
+}
+
+/** Un risultato di ricerca in attesa della tua approvazione. */
+export interface Candidato {
+  id: string
+  ricercaId: string
+  fonte: Fonte
+  /** Come è stato verificato: dal catalogo (metadati reali) o fra i risultati e le pagine lette. */
+  verifica: 'catalogo' | 'url_verificato'
+  estrattiScartati: number
+  consiglio: ConsiglioSelezione | null
+}
+
+export interface FonteEsclusa {
+  titolo: string
+  url: string
+  motivo: string
+}
+
+export interface RegistroRicerca {
+  id: string
+  domanda: string
+  data: string
+  query: string[]
+  perCatalogo: Record<string, number | string>
+  trovati: number
+  esclusi: FonteEsclusa[]
+  passaggi: string[]
 }
 
 export interface Osservazione {
@@ -230,6 +282,9 @@ export interface Progetto {
   indiceApprovatoIl: string | null
   glossario: VoceGlossario[]
   fonti: Fonte[]
+  /** Risultati delle ricerche che aspettano la tua approvazione. */
+  inAttesa: Candidato[]
+  ricerche: RegistroRicerca[]
   osservazioni: Osservazione[]
   courseFiles: CourseFile[]
   quadro: QuadroTeorico | null
