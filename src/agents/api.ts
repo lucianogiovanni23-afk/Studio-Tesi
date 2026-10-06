@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { AgentKey } from '../types'
+import type { Chi } from '../types'
 import { normalizzaUso, sommaUsi, type UsoNormalizzato } from './costs'
 import type { JsonSchema } from './schemas'
 
@@ -12,23 +12,11 @@ import type { JsonSchema } from './schemas'
  * classi d'errore tipizzate invece di confrontare stringhe.
  */
 
-/** Valori predefiniti, modificabili dal pannello impostazioni. */
-export const MODELLI_PREDEFINITI = {
-  lettore: 'claude-sonnet-5',
-  ricercatore: 'claude-sonnet-5',
-  // La selezione è un compito semplice: basta il modello più economico.
-  selettore: 'claude-haiku-4-5',
-  scrittore: 'claude-opus-5-5',
-  controllore: 'claude-sonnet-5',
-  chat: 'claude-sonnet-5',
-} as const
-
-export type ModelSlot = keyof typeof MODELLI_PREDEFINITI
-
 export const MODELLI_DISPONIBILI: { id: string; nome: string; nota: string }[] = [
   { id: 'claude-opus-5-5', nome: 'Claude Opus 5.5', nota: 'La più alta qualità di scrittura' },
   { id: 'claude-opus-5', nome: 'Claude Opus 5', nota: 'Molto capace, più caro' },
-  { id: 'claude-sonnet-5', nome: 'Claude Sonnet 5', nota: 'Equilibrato: veloce e conveniente' },
+  { id: 'claude-sonnet-5-5', nome: 'Claude Sonnet 5.5', nota: 'Il Sonnet più recente: veloce e conveniente' },
+  { id: 'claude-sonnet-5', nome: 'Claude Sonnet 5', nota: 'Generazione precedente, stesso prezzo' },
   { id: 'claude-haiku-4-5', nome: 'Claude Haiku 4.5', nota: 'Il più rapido ed economico' },
 ]
 
@@ -211,8 +199,7 @@ export function creaClient(apiKey: string): Anthropic {
 // Registrazione dei consumi
 // ---------------------------------------------------------------------------
 
-export type Chi = AgentKey | 'chat'
-type Registratore = (chi: Chi, modello: string, uso: UsoNormalizzato) => void
+type Registratore = (chi: Chi, azione: string, modello: string, uso: UsoNormalizzato) => void
 let registratore: Registratore | null = null
 
 /** Lo store si registra qui, così questo modulo resta indipendente dall'interfaccia. */
@@ -220,8 +207,8 @@ export function impostaRegistratoreUso(fn: Registratore) {
   registratore = fn
 }
 
-function registra(chi: Chi | undefined, modello: string, uso: UsoNormalizzato) {
-  if (chi && registratore) registratore(chi, modello, uso)
+function registra(chi: Chi | undefined, azione: string | undefined, modello: string, uso: UsoNormalizzato) {
+  if (chi && registratore) registratore(chi, azione ?? '', modello, uso)
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +228,8 @@ export interface ChiamataBase {
   signal?: AbortSignal
   /** A chi addebitare i token nel riepilogo dei costi. */
   chi?: Chi
+  /** Azione da registrare nel consuntivo, per esempio "quadro teorico". */
+  azione?: string
 }
 
 function outputConfig(model: string, effort: Effort | undefined, schema?: JsonSchema) {
@@ -268,7 +257,12 @@ function leggiJson<T>(risposta: Anthropic.Message): T {
     )
   }
   if (risposta.stop_reason === 'refusal') {
-    throw new ApiError('richiesta_non_valida', 'Il modello ha rifiutato la richiesta.', null, false)
+    throw new ApiError(
+      'richiesta_non_valida',
+      'Il modello ha rifiutato la richiesta per motivi di sicurezza. Riformula il compito o prova un altro modello nelle impostazioni.',
+      null,
+      false,
+    )
   }
   const testo = testoDi(risposta)
   if (!testo) throw new ApiError('sconosciuto', "L'API ha risposto senza contenuto: nessun JSON da leggere.", null, true)
@@ -291,7 +285,7 @@ export async function chiamataStrutturata<T>(opts: ChiamataBase & { schema: Json
     },
     { signal: opts.signal },
   )
-  registra(opts.chi, opts.model, normalizzaUso(risposta.usage))
+  registra(opts.chi, opts.azione, opts.model, normalizzaUso(risposta.usage))
   return leggiJson<T>(risposta)
 }
 
@@ -327,7 +321,7 @@ export async function chiamataStrutturataStream<T>(
 
   try {
     const risposta = await stream.finalMessage()
-    registra(opts.chi, opts.model, normalizzaUso(risposta.usage))
+    registra(opts.chi, opts.azione, opts.model, normalizzaUso(risposta.usage))
     return leggiJson<T>(risposta)
   } finally {
     // Anche in caso d'errore le chiamate in attesa non devono restare bloccate.
@@ -389,7 +383,7 @@ export async function chiamataConStrumenti(
       return { blocchi, consegna, messaggi }
     }
   } finally {
-    registra(opts.chi, opts.model, uso)
+    registra(opts.chi, opts.azione, opts.model, uso)
   }
 
   throw new ApiError(
@@ -415,6 +409,6 @@ export async function chiamataChatStream(opts: ChiamataBase & { onTesto: (framme
 
   stream.on('text', (frammento) => opts.onTesto(frammento))
   const risposta = await stream.finalMessage()
-  registra(opts.chi, opts.model, normalizzaUso(risposta.usage))
+  registra(opts.chi, opts.azione, opts.model, normalizzaUso(risposta.usage))
   return testoDi(risposta)
 }

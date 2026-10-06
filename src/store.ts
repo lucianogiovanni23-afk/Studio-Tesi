@@ -1,63 +1,57 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import { del, get, set as idbSet } from 'idb-keyval'
-import { MODELLI_PREDEFINITI, impostaRegistratoreUso, type ModelSlot } from './agents/api'
-import { contaParole } from './agents/citations'
-import { costoUso } from './agents/costs'
-import { ARGOMENTO_PREDEFINITO, CAPITOLO_PREDEFINITO } from './agents/prompts'
+import { AGENT_KEYS } from './agents/agenti'
+import { impostaRegistratoreUso } from './agents/api'
+import { costoUso, risparmioCache } from './agents/costs'
+import {
+  adesso,
+  firmaCorso,
+  nuovaSezione,
+  nuovoCapitolo,
+  nuovoId,
+  preferenzeIniziali,
+  progettoIniziale,
+} from './domain/progettoIniziale'
 import type {
   AgentKey,
   AgentRuntime,
-  ApprovalStatus,
-  CaseFile,
-  ChatMessage,
+  Autore,
+  Capitolo,
   CourseFile,
-  Fonte,
-  FonteScartata,
-  GiudizioCitazione,
-  ImpiantoKey,
-  LogEntry,
-  LogKind,
-  ModalitaScena,
-  Opzione,
-  Paragrafo,
-  Passo,
-  PrefissoScrittore,
-  Profondita,
-  RisultatoControllore,
-  RisultatoLettore,
-  Scaletta,
-  SceltaFonte,
-  TickerItem,
-  Vista,
+  ModelSlot,
+  Preferenze,
+  Progetto,
+  QuadroTeorico,
+  Schermata,
+  Sezione,
+  StatoCapitolo,
+  StileCitazione,
+  VoceGlossario,
   VoceUso,
 } from './types'
 
-const CHIAVE_API_STORAGE = 'studio-tesi.anthropic-api-key'
-const MAX_LOG = 500
-const MAX_TICKER = 40
-const MAX_USI = 400
+export const CHIAVE_API_STORAGE = 'studio-tesi.anthropic-api-key'
+const MAX_LOG = 400
+const MAX_USI = 2000
+const MAX_VERSIONI = 60
 
-export const AGENT_KEYS: AgentKey[] = [
-  'lettore',
-  'ricercatore',
-  'selettore',
-  'scrittore',
-  'controllore',
-]
+export type LogKind = 'info' | 'ok' | 'avviso' | 'riparazione' | 'fallimento'
+
+export interface LogEntry {
+  id: string
+  ora: string
+  kind: LogKind
+  agente: AgentKey | null
+  messaggio: string
+}
 
 function agenteVuoto(): AgentRuntime {
-  return { status: 'idle', microLabel: '', passaggi: [], errore: null, arrived: false, tentativi: 0 }
+  return { status: 'riposo', etichetta: '', passaggi: [], errore: null, tentativi: 0 }
 }
 
 function agentiVuoti(): Record<AgentKey, AgentRuntime> {
-  return AGENT_KEYS.reduce(
-    (acc, k) => {
-      acc[k] = agenteVuoto()
-      return acc
-    },
-    {} as Record<AgentKey, AgentRuntime>,
-  )
+  return Object.fromEntries(AGENT_KEYS.map((k) => [k, agenteVuoto()])) as Record<AgentKey, AgentRuntime>
 }
 
 // La chiave API resta in localStorage e non entra mai nello stato persistito.
@@ -74,12 +68,12 @@ function scriviChiave(valore: string) {
     if (valore) localStorage.setItem(CHIAVE_API_STORAGE, valore)
     else localStorage.removeItem(CHIAVE_API_STORAGE)
   } catch {
-    // Storage non disponibile: la chiave resta solo in memoria per questa sessione.
+    // Storage non disponibile: la chiave resta in memoria per questa sessione.
   }
 }
 
-/** localStorage è troppo piccolo per i capitoli: la sessione vive in IndexedDB. */
-const storageIndexedDb: StateStorage = {
+/** localStorage è troppo piccolo per una tesi: il progetto vive in IndexedDB. */
+const archivioIdb: StateStorage = {
   getItem: async (nome) => (await get<string>(nome)) ?? null,
   setItem: async (nome, valore) => {
     await idbSet(nome, valore)
@@ -89,528 +83,281 @@ const storageIndexedDb: StateStorage = {
   },
 }
 
-let idLog = 0
-let idTicker = 0
-
-export interface InfoLettura {
-  passaggi: number
-  file: number
-  caratteri: number
-  /** Caratteri totali del corpus, per mostrare quanta parte è stata letta. */
-  totale: number
-}
-
-export interface StudioState {
-  // --- configurazione ---
+export interface StatoStudio {
+  progetto: Progetto
+  preferenze: Preferenze
   apiKey: string
-  modelli: Record<ModelSlot, string>
-  profondita: Profondita
-  modalitaScena: ModalitaScena
 
-  // --- materiale ---
-  courseFiles: CourseFile[]
-  caseFiles: CaseFile[]
-  argomento: string
-  capitolo: string
-  /** true quando il corpus salvato è stato confrontato con l'elenco dei file. */
+  schermata: Schermata
+  capitoloAperto: string | null
+  sezioneAperta: string | null
+  cartaAperta: boolean
+  nuvoletta: AgentKey | null
+  agenti: Record<AgentKey, AgentRuntime>
+  log: LogEntry[]
   corpusSincronizzato: boolean
 
-  // --- esecuzione ---
-  agenti: Record<AgentKey, AgentRuntime>
-  inEsecuzione: boolean
-  agenteAttivo: AgentKey | null
-  erroreGlobale: string | null
-  /** Agente da cui ripartire dopo un errore. */
-  ripresaDa: AgentKey | null
-  esecuzione: number
-
-  dossier: RisultatoLettore | null
-  infoLettura: InfoLettura | null
-  fonti: Fonte[]
-  fontiScartate: FonteScartata[]
-  selezionate: SceltaFonte[]
-  scartateDalSelettore: SceltaFonte[]
-  coperturaSufficiente: boolean
-  avvisoRicerca: string | null
-
-  approvazione: ApprovalStatus
-  giroApprovazione: number
-  motivoRifiuto: string
-  storicoApprovazioni: string[]
-
-  prefissoScrittore: PrefissoScrittore | null
-  scaletta: Scaletta | null
-  approvazioneScaletta: ApprovalStatus
-  giroScaletta: number
-  motivoRifiutoScaletta: string
-  storicoScaletta: string[]
-
-  opzioni: Opzione[]
-  opzioneAttiva: ImpiantoKey
-  referto: RisultatoControllore | null
-
-  usi: VoceUso[]
-
-  // --- diagnostica e interfaccia ---
-  vista: Vista
-  passoAttivo: Passo
-  letturaAperta: ImpiantoKey | null
-  log: LogEntry[]
-  logNonVisti: number
-  erroriNonVisti: number
-  ticker: TickerItem[]
-
-  nuvolettaAperta: AgentKey | null
-  fuocoCamera: AgentKey | null
-  tokenFuoco: number
-  campanellaSuonata: boolean
-  audioAttivo: boolean
-
-  chat: ChatMessage[]
-  chatInCorso: boolean
-  chatErrore: string | null
-  chatParziale: string
-
-  // --- azioni ---
-  setApiKey: (k: string) => void
+  // impostazioni
+  setApiKey: (v: string) => void
   setModello: (slot: ModelSlot, id: string) => void
-  ripristinaModelli: () => void
-  setProfondita: (p: Profondita) => void
-  setModalitaScena: (m: ModalitaScena) => void
+  setPreferenze: (p: Partial<Omit<Preferenze, 'modelli'>>) => void
 
+  // navigazione
+  vai: (s: Schermata) => void
+  apriSezione: (capitoloId: string, sezioneId: string | null) => void
+  setCarta: (v: boolean) => void
+  apriNuvoletta: (k: AgentKey | null) => void
+
+  // progetto
+  setTitolo: (v: string) => void
+  setDomanda: (v: string) => void
+  setCaso: (c: Partial<Progetto['casoAziendale']>) => void
+  setStileCitazione: (s: StileCitazione) => void
+
+  // indice
+  aggiungiCapitolo: (titolo: string) => void
+  rinominaCapitolo: (id: string, titolo: string) => void
+  rimuoviCapitolo: (id: string) => void
+  spostaCapitolo: (id: string, delta: -1 | 1) => void
+  setStatoCapitolo: (id: string, stato: StatoCapitolo) => void
+  aggiungiSezione: (capitoloId: string, titolo: string) => void
+  aggiornaSezione: (capitoloId: string, sezioneId: string, patch: Partial<Pick<Sezione, 'titolo' | 'obiettivo'>>) => void
+  rimuoviSezione: (capitoloId: string, sezioneId: string) => void
+  spostaSezione: (capitoloId: string, sezioneId: string, delta: -1 | 1) => void
+  approvaIndice: () => void
+
+  // testi e versioni
+  setTestoSezione: (capitoloId: string, sezioneId: string, testo: string) => void
+  salvaVersione: (capitoloId: string, sezioneId: string, nota: string, autore?: Autore) => boolean
+  ripristinaVersione: (capitoloId: string, sezioneId: string, versioneId: string) => void
+
+  // glossario
+  aggiungiVoce: (v: Omit<VoceGlossario, 'id'>) => void
+  aggiornaVoce: (id: string, patch: Partial<Omit<VoceGlossario, 'id'>>) => void
+  rimuoviVoce: (id: string) => void
+
+  // materiale del corso
   aggiungiCourseFile: (f: CourseFile) => void
   aggiornaCourseFile: (id: string, patch: Partial<CourseFile>) => void
   rimuoviCourseFile: (id: string) => void
-  aggiungiCaseFile: (f: CaseFile) => void
-  aggiornaCaseFile: (id: string, patch: Partial<CaseFile>) => void
-  rimuoviCaseFile: (id: string) => void
+  setQuadro: (q: QuadroTeorico | null) => void
   setCorpusSincronizzato: (v: boolean) => void
 
-  setArgomento: (v: string) => void
-  setCapitolo: (v: string) => void
-
-  patchAgente: (k: AgentKey, patch: Partial<AgentRuntime>) => void
-  setArrivato: (k: AgentKey, v: boolean) => void
-  setInEsecuzione: (v: boolean) => void
-  setAgenteAttivo: (k: AgentKey | null) => void
-  setErroreGlobale: (m: string | null) => void
-  setRipresaDa: (k: AgentKey | null) => void
-  nuovaEsecuzione: () => void
-
-  setDossier: (d: RisultatoLettore | null) => void
-  setInfoLettura: (i: InfoLettura | null) => void
-  setFonti: (f: Fonte[], scartate: FonteScartata[]) => void
-  setSelezione: (sel: SceltaFonte[], scartate: SceltaFonte[], copertura: boolean) => void
-  setAvvisoRicerca: (m: string | null) => void
-
-  chiediApprovazione: () => void
-  approva: () => void
-  rifiuta: (motivo: string) => void
-  azzeraApprovazione: () => void
-
-  setPrefissoScrittore: (p: PrefissoScrittore | null) => void
-  setScaletta: (s: Scaletta | null) => void
-  chiediApprovazioneScaletta: () => void
-  approvaScaletta: () => void
-  rifiutaScaletta: (motivo: string) => void
-  azzeraApprovazioneScaletta: () => void
-
-  inizializzaOpzioni: (opzioni: Opzione[]) => void
-  patchOpzione: (impianto: ImpiantoKey, patch: Partial<Opzione>) => void
-  setOpzioneAttiva: (i: ImpiantoKey) => void
-  /** Sostituisce un paragrafo conservando la versione precedente per l'annullamento. */
-  patchParagrafo: (impianto: ImpiantoKey, indice: number, paragrafo: Paragrafo) => void
-  annullaParagrafo: (impianto: ImpiantoKey, indice: number) => void
-  applicaGiudizi: (giudizi: GiudizioCitazione[]) => void
-  setReferto: (r: RisultatoControllore | null) => void
-
-  registraUso: (voce: Omit<VoceUso, 'at' | 'esecuzione'>) => void
+  // costi
+  registraUso: (v: Omit<VoceUso, 'id' | 'data'>) => void
   azzeraUsi: () => void
 
-  setVista: (v: Vista) => void
-  setPassoAttivo: (p: Passo) => void
-  apriLettura: (i: ImpiantoKey | null) => void
+  // agenti e registro
+  patchAgente: (k: AgentKey, patch: Partial<AgentRuntime>) => void
   aggiungiLog: (kind: LogKind, agente: AgentKey | null, messaggio: string) => void
-  svuotaLog: () => void
-  aggiungiTicker: (testo: string, segno: TickerItem['segno']) => void
-
-  alternaNuvoletta: (k: AgentKey) => void
-  chiudiNuvoletta: () => void
-  inquadra: (k: AgentKey | null) => void
-  setCampanella: (v: boolean) => void
-  setAudioAttivo: (v: boolean) => void
-
-  aggiungiChat: (m: ChatMessage) => void
-  setChatInCorso: (v: boolean) => void
-  setChatErrore: (m: string | null) => void
-  setChatParziale: (t: string) => void
-  svuotaChat: () => void
-
   sbloccaInterfaccia: () => void
-  nuovaSessione: () => void
+
+  // file di progetto
+  sostituisciProgetto: (p: Progetto) => void
+  segnaSalvatoSuFile: () => void
 }
 
-const statoEsecuzioneVuoto = {
-  agenti: agentiVuoti(),
-  inEsecuzione: false,
-  agenteAttivo: null,
-  erroreGlobale: null,
-  ripresaDa: null,
-  dossier: null,
-  infoLettura: null,
-  fonti: [],
-  fontiScartate: [],
-  selezionate: [],
-  scartateDalSelettore: [],
-  coperturaSufficiente: true,
-  avvisoRicerca: null,
-  approvazione: 'inattiva' as ApprovalStatus,
-  giroApprovazione: 0,
-  motivoRifiuto: '',
-  storicoApprovazioni: [],
-  prefissoScrittore: null,
-  scaletta: null,
-  approvazioneScaletta: 'inattiva' as ApprovalStatus,
-  giroScaletta: 0,
-  motivoRifiutoScaletta: '',
-  storicoScaletta: [],
-  opzioni: [],
-  opzioneAttiva: 'A' as ImpiantoKey,
-  referto: null,
-  letturaAperta: null,
-  nuvolettaAperta: null,
-  campanellaSuonata: false,
+type Set = (fn: (s: StatoStudio) => Partial<StatoStudio>) => void
+
+/** Applica una modifica al progetto. */
+function conProgetto(set: Set, fn: (p: Progetto) => Partial<Progetto>) {
+  set((s) => ({ progetto: { ...s.progetto, ...fn(s.progetto) } }))
 }
 
-function aggiornaOpzione(opzioni: Opzione[], impianto: ImpiantoKey, fn: (o: Opzione) => Opzione): Opzione[] {
-  return opzioni.map((o) => (o.impianto === impianto ? fn(o) : o))
+/** Le modifiche strutturali all'indice richiedono una nuova approvazione. */
+function modificaIndice(set: Set, fn: (capitoli: Capitolo[]) => Capitolo[]) {
+  conProgetto(set, (p) => ({ capitoli: fn(p.capitoli), indiceApprovato: false, indiceApprovatoIl: null }))
 }
 
-export const useStudioStore = create<StudioState>()(
+function mappaCapitolo(capitoli: Capitolo[], id: string, fn: (c: Capitolo) => Capitolo): Capitolo[] {
+  return capitoli.map((c) => (c.id === id ? fn(c) : c))
+}
+
+function mappaSezione(c: Capitolo, id: string, fn: (s: Sezione) => Sezione): Capitolo {
+  return { ...c, sezioni: c.sezioni.map((s) => (s.id === id ? fn(s) : s)) }
+}
+
+function sposta<T extends { id: string }>(elenco: T[], id: string, delta: -1 | 1): T[] {
+  const i = elenco.findIndex((x) => x.id === id)
+  const j = i + delta
+  if (i < 0 || j < 0 || j >= elenco.length) return elenco
+  const copia = [...elenco]
+  ;[copia[i], copia[j]] = [copia[j], copia[i]]
+  return copia
+}
+
+function aggiungiVersione(s: Sezione, nota: string, autore: Autore): Sezione {
+  const versione = { id: nuovoId('v'), data: adesso(), testo: s.testo, nota, autore }
+  return { ...s, versioni: [...s.versioni, versione].slice(-MAX_VERSIONI) }
+}
+
+export const useStudio = create<StatoStudio>()(
   persist(
-    (set, get) => ({
+    (set) => ({
+      progetto: progettoIniziale(),
+      preferenze: preferenzeIniziali(),
       apiKey: leggiChiave(),
-      modelli: { ...MODELLI_PREDEFINITI },
-      profondita: 'standard',
-      modalitaScena: 'auto',
 
-      courseFiles: [],
-      caseFiles: [],
-      argomento: ARGOMENTO_PREDEFINITO,
-      capitolo: CAPITOLO_PREDEFINITO,
+      schermata: 'cruscotto',
+      capitoloAperto: null,
+      sezioneAperta: null,
+      cartaAperta: false,
+      nuvoletta: null,
+      agenti: agentiVuoti(),
+      log: [],
       corpusSincronizzato: false,
 
-      ...statoEsecuzioneVuoto,
-      esecuzione: 0,
-      usi: [],
-
-      vista: 'lavoro',
-      passoAttivo: 'materiale',
-      log: [],
-      logNonVisti: 0,
-      erroriNonVisti: 0,
-      ticker: [],
-
-      fuocoCamera: null,
-      tokenFuoco: 0,
-      audioAttivo: true,
-
-      chat: [],
-      chatInCorso: false,
-      chatErrore: null,
-      chatParziale: '',
-
-      setApiKey: (k) => {
-        scriviChiave(k)
-        set({ apiKey: k, erroreGlobale: null })
+      setApiKey: (v) => {
+        scriviChiave(v.trim())
+        set(() => ({ apiKey: v.trim() }))
       },
-      setModello: (slot, id) => set((s) => ({ modelli: { ...s.modelli, [slot]: id } })),
-      ripristinaModelli: () => set({ modelli: { ...MODELLI_PREDEFINITI } }),
-      setProfondita: (profondita) => set({ profondita }),
-      setModalitaScena: (modalitaScena) => set({ modalitaScena }),
+      setModello: (slot, id) =>
+        set((s) => ({ preferenze: { ...s.preferenze, modelli: { ...s.preferenze.modelli, [slot]: id } } })),
+      setPreferenze: (p) => set((s) => ({ preferenze: { ...s.preferenze, ...p } })),
 
-      aggiungiCourseFile: (f) => set((s) => ({ courseFiles: [...s.courseFiles, f] })),
-      aggiornaCourseFile: (id, patch) =>
-        set((s) => ({ courseFiles: s.courseFiles.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
-      rimuoviCourseFile: (id) => set((s) => ({ courseFiles: s.courseFiles.filter((f) => f.id !== id) })),
-      aggiungiCaseFile: (f) => set((s) => ({ caseFiles: [...s.caseFiles, f] })),
-      aggiornaCaseFile: (id, patch) =>
-        set((s) => ({ caseFiles: s.caseFiles.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
-      rimuoviCaseFile: (id) => set((s) => ({ caseFiles: s.caseFiles.filter((f) => f.id !== id) })),
-      setCorpusSincronizzato: (corpusSincronizzato) => set({ corpusSincronizzato }),
+      vai: (schermata) => set(() => ({ schermata, nuvoletta: null })),
+      apriSezione: (capitoloAperto, sezioneAperta) =>
+        set(() => ({ capitoloAperto, sezioneAperta, schermata: 'scrittura', nuvoletta: null })),
+      setCarta: (cartaAperta) => set(() => ({ cartaAperta })),
+      apriNuvoletta: (nuvoletta) => set(() => ({ nuvoletta })),
 
-      setArgomento: (argomento) => set({ argomento }),
-      setCapitolo: (capitolo) => set({ capitolo }),
+      setTitolo: (titolo) => conProgetto(set, () => ({ titolo })),
+      setDomanda: (domanda) => conProgetto(set, () => ({ domanda })),
+      setCaso: (c) => conProgetto(set, (p) => ({ casoAziendale: { ...p.casoAziendale, ...c } })),
+      setStileCitazione: (stileCitazione) => conProgetto(set, () => ({ stileCitazione })),
 
-      patchAgente: (k, patch) =>
-        set((s) => ({ agenti: { ...s.agenti, [k]: { ...s.agenti[k], ...patch } } })),
-      setArrivato: (k, v) =>
-        set((s) =>
-          s.agenti[k].arrived === v ? s : { agenti: { ...s.agenti, [k]: { ...s.agenti[k], arrived: v } } },
+      aggiungiCapitolo: (titolo) => modificaIndice(set, (cc) => [...cc, nuovoCapitolo(titolo)]),
+      rinominaCapitolo: (id, titolo) => modificaIndice(set, (cc) => mappaCapitolo(cc, id, (c) => ({ ...c, titolo }))),
+      rimuoviCapitolo: (id) => modificaIndice(set, (cc) => cc.filter((c) => c.id !== id)),
+      spostaCapitolo: (id, delta) => modificaIndice(set, (cc) => sposta(cc, id, delta)),
+      setStatoCapitolo: (id, stato) =>
+        conProgetto(set, (p) => ({ capitoli: mappaCapitolo(p.capitoli, id, (c) => ({ ...c, stato })) })),
+      aggiungiSezione: (capitoloId, titolo) =>
+        modificaIndice(set, (cc) =>
+          mappaCapitolo(cc, capitoloId, (c) => ({ ...c, sezioni: [...c.sezioni, nuovaSezione(titolo)] })),
         ),
-      setInEsecuzione: (inEsecuzione) => set({ inEsecuzione }),
-      setAgenteAttivo: (agenteAttivo) => set({ agenteAttivo }),
-      setErroreGlobale: (erroreGlobale) => set({ erroreGlobale }),
-      setRipresaDa: (ripresaDa) => set({ ripresaDa }),
-      nuovaEsecuzione: () => set((s) => ({ esecuzione: s.esecuzione + 1 })),
+      aggiornaSezione: (capitoloId, sezioneId, patch) =>
+        modificaIndice(set, (cc) =>
+          mappaCapitolo(cc, capitoloId, (c) => mappaSezione(c, sezioneId, (s) => ({ ...s, ...patch }))),
+        ),
+      rimuoviSezione: (capitoloId, sezioneId) =>
+        modificaIndice(set, (cc) =>
+          mappaCapitolo(cc, capitoloId, (c) => ({ ...c, sezioni: c.sezioni.filter((s) => s.id !== sezioneId) })),
+        ),
+      spostaSezione: (capitoloId, sezioneId, delta) =>
+        modificaIndice(set, (cc) =>
+          mappaCapitolo(cc, capitoloId, (c) => ({ ...c, sezioni: sposta(c.sezioni, sezioneId, delta) })),
+        ),
+      approvaIndice: () => conProgetto(set, () => ({ indiceApprovato: true, indiceApprovatoIl: adesso() })),
 
-      setDossier: (dossier) => set({ dossier }),
-      setInfoLettura: (infoLettura) => set({ infoLettura }),
-      setFonti: (fonti, fontiScartate) => set({ fonti, fontiScartate }),
-      setSelezione: (selezionate, scartateDalSelettore, coperturaSufficiente) =>
-        set({ selezionate, scartateDalSelettore, coperturaSufficiente }),
-      setAvvisoRicerca: (avvisoRicerca) => set({ avvisoRicerca }),
-
-      chiediApprovazione: () =>
-        set((s) => ({
-          approvazione: 'in_attesa',
-          giroApprovazione: s.giroApprovazione + 1,
-          motivoRifiuto: '',
-        })),
-      approva: () =>
-        set((s) => ({
-          approvazione: 'approvata',
-          storicoApprovazioni: [...s.storicoApprovazioni, `Giro ${s.giroApprovazione}: approvato.`],
-        })),
-      rifiuta: (motivo) =>
-        set((s) => ({
-          approvazione: 'rifiutata',
-          motivoRifiuto: motivo,
-          storicoApprovazioni: [
-            ...s.storicoApprovazioni,
-            `Giro ${s.giroApprovazione}: non convince${motivo.trim() ? ` — ${motivo.trim()}` : '.'}`,
-          ],
-        })),
-      azzeraApprovazione: () => set({ approvazione: 'inattiva', motivoRifiuto: '' }),
-
-      setPrefissoScrittore: (prefissoScrittore) => set({ prefissoScrittore }),
-      setScaletta: (scaletta) => set({ scaletta }),
-      chiediApprovazioneScaletta: () =>
-        set((s) => ({
-          approvazioneScaletta: 'in_attesa',
-          giroScaletta: s.giroScaletta + 1,
-          motivoRifiutoScaletta: '',
-        })),
-      approvaScaletta: () =>
-        set((s) => ({
-          approvazioneScaletta: 'approvata',
-          storicoScaletta: [...s.storicoScaletta, `Scaletta ${s.giroScaletta}: approvata.`],
-        })),
-      rifiutaScaletta: (motivo) =>
-        set((s) => ({
-          approvazioneScaletta: 'rifiutata',
-          motivoRifiutoScaletta: motivo,
-          storicoScaletta: [
-            ...s.storicoScaletta,
-            `Scaletta ${s.giroScaletta}: da rifare${motivo.trim() ? ` — ${motivo.trim()}` : '.'}`,
-          ],
-        })),
-      azzeraApprovazioneScaletta: () => set({ approvazioneScaletta: 'inattiva', motivoRifiutoScaletta: '' }),
-
-      inizializzaOpzioni: (opzioni) => set({ opzioni }),
-      patchOpzione: (impianto, patch) =>
-        set((s) => ({ opzioni: aggiornaOpzione(s.opzioni, impianto, (o) => ({ ...o, ...patch })) })),
-      setOpzioneAttiva: (opzioneAttiva) => set({ opzioneAttiva }),
-      patchParagrafo: (impianto, indice, paragrafo) =>
-        set((s) => ({
-          opzioni: aggiornaOpzione(s.opzioni, impianto, (o) => {
-            if (!o.risultato || !o.risultato.paragrafi[indice]) return o
-            const paragrafi = o.risultato.paragrafi.map((p, i) => (i === indice ? paragrafo : p))
-            return {
-              ...o,
-              risultato: { ...o.risultato, paragrafi },
-              parole: contaParole(paragrafi),
-              storico: { ...o.storico, [indice]: [...(o.storico[indice] ?? []), o.risultato.paragrafi[indice]] },
-            }
+      setTestoSezione: (capitoloId, sezioneId, testo) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) => {
+            const aggiornato = mappaSezione(c, sezioneId, (s) => ({ ...s, testo, aggiornataIl: adesso() }))
+            // Il primo testo scritto porta il capitolo da "da fare" a "bozza".
+            const stato = c.stato === 'da_fare' && testo.trim() ? 'bozza' : c.stato
+            return { ...aggiornato, stato }
           }),
         })),
-      annullaParagrafo: (impianto, indice) =>
-        set((s) => ({
-          opzioni: aggiornaOpzione(s.opzioni, impianto, (o) => {
-            const versioni = o.storico[indice] ?? []
-            if (!o.risultato || versioni.length === 0) return o
-            const precedente = versioni[versioni.length - 1]
-            const paragrafi = o.risultato.paragrafi.map((p, i) => (i === indice ? precedente : p))
-            return {
-              ...o,
-              risultato: { ...o.risultato, paragrafi },
-              parole: contaParole(paragrafi),
-              storico: { ...o.storico, [indice]: versioni.slice(0, -1) },
-            }
-          }),
-        })),
-      applicaGiudizi: (giudizi) =>
-        set((s) => {
-          const perId = new Map(giudizi.map((g) => [g.id.trim().toUpperCase(), g]))
-          return {
-            opzioni: s.opzioni.map((o) => {
-              if (!o.risultato) return o
-              const paragrafi = o.risultato.paragrafi.map((p, ip) => ({
-                ...p,
-                citazioni: p.citazioni.map((c, ic) => {
-                  const g = perId.get(`${o.impianto}.${ip + 1}.${ic + 1}`)
-                  if (!g) return c
-                  return {
-                    ...c,
-                    verifica: {
-                      testuale: c.verifica?.testuale ?? 'non_trovato',
-                      giudizio: g.giudizio,
-                      nota: g.nota,
-                    },
-                  }
-                }),
-              }))
-              return { ...o, risultato: { ...o.risultato, paragrafi } }
+      salvaVersione: (capitoloId, sezioneId, nota, autore = 'studente') => {
+        let salvata = false
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) =>
+            mappaSezione(c, sezioneId, (s) => {
+              const ultima = s.versioni[s.versioni.length - 1]
+              // Niente doppioni: se il testo non è cambiato non serve una nuova versione.
+              if (ultima && ultima.testo === s.testo) return s
+              salvata = true
+              return aggiungiVersione(s, nota, autore)
             }),
-          }
-        }),
-      setReferto: (referto) => set({ referto }),
+          ),
+        }))
+        return salvata
+      },
+      ripristinaVersione: (capitoloId, sezioneId, versioneId) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) =>
+            mappaSezione(c, sezioneId, (s) => {
+              const v = s.versioni.find((x) => x.id === versioneId)
+              if (!v) return s
+              // Prima di tornare indietro si conserva il testo corrente: il ripristino è reversibile.
+              const ultima = s.versioni[s.versioni.length - 1]
+              const conservata =
+                ultima && ultima.testo === s.testo ? s : aggiungiVersione(s, 'Prima del ripristino', 'sistema')
+              return { ...conservata, testo: v.testo, aggiornataIl: adesso() }
+            }),
+          ),
+        })),
 
-      registraUso: (voce) =>
-        set((s) => ({ usi: [...s.usi, { ...voce, at: Date.now(), esecuzione: s.esecuzione }].slice(-MAX_USI) })),
-      azzeraUsi: () => set({ usi: [] }),
+      aggiungiVoce: (v) => conProgetto(set, (p) => ({ glossario: [...p.glossario, { ...v, id: nuovoId('gl') }] })),
+      aggiornaVoce: (id, patch) =>
+        conProgetto(set, (p) => ({ glossario: p.glossario.map((v) => (v.id === id ? { ...v, ...patch } : v)) })),
+      rimuoviVoce: (id) => conProgetto(set, (p) => ({ glossario: p.glossario.filter((v) => v.id !== id) })),
 
-      setVista: (vista) =>
-        set(vista === 'console' ? { vista, logNonVisti: 0, erroriNonVisti: 0 } : { vista }),
-      setPassoAttivo: (passoAttivo) => set({ passoAttivo }),
-      apriLettura: (letturaAperta) => set({ letturaAperta }),
+      aggiungiCourseFile: (f) => conProgetto(set, (p) => ({ courseFiles: [...p.courseFiles, f] })),
+      aggiornaCourseFile: (id, patch) =>
+        conProgetto(set, (p) => ({ courseFiles: p.courseFiles.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
+      rimuoviCourseFile: (id) => conProgetto(set, (p) => ({ courseFiles: p.courseFiles.filter((f) => f.id !== id) })),
+      setQuadro: (quadro) => conProgetto(set, () => ({ quadro })),
+      setCorpusSincronizzato: (corpusSincronizzato) => set(() => ({ corpusSincronizzato })),
+
+      registraUso: (v) =>
+        conProgetto(set, (p) => ({
+          usi: [...p.usi, { ...v, id: nuovoId('uso'), data: adesso() }].slice(-MAX_USI),
+        })),
+      azzeraUsi: () => conProgetto(set, () => ({ usi: [] })),
+
+      patchAgente: (k, patch) => set((s) => ({ agenti: { ...s.agenti, [k]: { ...s.agenti[k], ...patch } } })),
       aggiungiLog: (kind, agente, messaggio) =>
+        set((s) => ({
+          log: [
+            ...s.log,
+            { id: nuovoId('log'), ora: new Date().toLocaleTimeString('it-IT'), kind, agente, messaggio },
+          ].slice(-MAX_LOG),
+        })),
+      sbloccaInterfaccia: () =>
         set((s) => {
-          idLog += 1
-          const voce: LogEntry = { id: idLog, at: Date.now(), kind, agente, messaggio }
-          const log = [...s.log, voce].slice(-MAX_LOG)
-          if (s.vista === 'console') return { log }
-          return {
-            log,
-            logNonVisti: s.logNonVisti + 1,
-            erroriNonVisti: s.erroriNonVisti + (kind === 'fallimento' ? 1 : 0),
-          }
-        }),
-      svuotaLog: () => set({ log: [], logNonVisti: 0, erroriNonVisti: 0 }),
-      aggiungiTicker: (testo, segno) =>
-        set((s) => {
-          idTicker += 1
-          return { ticker: [...s.ticker, { id: idTicker, testo, segno }].slice(-MAX_TICKER) }
-        }),
-
-      alternaNuvoletta: (k) =>
-        set((s) => ({ nuvolettaAperta: s.nuvolettaAperta === k ? null : k })),
-      chiudiNuvoletta: () => set({ nuvolettaAperta: null }),
-      inquadra: (k) => set((s) => ({ fuocoCamera: k, tokenFuoco: s.tokenFuoco + 1 })),
-      setCampanella: (campanellaSuonata) => set({ campanellaSuonata }),
-      setAudioAttivo: (audioAttivo) => set({ audioAttivo }),
-
-      aggiungiChat: (m) => set((s) => ({ chat: [...s.chat, m] })),
-      setChatInCorso: (chatInCorso) => set({ chatInCorso }),
-      setChatErrore: (chatErrore) => set({ chatErrore }),
-      setChatParziale: (chatParziale) => set({ chatParziale }),
-      svuotaChat: () => set({ chat: [], chatErrore: null, chatParziale: '' }),
-
-      /** Riabilita i controlli: usata dal Controllore dopo un errore di runtime. */
-      sbloccaInterfaccia: () => {
-        const { agenti, opzioni } = get()
-        const patch = { ...agenti }
-        for (const k of AGENT_KEYS) {
-          if (patch[k].status === 'working' || patch[k].status === 'walking') {
-            patch[k] = {
-              ...patch[k],
-              status: 'error',
-              microLabel: 'interrotto',
-              errore: patch[k].errore ?? 'Interfaccia ripristinata dopo un errore di runtime.',
+          const agenti = { ...s.agenti }
+          for (const k of AGENT_KEYS) {
+            if (agenti[k].status === 'lavoro') {
+              agenti[k] = { ...agenti[k], status: 'errore', etichetta: 'interrotto', errore: 'Lavoro interrotto da un errore.' }
             }
           }
-        }
-        set({
-          agenti: patch,
-          inEsecuzione: false,
-          agenteAttivo: null,
-          chatInCorso: false,
-          opzioni: opzioni.map((o) => (o.rifinisce === null ? o : { ...o, rifinisce: null })),
-        })
-      },
-
-      nuovaSessione: () =>
-        set({
-          ...statoEsecuzioneVuoto,
-          agenti: agentiVuoti(),
-          courseFiles: [],
-          caseFiles: [],
-          passoAttivo: 'materiale',
-          vista: 'lavoro',
-          log: [],
-          logNonVisti: 0,
-          erroriNonVisti: 0,
-          ticker: [],
-          chat: [],
-          chatErrore: null,
-          chatParziale: '',
-          chatInCorso: false,
+          return { agenti }
         }),
+
+      sostituisciProgetto: (progetto) =>
+        set(() => ({ progetto, capitoloAperto: null, sezioneAperta: null, schermata: 'cruscotto', agenti: agentiVuoti() })),
+      segnaSalvatoSuFile: () => conProgetto(set, () => ({ salvatoSuFileIl: adesso() })),
     }),
     {
-      name: 'studio-tesi-sessione',
-      storage: createJSONStorage(() => storageIndexedDb),
-      version: 2,
-      // I PDF scansionati non si salvano: pesano troppo e si ricaricano.
-      partialize: (s) => ({
-        modelli: s.modelli,
-        profondita: s.profondita,
-        modalitaScena: s.modalitaScena,
-        argomento: s.argomento,
-        capitolo: s.capitolo,
-        courseFiles: s.courseFiles.map((f) => ({ ...f, base64: undefined })),
-        caseFiles: s.caseFiles,
-        agenti: s.agenti,
-        esecuzione: s.esecuzione,
-        dossier: s.dossier,
-        infoLettura: s.infoLettura,
-        fonti: s.fonti,
-        fontiScartate: s.fontiScartate,
-        selezionate: s.selezionate,
-        scartateDalSelettore: s.scartateDalSelettore,
-        coperturaSufficiente: s.coperturaSufficiente,
-        approvazione: s.approvazione,
-        giroApprovazione: s.giroApprovazione,
-        storicoApprovazioni: s.storicoApprovazioni,
-        prefissoScrittore: s.prefissoScrittore,
-        scaletta: s.scaletta,
-        approvazioneScaletta: s.approvazioneScaletta,
-        giroScaletta: s.giroScaletta,
-        storicoScaletta: s.storicoScaletta,
-        opzioni: s.opzioni.map((o) => ({ ...o, rifinisce: null })),
-        opzioneAttiva: s.opzioneAttiva,
-        referto: s.referto,
-        usi: s.usi,
-        passoAttivo: s.passoAttivo,
-        log: s.log,
-        ticker: s.ticker,
-        chat: s.chat,
-        audioAttivo: s.audioAttivo,
-      }),
-      // Dalla versione 1 si tengono solo le scelte dello studente: i risultati
-      // avevano un formato diverso (niente estratti, niente citazioni).
-      migrate: (salvato, versione) => {
-        const s = (salvato ?? {}) as Partial<StudioState>
-        if (versione >= 2) return s as StudioState
-        const modelli = { ...MODELLI_PREDEFINITI, ...(s.modelli ?? {}) } as Record<ModelSlot, string>
-        if (modelli.selettore === 'claude-sonnet-5') modelli.selettore = MODELLI_PREDEFINITI.selettore
+      name: 'studio-tesi-olio-v1',
+      version: 1,
+      storage: createJSONStorage(() => archivioIdb),
+      partialize: (s) => ({ progetto: s.progetto, preferenze: s.preferenze }),
+      merge: (salvato, attuale) => {
+        const dati = (salvato ?? {}) as Partial<StatoStudio>
         return {
-          modelli,
-          argomento: s.argomento ?? ARGOMENTO_PREDEFINITO,
-          capitolo: s.capitolo ?? CAPITOLO_PREDEFINITO,
-          caseFiles: s.caseFiles ?? [],
-          chat: s.chat ?? [],
-          audioAttivo: s.audioAttivo ?? true,
-        } as unknown as StudioState
+          ...attuale,
+          progetto: dati.progetto ? { ...attuale.progetto, ...dati.progetto } : attuale.progetto,
+          preferenze: dati.preferenze
+            ? {
+                ...attuale.preferenze,
+                ...dati.preferenze,
+                modelli: { ...attuale.preferenze.modelli, ...dati.preferenze.modelli },
+              }
+            : attuale.preferenze,
+        }
       },
     },
   ),
 )
 
-// Ogni chiamata API registra qui i token consumati e il loro costo.
-impostaRegistratoreUso((chi, modello, uso) => {
-  useStudioStore.getState().registraUso({
+// Ogni risposta dell'API registra i suoi consumi qui.
+impostaRegistratoreUso((chi, azione, modello, uso) => {
+  useStudio.getState().registraUso({
     chi,
+    azione,
     modello,
     input: uso.input,
     output: uso.output,
@@ -619,42 +366,34 @@ impostaRegistratoreUso((chi, modello, uso) => {
     ricerche: uso.ricerche,
     letture: uso.letture,
     costo: costoUso(modello, uso),
+    risparmio: risparmioCache(modello, uso),
   })
 })
 
-// --- selettori ---------------------------------------------------------------
-// Restituiscono solo valori primitivi o porzioni esistenti dello stato: gli
-// elenchi derivati vanno calcolati nei componenti con useMemo.
+// ---------------------------------------------------------------------------
+// Derivati (funzioni pure: nei componenti si usano dentro useMemo)
+// ---------------------------------------------------------------------------
 
-/** I PDF scansionati perdono il base64 al ricaricamento: vanno ricaricati. */
-export function daRicaricare(f: CourseFile): boolean {
-  return f.status === 'pronto' && !!f.scansionato && !f.base64
+export function meseCorrente(): string {
+  return new Date().toISOString().slice(0, 7)
 }
 
-export function materialePronto(s: StudioState): boolean {
-  return (
-    s.corpusSincronizzato &&
-    s.courseFiles.length > 0 &&
-    s.courseFiles.every((f) => f.status === 'pronto' && !daRicaricare(f))
-  )
+export function costoDelMese(usi: VoceUso[], mese = meseCorrente()): number {
+  return usi.filter((u) => u.data.startsWith(mese)).reduce((s, u) => s + u.costo, 0)
 }
 
-export function siPuoAvviare(s: StudioState): boolean {
-  return (
-    materialePronto(s) &&
-    s.argomento.trim().length > 0 &&
-    s.capitolo.trim().length > 0 &&
-    s.apiKey.trim().length > 0 &&
-    !s.inEsecuzione
-  )
+export function quadroObsoleto(p: Progetto): boolean {
+  return p.quadro !== null && p.quadro.firmaCorso !== firmaCorso(p)
 }
 
-/** Da usare fuori dal render (pipeline): crea un nuovo elenco a ogni chiamata. */
-export function calcolaFontiApprovate(fonti: Fonte[], selezionate: SceltaFonte[]): Fonte[] {
-  const scelte = new Set(selezionate.map((v) => v.url))
-  return fonti.filter((f) => scelte.has(f.url))
+export function contaParoleTesto(testo: string): number {
+  return testo.replace(/\[[A-Z]\d+\]/g, '').split(/\s+/).filter(Boolean).length
 }
 
-export function costoTotale(usi: VoceUso[], esecuzione?: number): number {
-  return usi.reduce((s, u) => (esecuzione === undefined || u.esecuzione === esecuzione ? s + u.costo : s), 0)
+export function paroleCapitolo(c: Capitolo): number {
+  return c.sezioni.reduce((n, s) => n + contaParoleTesto(s.testo), 0)
+}
+
+export function estrazioneInCorso(p: Progetto): boolean {
+  return p.courseFiles.some((f) => f.status === 'lettura' || f.status === 'estrazione')
 }

@@ -1,4 +1,13 @@
-import type { Citazione, EsitoTestuale, Paragrafo, Riferimento } from '../types'
+import type { Citazione, EsitoTestuale } from '../types'
+
+/** Un riferimento citabile: una fonte della biblioteca o un passaggio del corso. */
+export interface Riferimento {
+  etichetta: string
+  tipo: 'fonte' | 'corso'
+  titolo: string
+  collocazione: string
+  testo: string
+}
 
 /**
  * Verifica deterministica delle citazioni: l'estratto che un agente attribuisce
@@ -78,7 +87,7 @@ export function verificaCitazioni(citazioni: Citazione[], riferimenti: Riferimen
   return citazioni.map((c) => {
     const rif = perEtichetta.get((c.rif ?? '').trim().toUpperCase())
     const testuale: EsitoTestuale = rif ? verificaEstratto(c.estratto ?? '', rif.testo) : 'rif_sconosciuto'
-    return { ...c, verifica: { ...(c.verifica ?? {}), testuale } }
+    return { ...c, testuale }
   })
 }
 
@@ -89,7 +98,7 @@ export function marcatori(testo: string): string[] {
   return [...testo.matchAll(MARCATORE)].map((m) => m[1].toUpperCase())
 }
 
-export interface EsameParagrafi {
+export interface EsameCitazioni {
   totali: number
   verificate: number
   approssimate: number
@@ -99,8 +108,9 @@ export interface EsameParagrafi {
   incoerenze: string[]
 }
 
-export function esaminaParagrafi(paragrafi: Paragrafo[]): EsameParagrafi {
-  const esame: EsameParagrafi = {
+/** Confronta i marcatori del testo con le citazioni registrate e ne conta gli esiti. */
+export function esaminaCitazioni(testo: string, citazioni: Citazione[]): EsameCitazioni {
+  const esame: EsameCitazioni = {
     totali: 0,
     verificate: 0,
     approssimate: 0,
@@ -108,41 +118,26 @@ export function esaminaParagrafi(paragrafi: Paragrafo[]): EsameParagrafi {
     rifSconosciuti: [],
     incoerenze: [],
   }
+  const nelTesto = new Set(marcatori(testo))
+  const citati = new Set(citazioni.map((c) => (c.rif ?? '').toUpperCase()))
+  for (const m of nelTesto) if (!citati.has(m)) esame.incoerenze.push(`marcatore [${m}] senza citazione`)
+  for (const c of citati) if (!nelTesto.has(c)) esame.incoerenze.push(`citazione ${c} senza marcatore nel testo`)
 
-  paragrafi.forEach((p, i) => {
-    const nelTesto = new Set(marcatori(p.testo))
-    const citati = new Set(p.citazioni.map((c) => (c.rif ?? '').toUpperCase()))
-    for (const m of nelTesto) {
-      if (!citati.has(m)) esame.incoerenze.push(`§${i + 1}: marcatore [${m}] senza citazione`)
+  for (const c of citazioni) {
+    esame.totali += 1
+    switch (c.testuale) {
+      case 'verificato':
+        esame.verificate += 1
+        break
+      case 'approssimato':
+        esame.approssimate += 1
+        break
+      case 'rif_sconosciuto':
+        esame.rifSconosciuti.push(c)
+        break
+      default:
+        esame.nonTrovate.push(c)
     }
-    for (const c of citati) {
-      if (!nelTesto.has(c)) esame.incoerenze.push(`§${i + 1}: citazione ${c} senza marcatore nel testo`)
-    }
-
-    for (const c of p.citazioni) {
-      esame.totali += 1
-      switch (c.verifica?.testuale) {
-        case 'verificato':
-          esame.verificate += 1
-          break
-        case 'approssimato':
-          esame.approssimate += 1
-          break
-        case 'rif_sconosciuto':
-          esame.rifSconosciuti.push(c)
-          break
-        default:
-          esame.nonTrovate.push(c)
-      }
-    }
-  })
-
+  }
   return esame
-}
-
-export function contaParole(paragrafi: Paragrafo[]): number {
-  return paragrafi.reduce(
-    (n, p) => n + p.testo.replace(MARCATORE, '').split(/\s+/).filter(Boolean).length,
-    0,
-  )
 }

@@ -1,6 +1,4 @@
 import type Anthropic from '@anthropic-ai/sdk'
-import type { Profondita } from '../types'
-import { BUDGET } from './corpus'
 
 /**
  * Listino in dollari per milione di token (API Anthropic, prezzi di listino).
@@ -12,14 +10,15 @@ import { BUDGET } from './corpus'
 export const LISTINO: Record<string, { input: number; output: number; letturaCache: number }> = {
   'claude-opus-5-5': { input: 4, output: 20, letturaCache: 0.2 },
   'claude-opus-5': { input: 5, output: 25, letturaCache: 0.5 },
+  'claude-sonnet-5-5': { input: 2, output: 10, letturaCache: 0.2 },
   'claude-sonnet-5': { input: 2, output: 10, letturaCache: 0.2 },
   'claude-haiku-4-5': { input: 1, output: 5, letturaCache: 0.1 },
 }
 
 const COSTO_RICERCA = 0.01
 
-function prezzi(modello: string) {
-  return LISTINO[modello] ?? LISTINO['claude-sonnet-5']
+export function prezzi(modello: string) {
+  return LISTINO[modello] ?? LISTINO['claude-sonnet-5-5']
 }
 
 export interface UsoNormalizzato {
@@ -77,78 +76,40 @@ export function costoUso(modello: string, u: UsoNormalizzato): number {
 }
 
 /** Token stimati da un numero di caratteri di testo italiano. */
-function token(caratteri: number): number {
+export function tokenDaCaratteri(caratteri: number): number {
   return Math.round(caratteri / 3.8)
 }
 
-export interface VoceStima {
-  voce: string
-  costo: number
+/** Quanto si è risparmiato leggendo dalla cache invece di pagare l'input pieno. */
+export function risparmioCache(modello: string, u: UsoNormalizzato): number {
+  const p = prezzi(modello)
+  return (u.letturaCache * (p.input - p.letturaCache)) / 1_000_000
 }
 
 export interface Stima {
   minimo: number
   massimo: number
-  dettaglio: VoceStima[]
 }
 
 /**
- * Stima indicativa di un'esecuzione completa, prima di avviarla. Le ipotesi
- * sono volutamente prudenti; il consuntivo reale si legge dai campi usage.
+ * Stima indicativa di una chiamata prima di eseguirla. Le ipotesi sono
+ * volutamente prudenti; il consuntivo reale si legge poi dai campi usage.
  */
-export function stimaEsecuzione(opzioni: {
-  modelli: Record<'lettore' | 'ricercatore' | 'selettore' | 'scrittore' | 'controllore', string>
-  caratteriCorso: number
-  profondita: Profondita
-}): Stima {
-  const budget = BUDGET[opzioni.profondita]
-  const corsoLettore = token(Math.min(opzioni.caratteriCorso, budget.lettore))
-  const corsoScrittore = token(Math.min(opzioni.caratteriCorso, budget.scrittore))
-  const prefissoScrittore = corsoScrittore + 9000
-
-  const costo = (modello: string, u: Partial<UsoNormalizzato>) =>
-    costoUso(modello, {
-      input: 0,
-      output: 0,
-      scritturaCache5m: 0,
-      scritturaCache1h: 0,
-      letturaCache: 0,
-      ricerche: 0,
-      letture: 0,
-      ...u,
-    })
-
-  const dettaglio: VoceStima[] = [
-    { voce: 'Lettore — dossier del corso', costo: costo(opzioni.modelli.lettore, { input: corsoLettore + 3000, output: 4500 }) },
-    {
-      voce: 'Ricercatore — ricerche e lettura delle pagine',
-      costo: costo(opzioni.modelli.ricercatore, { input: 60_000, output: 7000, ricerche: 8 }),
-    },
-    { voce: 'Selettore', costo: costo(opzioni.modelli.selettore, { input: 10_000, output: 2500 }) },
-    {
-      voce: 'Scrittore — scaletta',
-      costo: costo(opzioni.modelli.scrittore, { scritturaCache5m: prefissoScrittore, input: 1500, output: 4000 }),
-    },
-    {
-      voce: 'Scrittore — tre opzioni',
-      costo: costo(opzioni.modelli.scrittore, {
-        scritturaCache5m: prefissoScrittore,
-        letturaCache: prefissoScrittore * 2,
-        input: 6000,
-        output: 36_000,
-      }),
-    },
-    {
-      voce: 'Controllore — verifica di citazioni e opzioni',
-      costo: costo(opzioni.modelli.controllore, { input: 30_000, output: 7000 }),
-    },
-  ]
-
-  const totale = dettaglio.reduce((s, v) => s + v.costo, 0)
-  return { minimo: totale * 0.7, massimo: totale * 1.5, dettaglio }
+export function stimaChiamata(modello: string, u: Partial<UsoNormalizzato>): Stima {
+  const costo = costoUso(modello, {
+    input: 0,
+    output: 0,
+    scritturaCache5m: 0,
+    scritturaCache1h: 0,
+    letturaCache: 0,
+    ricerche: 0,
+    letture: 0,
+    ...u,
+  })
+  return { minimo: costo * 0.7, massimo: costo * 1.5 }
 }
 
 export function formattaDollari(valore: number): string {
-  if (valore < 0.01) return `${(valore * 100).toFixed(2)} ¢`
-  return `${valore.toFixed(2)} $`
+  if (valore > 0 && valore < 0.01) return 'meno di 0,01 $'
+  return `${valore.toFixed(2).replace('.', ',')} $`
 }

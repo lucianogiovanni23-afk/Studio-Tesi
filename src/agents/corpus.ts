@@ -1,7 +1,7 @@
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
 import urlWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 import { del, get, set as idbSet } from 'idb-keyval'
-import type { Passaggio, Profondita } from '../types'
+import type { Passaggio } from '../types'
 
 /**
  * Corpus del materiale del corso.
@@ -31,12 +31,8 @@ const SOVRAPPOSIZIONE = 200
 /** Sotto questa media di caratteri per pagina il PDF è considerato scansionato. */
 const SOGLIA_SCANSIONE = 80
 
-/** Caratteri di materiale del corso per chiamata, secondo la profondità scelta. */
-export const BUDGET: Record<Profondita, { lettore: number; scrittore: number }> = {
-  sintetica: { lettore: 80_000, scrittore: 45_000 },
-  standard: { lettore: 200_000, scrittore: 100_000 },
-  estesa: { lettore: 420_000, scrittore: 180_000 },
-}
+/** Caratteri di materiale del corso inviati al Lettore per il quadro teorico. */
+export const BUDGET_LETTORE = 200_000
 
 // ---------------------------------------------------------------------------
 // Estrazione
@@ -190,6 +186,24 @@ export async function svuotaCorpus() {
   await del(CHIAVE_IDB)
 }
 
+/** Tutto il corpus, per il file di progetto. */
+export function esportaCorpus(): Record<string, Passaggio[]> {
+  return Object.fromEntries(corpus)
+}
+
+/** Sostituisce il corpus con quello di un file di progetto. */
+export async function importaCorpus(dati: Record<string, Passaggio[]>) {
+  corpus.clear()
+  for (const [id, passaggi] of Object.entries(dati)) corpus.set(id, passaggi)
+  indice = null
+  await salvaSuDisco()
+}
+
+/** Passaggi di un file, per l'anteprima e le citazioni dal corso. */
+export function passaggiDi(fileId: string): Passaggio[] {
+  return corpus.get(fileId) ?? []
+}
+
 export function haFile(fileId: string): boolean {
   return corpus.has(fileId)
 }
@@ -326,6 +340,16 @@ export function recuperaPassaggi(domande: string[], budget: number): Passaggio[]
   }
 
   return ordina([...scelti.values()])
+}
+
+/** I passaggi più pertinenti a una domanda, in ordine di pertinenza. */
+export function cercaPassaggi(domanda: string, quanti = 6): Passaggio[] {
+  if (corpus.size === 0 || !domanda.trim()) return []
+  return punteggi(domanda)
+    .filter((x) => x.punteggio > 0)
+    .sort((a, b) => b.punteggio - a.punteggio)
+    .slice(0, quanti)
+    .map((x) => x.passaggio)
 }
 
 /** Ordine di lettura naturale: per file, poi per pagina. */

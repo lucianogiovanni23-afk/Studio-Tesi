@@ -1,6 +1,6 @@
-import { useStudioStore } from '../store'
+import { useStudio, type LogKind } from '../store'
 import { ApiError, toApiError } from './api'
-import type { AgentKey, LogKind } from '../types'
+import type { AgentKey } from '../types'
 
 const MAX_TENTATIVI = 3
 const BACKOFF_MS = [2000, 4000, 8000]
@@ -10,7 +10,7 @@ const BACKOFF_MS = [2000, 4000, 8000]
 // ---------------------------------------------------------------------------
 
 function log(kind: LogKind, agente: AgentKey | null, messaggio: string) {
-  useStudioStore.getState().aggiungiLog(kind, agente, messaggio)
+  useStudio.getState().aggiungiLog(kind, agente, messaggio)
 }
 
 export const logOk = (a: AgentKey | null, m: string) => log('ok', a, m)
@@ -18,10 +18,6 @@ export const logAvviso = (a: AgentKey | null, m: string) => log('avviso', a, m)
 export const logRiparazione = (a: AgentKey | null, m: string) => log('riparazione', a, m)
 export const logFallimento = (a: AgentKey | null, m: string) => log('fallimento', a, m)
 export const logInfo = (a: AgentKey | null, m: string) => log('info', a, m)
-
-export function ticker(testo: string, segno: '▲' | '▼' | '●' = '●') {
-  useStudioStore.getState().aggiungiTicker(testo, segno)
-}
 
 // ---------------------------------------------------------------------------
 // Intercettazione di console ed errori di runtime
@@ -54,7 +50,7 @@ function descriviArgomenti(args: unknown[]): string {
 }
 
 /**
- * Il Controllore è attivo dall'inizio: registra console.error/warn e gli errori
+ * Il supervisore è attivo dall'inizio: registra console.error/warn e gli errori
  * di runtime della pagina, e riabilita i controlli se restano bloccati.
  */
 export function installaHookControllore(): () => void {
@@ -66,17 +62,17 @@ export function installaHookControllore(): () => void {
 
   console.error = (...args: unknown[]) => {
     erroreOriginale.apply(console, args as never[])
-    logFallimento('controllore', `console.error — ${descriviArgomenti(args)}`)
+    logFallimento(null, `console.error — ${descriviArgomenti(args)}`)
     ripristinaSeBloccata()
   }
   console.warn = (...args: unknown[]) => {
     avvisoOriginale.apply(console, args as never[])
-    logAvviso('controllore', `console.warn — ${descriviArgomenti(args)}`)
+    logAvviso(null, `console.warn — ${descriviArgomenti(args)}`)
   }
 
   const suErrore = (e: ErrorEvent) => {
     logFallimento(
-      'controllore',
+      null,
       `Errore di runtime — ${e.message} (${e.filename ?? '?'}:${e.lineno ?? 0}:${e.colno ?? 0})`,
     )
     ripristinaSeBloccata()
@@ -84,7 +80,7 @@ export function installaHookControllore(): () => void {
   const suRifiuto = (e: PromiseRejectionEvent) => {
     const r = e.reason
     logFallimento(
-      'controllore',
+      null,
       `Promise non gestita — ${r instanceof Error ? `${r.name}: ${r.message}` : String(r)}`,
     )
     ripristinaSeBloccata()
@@ -102,15 +98,12 @@ export function installaHookControllore(): () => void {
   }
 }
 
-/** Se l'app risulta occupata ma non c'è nessuna richiesta in volo, si sblocca. */
+/** Se un agente risulta al lavoro ma non c'è nessuna richiesta in volo, si sblocca. */
 function ripristinaSeBloccata() {
-  const s = useStudioStore.getState()
-  const rifinitura = s.opzioni.some((o) => o.rifinisce !== null)
-  if (!s.inEsecuzione && !s.chatInCorso && !rifinitura) return
-  if (inVolo > 0) return
-  if (s.approvazione === 'in_attesa' || s.approvazioneScaletta === 'in_attesa') return
-
-  logRiparazione('controllore', 'Interfaccia bloccata dopo un errore: controlli riabilitati.')
+  const s = useStudio.getState()
+  const alLavoro = Object.values(s.agenti).some((a) => a.status === 'lavoro')
+  if (!alLavoro || inVolo > 0) return
+  logRiparazione(null, 'Interfaccia bloccata dopo un errore: controlli riabilitati.')
   s.sbloccaInterfaccia()
 }
 
@@ -167,7 +160,7 @@ export async function sorveglia<T>(call: ChiamataSorvegliata<T>): Promise<T> {
   let ultimoErrore: Error | null = null
 
   for (let tentativo = 1; tentativo <= MAX_TENTATIVI; tentativo++) {
-    useStudioStore.getState().patchAgente(call.agente, { tentativi: tentativo })
+    useStudio.getState().patchAgente(call.agente, { tentativi: tentativo })
 
     try {
       if (tentativo > 1) {
@@ -246,23 +239,21 @@ const TERMINI_FUORI_PERIMETRO = [
   'principi contabili',
   'oic ',
   'ias/ifrs',
-  'ifrs ',
   'partita doppia',
   'scritture contabili',
   'codice civile',
-  'responsabilità degli amministratori',
-  'società per azioni',
-  's.p.a.',
-  'srl',
-  'concordato preventivo',
-  'procedura concorsuale',
-  'fallimento societario',
-  'diritto commerciale',
+  'normativa pac',
+  'regolamento (ue)',
+  'decreto legislativo',
+  'tecniche di potatura',
+  'concimazione',
+  'ciclo biologico della mosca',
+  'bactrocera oleae',
 ]
 
 /**
- * Controllo lessicale di supporto: non sostituisce il giudizio del Controllore,
- * ma segnala in console i punti da guardare.
+ * Controllo lessicale di supporto: non sostituisce il giudizio del Revisore,
+ * ma segnala i punti da guardare.
  */
 export function segnalaSconfinamenti(testo: string): string[] {
   const minuscolo = testo.toLowerCase()
