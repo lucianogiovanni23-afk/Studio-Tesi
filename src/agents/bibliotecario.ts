@@ -22,7 +22,8 @@ import {
 } from './api'
 import { CATALOGHI, CERCA, unisci, type Catalogo, type RisultatoCatalogo } from './cataloghi'
 import { verificaEstratto } from './citations'
-import { testoDaPdfBase64 } from './corpus'
+import { pagineDaPdfBase64 } from './corpus'
+import { daPagine } from '../io/pdfPaper'
 import { stimaChiamata, type Stima } from './costs'
 import { SYSTEM_BIBLIOTECARIO, intestazioneProgetto, quadroTestuale } from './prompts'
 import { SCHEMA_PIANO, SCHEMA_SELEZIONE, TOOL_CONSEGNA_FONTI } from './schemas'
@@ -149,6 +150,8 @@ function fonteDaCatalogo(r: RisultatoCatalogo): Fonte {
     // Per i paper dei cataloghi il testo disponibile è l'abstract, finché non carichi il PDF.
     testo: r.abstract,
     testoCompleto: false,
+    ...(r.oaUrl ? { oaUrl: r.oaUrl } : {}),
+    ...(r.primaPagina ? { paginaIniziale: r.primaPagina } : {}),
     aggiuntaIl: adesso(),
   }
 }
@@ -297,9 +300,12 @@ async function cercaSulWeb(
   for (const f of verificate) {
     const pagina = raccolta.pagine.get(normalizzaUrl(f.url))
     let testo = pagina?.testo ?? ''
+    let inizi: number[] | undefined
     if (!testo && pagina?.pdfBase64) {
       try {
-        testo = await testoDaPdfBase64(pagina.pdfBase64)
+        const letto = daPagine(await pagineDaPdfBase64(pagina.pdfBase64))
+        testo = letto.testo
+        inizi = letto.pagine
       } catch {
         testo = ''
       }
@@ -332,6 +338,7 @@ async function cercaSulWeb(
       usataIn: [],
       scheda: null,
       testo: testo.slice(0, MAX_TESTO_PAGINA),
+      ...(inizi ? { pagine: inizi.filter((i) => i < MAX_TESTO_PAGINA) } : {}),
       testoCompleto: Boolean(testo),
       aggiuntaIl: adesso(),
     })

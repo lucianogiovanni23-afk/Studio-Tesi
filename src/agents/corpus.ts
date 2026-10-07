@@ -94,6 +94,14 @@ export async function estraiPdf(
 }
 
 /** Testo di un PDF arrivato in base64 (per esempio da web_fetch). */
+/** Pagine di un PDF arrivato in base64, una stringa per pagina. */
+export async function pagineDaPdfBase64(base64: string, maxPagine = 150): Promise<string[]> {
+  const binario = atob(base64)
+  const byte = new Uint8Array(binario.length)
+  for (let i = 0; i < binario.length; i++) byte[i] = binario.charCodeAt(i)
+  return (await estraiPdf(byte.buffer, undefined, maxPagine)).pagine
+}
+
 export async function testoDaPdfBase64(base64: string, maxPagine = 40): Promise<string> {
   const binario = atob(base64)
   const byte = new Uint8Array(binario.length)

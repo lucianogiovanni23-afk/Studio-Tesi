@@ -1,4 +1,5 @@
 import { marcatoriDi } from '../domain/citazioniTesto'
+import { paginaEstratto } from '../domain/pagine'
 import { useStudio } from '../store'
 import type { Citazione, Consegna, GiudizioCitazione, Sezione } from '../types'
 import { ApiError, chiamataStrutturata, creaClient } from './api'
@@ -37,9 +38,14 @@ export function controllaInCodice(capitoloId: string, sezioneId: string): EsitoC
   const s = useStudio.getState()
   const sez = s.progetto.capitoli.find((c) => c.id === capitoloId)?.sezioni.find((x) => x.id === sezioneId)
   if (!sez) throw new ApiError('sconosciuto', 'Sezione non trovata.')
+  const fonti = s.progetto.fonti
   const aggiornate = sez.citazioni.map((c) => {
     const testo = testoDiRiferimento(c)
-    return { ...c, testuale: testo === null ? ('rif_sconosciuto' as const) : verificaEstratto(c.estratto, testo) }
+    const testuale = testo === null ? ('rif_sconosciuto' as const) : verificaEstratto(c.estratto, testo)
+    // La pagina si ricalcola: la fonte può avere ricevuto da poco il PDF completo.
+    const fonte = c.fonteId ? fonti.find((f) => f.id === c.fonteId) : undefined
+    const pagina = fonte && (testuale === 'verificato' || testuale === 'approssimato') ? paginaEstratto(fonte, c.estratto) : null
+    return { ...c, testuale, pagina: pagina ?? undefined }
   })
   s.setCitazioni(capitoloId, sezioneId, aggiornate)
   const registrate = new Set(aggiornate.map((c) => c.rif))

@@ -58,6 +58,8 @@ export interface Citazione {
   motivo?: string
   /** Fonte della biblioteca citata (marcatori F). */
   fonteId?: string
+  /** Pagina in cui si trova l'estratto, calcolata in codice sul PDF della fonte. */
+  pagina?: number
   /** Passaggio del corso citato (marcatori C), conservato con la sua collocazione. */
   passaggio?: { file: string; pagine: [number, number]; testo: string }
 }
@@ -135,6 +137,8 @@ export type OrigineFonte = 'openalex' | 'crossref' | 'semanticscholar' | 'istitu
 export interface EstrattoVerificato {
   testo: string
   esito: EsitoTestuale
+  /** Pagina (numerazione della rivista) in cui si trova, quando la fonte ha le pagine. */
+  pagina?: number
 }
 
 export interface Fonte {
@@ -162,6 +166,12 @@ export interface Fonte {
   testo: string
   /** Da quale testo è stata preparata la scheda. */
   testoCompleto: boolean
+  /** Indirizzo della versione open access (gratuita), se il catalogo la conosce. */
+  oaUrl?: string
+  /** Per i testi presi da un PDF: posizione in `testo` dove inizia ogni pagina. */
+  pagine?: number[]
+  /** Numero stampato della prima pagina del PDF (per esempio 245 in una rivista); 1 se non noto. */
+  paginaIniziale?: number
   aggiuntaIl: string
 }
 

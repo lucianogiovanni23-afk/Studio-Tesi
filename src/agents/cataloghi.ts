@@ -1,3 +1,4 @@
+import { primaPaginaDa } from '../domain/pagine'
 import type { OrigineFonte } from '../types'
 
 /**
@@ -25,6 +26,10 @@ export interface RisultatoCatalogo {
   abstract: string
   lingua: string
   citazioni: number
+  /** Versione gratuita (PDF o pagina), se il catalogo la conosce. */
+  oaUrl?: string
+  /** Prima pagina stampata dell'articolo. */
+  primaPagina?: number
 }
 
 const TIMEOUT_MS = 20_000
@@ -103,6 +108,9 @@ interface OpenAlexWork {
   authorships?: { author?: { display_name?: string } }[]
   primary_location?: { landing_page_url?: string | null; source?: { display_name?: string } | null } | null
   abstract_inverted_index?: Record<string, number[]> | null
+  open_access?: { is_oa?: boolean; oa_url?: string | null } | null
+  best_oa_location?: { pdf_url?: string | null; landing_page_url?: string | null } | null
+  biblio?: { first_page?: string | null } | null
 }
 
 /** OpenAlex fornisce l'abstract come indice invertito: si ricompone in ordine. */
@@ -114,13 +122,19 @@ export function ricomponiAbstract(indice: Record<string, number[]> | null | unde
 }
 
 export async function cercaOpenAlex(q: string, quanti: number, signal?: AbortSignal): Promise<RisultatoCatalogo[]> {
-  const campi = 'doi,title,display_name,publication_year,language,cited_by_count,authorships,primary_location,abstract_inverted_index'
+  const campi =
+    'doi,title,display_name,publication_year,language,cited_by_count,authorships,primary_location,abstract_inverted_index,open_access,best_oa_location,biblio'
   const url = `https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=${quanti}&select=${campi}`
   const dati = (await leggiJson('openalex', url, signal)) as { results?: OpenAlexWork[] }
-  return (dati.results ?? []).map((w) => {
+  return (dati.results ?? []).map(daOpenAlex)
+}
+
+function daOpenAlex(w: OpenAlexWork): RisultatoCatalogo {
     const doi = normalizzaDoi(w.doi)
     return {
       origine: 'openalex' as const,
+      oaUrl: w.best_oa_location?.pdf_url || w.open_access?.oa_url || w.best_oa_location?.landing_page_url || undefined,
+      primaPagina: primaPaginaDa(w.biblio?.first_page),
       titolo: pulisciTesto(w.title ?? w.display_name),
       autori: (w.authorships ?? []).map((a) => a.author?.display_name ?? '').filter(Boolean),
       anno: w.publication_year ?? null,
@@ -131,7 +145,6 @@ export async function cercaOpenAlex(q: string, quanti: number, signal?: AbortSig
       lingua: w.language ?? '',
       citazioni: w.cited_by_count ?? 0,
     }
-  })
 }
 
 // ---------------------------------------------------------------------------
@@ -148,6 +161,8 @@ interface CrossrefItem {
   language?: string
   URL?: string
   'is-referenced-by-count'?: number
+  page?: string
+  link?: { URL?: string; 'content-type'?: string }[]
 }
 
 function daCrossref(it: CrossrefItem): RisultatoCatalogo {
@@ -163,11 +178,12 @@ function daCrossref(it: CrossrefItem): RisultatoCatalogo {
     abstract: pulisciTesto(it.abstract),
     lingua: it.language ?? '',
     citazioni: it['is-referenced-by-count'] ?? 0,
+    primaPagina: primaPaginaDa(it.page),
   }
 }
 
 export async function cercaCrossref(q: string, quanti: number, signal?: AbortSignal): Promise<RisultatoCatalogo[]> {
-  const campi = 'DOI,title,author,issued,container-title,abstract,language,URL,is-referenced-by-count'
+  const campi = 'DOI,title,author,issued,container-title,abstract,language,URL,is-referenced-by-count,page'
   const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=${quanti}&select=${campi}`
   const dati = (await leggiJson('crossref', url, signal)) as { message?: { items?: CrossrefItem[] } }
   return (dati.message?.items ?? []).map(daCrossref)
@@ -196,10 +212,11 @@ interface S2Paper {
   abstract?: string | null
   url?: string
   citationCount?: number
+  openAccessPdf?: { url?: string | null } | null
 }
 
 export async function cercaSemanticScholar(q: string, quanti: number, signal?: AbortSignal): Promise<RisultatoCatalogo[]> {
-  const campi = 'title,year,venue,authors,externalIds,abstract,url,citationCount'
+  const campi = 'title,year,venue,authors,externalIds,abstract,url,citationCount,openAccessPdf'
   const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(q)}&limit=${quanti}&fields=${campi}`
   const dati = (await leggiJson('semanticscholar', url, signal)) as { data?: S2Paper[] }
   return (dati.data ?? []).map((p) => {
@@ -215,6 +232,7 @@ export async function cercaSemanticScholar(q: string, quanti: number, signal?: A
       abstract: pulisciTesto(p.abstract),
       lingua: '',
       citazioni: p.citationCount ?? 0,
+      oaUrl: p.openAccessPdf?.url || undefined,
     }
   })
 }
@@ -261,6 +279,8 @@ export function unisci(risultati: RisultatoCatalogo[]): RisultatoCatalogo[] {
     }
     if (!esistente.rivista && r.rivista) esistente.rivista = r.rivista
     esistente.citazioni = Math.max(esistente.citazioni, r.citazioni)
+    if (!esistente.oaUrl && r.oaUrl) esistente.oaUrl = r.oaUrl
+    if (!esistente.primaPagina && r.primaPagina) esistente.primaPagina = r.primaPagina
   }
   return [...new Set(perChiave.values())]
 }
@@ -283,4 +303,25 @@ export async function provaCataloghi(): Promise<EsitoProva[]> {
       }
     }),
   )
+}
+
+/**
+ * Dove si trova la versione gratuita di un articolo già in biblioteca:
+ * OpenAlex per DOI (PDF o pagina open access). Restituisce gli indirizzi da
+ * provare, il PDF per primo, e la prima pagina stampata se nota.
+ */
+export async function cercaOpenAccess(doi: string, signal?: AbortSignal): Promise<{ indirizzi: string[]; primaPagina?: number }> {
+  const d = normalizzaDoi(doi)
+  if (!d) return { indirizzi: [] }
+  const campi = 'open_access,best_oa_location,locations,biblio'
+  const w = (await leggiJson('openalex', `https://api.openalex.org/works/doi:${encodeURIComponent(d)}?select=${campi}`, signal)) as OpenAlexWork & {
+    locations?: { pdf_url?: string | null; landing_page_url?: string | null; is_oa?: boolean }[]
+  }
+  const indirizzi = [
+    w.best_oa_location?.pdf_url,
+    ...(w.locations ?? []).filter((l) => l.is_oa).map((l) => l.pdf_url),
+    w.open_access?.oa_url,
+    w.best_oa_location?.landing_page_url,
+  ].filter((u): u is string => typeof u === 'string' && /^https?:\/\//.test(u))
+  return { indirizzi: [...new Set(indirizzi)], primaPagina: primaPaginaDa(w.biblio?.first_page) }
 }

@@ -1,11 +1,12 @@
 import { create } from 'zustand'
 import { autoreAnno } from '../domain/bibliografia'
 import { paragrafi, sostituisciParagrafo } from '../domain/citazioniTesto'
+import { paginaEstratto } from '../domain/pagine'
 import { useStudio } from '../store'
 import type { Capitolo, Citazione, Consegna, Fonte, Passaggio, Sezione } from '../types'
 import { ApiError, chiamataStrutturataStream, creaClient } from './api'
 import { normalizza, verificaEstratto } from './citations'
-import { collocazione, recuperaPassaggi } from './corpus'
+import { collocazione, recuperaPassaggi, tokenizza } from './corpus'
 import { stimaChiamata, tokenDaCaratteri, type Stima } from './costs'
 import { SYSTEM_SCRITTORE, intestazioneProgetto, quadroTestuale } from './prompts'
 import { SCHEMA_ALTERNATIVE, SCHEMA_BOZZA, SCHEMA_PARAGRAFO, SCHEMA_SCALETTA } from './schemas'
@@ -35,12 +36,61 @@ interface Prefisso {
 const prefissi = new Map<string, Prefisso>()
 const ultimoUso = new Map<string, number>()
 
-/** Il testo citabile di una fonte: completo se c'è, altrimenti abstract, estratti e frasi chiave verificate. */
+/** Il testo su cui si verificano le citazioni: completo se c'è, altrimenti abstract, estratti e frasi chiave verificate. */
 export function testoCitabile(f: Fonte): string {
-  if (f.testoCompleto && f.testo.trim().length > 400) return f.testo.slice(0, MAX_PER_FONTE)
+  if (f.testoCompleto && f.testo.trim().length > 400) return f.testo
   return [f.abstract, ...f.estratti.map((e) => e.testo), ...(f.scheda?.frasiChiave.map((x) => x.testo) ?? [])]
     .filter(Boolean)
     .join('\n')
+}
+
+const LUNGHEZZA_PEZZO = 1500
+
+/** Pezzi del testo di una fonte, con la pagina stampata quando la fonte viene da un PDF. */
+function pezzi(f: Fonte): { testo: string; pagina: number | null; ordine: number }[] {
+  const fuori: { testo: string; pagina: number | null; ordine: number }[] = []
+  const inizi = f.pagine?.length ? f.pagine : [0]
+  const scarto = (f.paginaIniziale ?? 1) - 1
+  inizi.forEach((inizio, i) => {
+    const fine = i + 1 < inizi.length ? inizi[i + 1] : f.testo.length
+    const pagina = f.pagine?.length ? i + 1 + scarto : null
+    for (let k = inizio; k < fine; k += LUNGHEZZA_PEZZO) {
+      fuori.push({ testo: f.testo.slice(k, Math.min(fine, k + LUNGHEZZA_PEZZO)).trim(), pagina, ordine: fuori.length })
+    }
+  })
+  return fuori.filter((x) => x.testo)
+}
+
+/**
+ * Il testo di una fonte da dare allo Scrittore per una sezione. Se il paper è
+ * lungo non si mandano solo le prime pagine: si tiene l'inizio (abstract e
+ * introduzione) e poi i pezzi più vicini alla sezione, con il numero di pagina.
+ */
+export function testoPerSezione(f: Fonte, domande: string[], budget: number): string {
+  const completo = testoCitabile(f)
+  if (completo.length <= budget && !f.pagine?.length) return completo
+  const tutti = pezzi({ ...f, testo: completo })
+  const termini = new Set(domande.flatMap((d) => tokenizza(d)))
+  const punteggio = (t: string) => tokenizza(t).filter((x) => termini.has(x)).length
+  const scelti = new Set<number>([0])
+  let usati = tutti[0]?.testo.length ?? 0
+  for (const p of [...tutti].sort((a, b) => punteggio(b.testo) - punteggio(a.testo))) {
+    if (usati >= budget) break
+    if (scelti.has(p.ordine) || usati + p.testo.length > budget) continue
+    scelti.add(p.ordine)
+    usati += p.testo.length
+  }
+  let ultimaPagina: number | null = null
+  let precedente = -2
+  const righe: string[] = []
+  for (const p of tutti.filter((x) => scelti.has(x.ordine))) {
+    if (p.ordine !== precedente + 1) righe.push('[…]')
+    if (p.pagina !== null && p.pagina !== ultimaPagina) righe.push(`(pagina ${p.pagina})`)
+    righe.push(p.testo)
+    ultimaPagina = p.pagina
+    precedente = p.ordine
+  }
+  return righe.join('\n')
 }
 
 function firmaDi(cap: Capitolo, sez: Sezione): string {
@@ -85,10 +135,12 @@ export function prefissoSezione(cap: Capitolo, sez: Sezione): Prefisso {
     const f = p.fonti.find((x) => x.id === id)
     if (!f) continue
     const rif = `F${f.numero}`
-    const testo = testoCitabile(f).slice(0, Math.max(2000, MAX_FONTI - usati))
+    const domande = [sez.titolo, sez.obiettivo, ...sez.scaletta, cap.titolo]
+    const testo = testoPerSezione(f, domande, Math.min(MAX_PER_FONTE, Math.max(2000, MAX_FONTI - usati)))
     usati += testo.length
     fonti.set(rif, f)
-    testiFonti.set(rif, testo)
+    // Le citazioni si verificano sul testo intero della fonte, non solo sui pezzi mostrati.
+    testiFonti.set(rif, testoCitabile(f))
     const scheda = f.scheda ? `\n  Scheda: ${f.scheda.risultati} — Rilevanza: ${f.scheda.rilevanza}` : ''
     blocchiFonti.push(
       `[${rif}] ${autoreAnno(f)} ${f.titolo}${f.rivista ? ` — ${f.rivista}` : ''}${scheda}\n  Testo citabile${f.testoCompleto ? '' : ' (solo abstract ed estratti)'}:\n"""\n${testo}\n"""`,
@@ -105,7 +157,7 @@ export function prefissoSezione(cap: Capitolo, sez: Sezione): Prefisso {
     `QUADRO TEORICO DEL CORSO:\n${quadroTestuale(p.quadro)}`,
     `CAPITOLO ${numero}: ${cap.titolo}\nSEZIONE ${numero}.${cap.sezioni.indexOf(sez) + 1}: ${sez.titolo}\nOBIETTIVO: ${sez.obiettivo || '(non indicato)'}`,
     `SCALETTA APPROVATA DALLO STUDENTE:\n${sez.scaletta.length && sez.scalettaApprovata ? sez.scaletta.map((x, i) => `${i + 1}. ${x}`).join('\n') : '(non ancora approvata)'}`,
-    `FONTI APPROVATE PER LA SEZIONE (citabili solo attraverso il loro testo qui sotto):\n${blocchiFonti.join('\n\n') || '(nessuna: la sezione si basa sul materiale del corso)'}`,
+    `FONTI APPROVATE PER LA SEZIONE (citabili solo attraverso il loro testo qui sotto; le indicazioni "(pagina N)" e "[…]" non fanno parte del testo e non vanno copiate negli estratti):\n${blocchiFonti.join('\n\n') || '(nessuna: la sezione si basa sul materiale del corso)'}`,
     `PASSAGGI DEL MATERIALE DEL CORSO (citabili alla lettera):\n${passaggi.map((x, i) => `[C${i + 1}] ${collocazione(x)}\n${x.testo}`).join('\n\n---\n\n') || '(nessuno)'}`,
   ].join('\n\n')
 
@@ -232,13 +284,16 @@ function integra(pre: Prefisso, sez: Sezione, grezzi: ParagrafoGrezzo[]): { para
         })
       } else {
         const fonte = pre.fonti.get(rif)
+        // Una fonte non approvata per la sezione non è citabile: risulta in rosso.
+        const testuale = fonte ? verificaEstratto(c.estratto, pre.testiFonti.get(rif) ?? '') : 'rif_sconosciuto'
+        const pagina = testuale === 'verificato' || testuale === 'approssimato' ? paginaEstratto(fonte, c.estratto) : null
         citazioni.push({
           rif,
           affermazione: c.affermazione,
           estratto: c.estratto,
-          // Una fonte non approvata per la sezione non è citabile: risulta in rosso.
-          testuale: fonte ? verificaEstratto(c.estratto, pre.testiFonti.get(rif) ?? '') : 'rif_sconosciuto',
+          testuale,
           ...(fonte ? { fonteId: fonte.id } : {}),
+          ...(pagina ? { pagina } : {}),
         })
       }
     }

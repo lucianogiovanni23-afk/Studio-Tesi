@@ -190,6 +190,22 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 - **Avvio più leggero**: le librerie per i PDF e per Word si scaricano solo quando servono; il
   file principale passa da 916 a 577 KB.
 
+**Ricerca: testo completo e pagine**
+- **Testo completo dei paper open access** (Biblioteca): i cataloghi indicano se un articolo ha
+  una versione gratuita (etichetta "open access"). Con "Cerca il testo completo" il browser prova
+  a scaricarla gratis; il codice controlla che il documento sia proprio quel paper (le parole del
+  titolo devono comparire all'inizio) e scarta le pagine troppo corte. Se il sito dell'editore non
+  lo fa scaricare al browser, puoi farlo leggere tramite l'API (strumento web_fetch nella versione
+  base, sul modello più economico, una lettura per fonte) dopo aver visto la stima. Con il testo
+  completo le schede, lo Scrittore e le verifiche lavorano sull'intero articolo e non sul solo
+  abstract; allo Scrittore vanno i pezzi più pertinenti, etichettati con la pagina.
+- **Numero di pagina nelle citazioni**: per i PDF (caricati, scaricati o letti via API) l'app
+  ricorda dove inizia ogni pagina e trova in codice la pagina dell'estratto citato. La pagina
+  compare nelle frasi chiave, nel dettaglio della citazione, nella copia ("(Rossi e Bianchi,
+  2023, p. 246)"), nella modalità carta e nelle note di Word. La numerazione segue quella della
+  rivista: la prima pagina stampata arriva dai cataloghi e si può correggere nei dati della
+  fonte; "Verifica le citazioni" ricalcola le pagine.
+
 ## Computer e iPad: una sola app con due modi
 
 Ho scelto **una sola app che si adatta**, con due modi rilevati in automatico e modificabili a mano:
@@ -248,6 +264,13 @@ npm run dev      # http://localhost:5173
 npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-Tesi/)
 npm run lint
 ```
+
+Il collaudo del testo completo e delle pagine aggiunge 19 controlli: quattro fonti dai cataloghi
+(una scaricabile, una bloccata dall'editore e letta via API con web_fetch base su Haiku, una
+senza versione gratuita, una che rimanda a un altro articolo e viene scartata), frasi chiave con
+la pagina della rivista, testo allo Scrittore con le pagine, copia, dettaglio, modalità carta e
+Word con la pagina, ricalcolo dopo il cambio della prima pagina. I collaudi precedenti passano
+ancora tutti (quello della fase 3 ora vede anche la pagina nelle citazioni).
 
 Il collaudo della fase 4 aggiunge 36 controlli: progetto aperto da file con testi, citazioni e
 fonti; osservazione del relatore con una proposta valida, una con paragrafo inventato (scartata),

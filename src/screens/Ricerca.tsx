@@ -154,6 +154,7 @@ function CartaCandidato({ c }: { c: Candidato }) {
         <span className={`verifica verifica-${c.verifica}`}>
           {c.verifica === 'catalogo' ? 'metadati dal catalogo' : 'URL verificato fra i risultati'}
         </span>
+        {f.oaUrl && <span className="verifica">open access</span>}
         {c.consiglio && (
           <span className={`consiglio consiglio-${c.consiglio.decisione}`}>
             {c.consiglio.decisione === 'tenere' ? `consigliata · pertinenza ${c.consiglio.pertinenza}` : 'sconsigliata'}

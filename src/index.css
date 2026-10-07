@@ -2605,3 +2605,34 @@ code {
   flex: 1 1 220px;
   margin: 0;
 }
+
+/* Testo completo e pagine */
+.testo-completo {
+  border-top: 1px solid var(--bordo);
+  margin-top: 14px;
+}
+
+.testo-completo-tutte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.oa {
+  color: var(--cielo);
+  font-weight: 600;
+}
+
+.pagina {
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--oliva-scuro);
+  white-space: nowrap;
+}
+
+.modo-ipad .pagina,
+.modo-ipad .oa {
+  font-size: 15px;
+}

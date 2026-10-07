@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { formattaDollari } from '../agents/costs'
 import { preparaScheda, stimaScheda, testoPerScheda, verificaFrasi } from '../agents/schede'
+import { puòAvereTestoCompleto, recuperaTestoCompleto, recuperaTuttiNelBrowser, stimaTestoCompleto } from '../agents/testoCompleto'
 import { logOk } from '../agents/supervisor'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
@@ -98,7 +99,7 @@ function Scheda({ f }: { f: Fonte }) {
           <ul className="frasi-chiave">
             {f.scheda.frasiChiave.map((fr, i) => (
               <li key={i}>
-                <Esito esito={fr.esito} /> «{fr.testo}»
+                <Esito esito={fr.esito} /> «{fr.testo}»{fr.pagina ? <strong className="pagina"> p. {fr.pagina}</strong> : null}
                 <button
                   type="button"
                   className="icona"
@@ -115,7 +116,7 @@ function Scheda({ f }: { f: Fonte }) {
             onSubmit={(e) => {
               e.preventDefault()
               if (!nuovaFrase.trim()) return
-              const [v] = verificaFrasi([nuovaFrase.trim()], testoPerScheda(f).testo)
+              const [v] = verificaFrasi([nuovaFrase.trim()], testoPerScheda(f).testo, f)
               modifica({ frasiChiave: [...f.scheda!.frasiChiave, v] })
               setNuovaFrase('')
             }}
@@ -145,8 +146,140 @@ function Scheda({ f }: { f: Fonte }) {
 }
 
 // ---------------------------------------------------------------------------
+// Testo completo open access
+// ---------------------------------------------------------------------------
+
+function TestoCompleto({ f }: { f: Fonte }) {
+  const haChiave = useStudio((s) => s.apiKey.length > 0)
+  const [stato, setStato] = useState<'fermo' | 'browser' | 'api'>('fermo')
+  const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'avviso' | 'errore'; testo: string } | null>(null)
+  const [bloccato, setBloccato] = useState(false)
+  if (f.testoCompleto) {
+    return (
+      <p className="nota nota-ok">
+        Testo completo disponibile{f.pagine?.length ? `: ${f.pagine.length} pagine, le citazioni avranno il numero di pagina` : ''}.
+      </p>
+    )
+  }
+  if (!puòAvereTestoCompleto(f)) return null
+  const stima = stimaTestoCompleto()
+
+  const prova = async (conApi: boolean) => {
+    setStato(conApi ? 'api' : 'browser')
+    setMessaggio(null)
+    try {
+      const e = await recuperaTestoCompleto(f.id, conApi)
+      if (e.ok) {
+        setMessaggio({ tono: 'ok', testo: `Testo completo ${e.via === 'browser' ? 'scaricato gratis dal browser' : 'letto tramite l\'API'}${e.pagine ? `: ${e.pagine} pagine` : ''}. Ora puoi rifare la scheda sul testo completo.` })
+      } else if (e.motivo === 'nessun_indirizzo') {
+        setMessaggio({ tono: 'avviso', testo: 'Per questo articolo non risulta una versione gratuita. Se hai il PDF (per esempio dalla biblioteca dell\'università), allegalo.' })
+      } else if (e.motivo === 'non_corrisponde') {
+        setMessaggio({ tono: 'avviso', testo: 'Il documento trovato non sembra questo articolo (il titolo non compare nelle prime pagine): non l\'ho usato.' })
+      } else {
+        setBloccato(true)
+        setMessaggio({ tono: 'avviso', testo: conApi ? 'Neanche tramite l\'API è stato possibile leggere il documento.' : 'Il sito che ospita la versione gratuita non permette al browser di scaricarla direttamente.' })
+      }
+    } catch (err) {
+      setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Errore.' })
+    } finally {
+      setStato('fermo')
+    }
+  }
+
+  return (
+    <section className="testo-completo">
+      <h3>Testo completo</h3>
+      <p className="nota">
+        {f.oaUrl ? 'Il catalogo indica una versione gratuita (open access) di questo articolo. ' : 'Cerco su OpenAlex, tramite il DOI, se esiste una versione gratuita. '}
+        Con il testo completo la scheda e le citazioni si basano sull'articolo intero e indicano il numero di pagina.
+      </p>
+      {stato !== 'fermo' ? (
+        <p className="in-corso">{stato === 'browser' ? 'Provo a scaricarlo dal browser…' : 'Lo leggo tramite l\'API…'}</p>
+      ) : (
+        <div className="riga-editor">
+          <button type="button" className="bottone" onClick={() => void prova(false)}>
+            Cerca il testo completo (gratis)
+          </button>
+          {bloccato && (
+            <Conferma
+              classe="bottone bottone-primario"
+              etichetta="Leggilo tramite l'API"
+              disabilitato={!haChiave}
+              domanda={`Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)} (dipende dalla lunghezza del PDF). Procedo?`}
+              conferma="Procedi"
+              onConferma={() => void prova(true)}
+            />
+          )}
+        </div>
+      )}
+      {messaggio && <p className={messaggio.tono === 'ok' ? 'nota nota-ok' : messaggio.tono === 'errore' ? 'allerta allerta-errore' : 'allerta'}>{messaggio.testo}</p>}
+    </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Dettaglio di una fonte
 // ---------------------------------------------------------------------------
+
+/** Testo completo per tutte le fonti: prima gratis dal browser, poi (se vuoi) tramite l'API per le rimaste. */
+function TestoCompletoPerTutte() {
+  const fonti = useStudio((s) => s.progetto.fonti)
+  const haChiave = useStudio((s) => s.apiKey.length > 0)
+  const candidate = fonti.filter(puòAvereTestoCompleto).length
+  const [avanzamento, setAvanzamento] = useState<string | null>(null)
+  const [daApi, setDaApi] = useState<string[]>([])
+  const [esito, setEsito] = useState<string | null>(null)
+  if (candidate === 0 && daApi.length === 0 && !esito) return null
+  const stima = stimaTestoCompleto()
+
+  return (
+    <div className="testo-completo-tutte">
+      {avanzamento ? (
+        <span className="in-corso">{avanzamento}</span>
+      ) : (
+        candidate > 0 && (
+          <button
+            type="button"
+            className="bottone bottone-piccolo"
+            onClick={async () => {
+              setEsito(null)
+              const r = await recuperaTuttiNelBrowser((fatte, totale) => setAvanzamento(`Cerco il testo completo: ${fatte} di ${totale}…`))
+              setAvanzamento(null)
+              setDaApi(r.daApi)
+              setEsito(`${r.riusciti} testi completi scaricati gratis.${r.daApi.length ? ` ${r.daApi.length} sono gratuiti ma il sito non li fa scaricare al browser.` : ''}`)
+            }}
+          >
+            Cerca il testo completo per {candidate} {candidate === 1 ? 'fonte' : 'fonti'} (gratis)
+          </button>
+        )
+      )}
+      {esito && <span className="nota">{esito}</span>}
+      {daApi.length > 0 && !avanzamento && (
+        <Conferma
+          classe="bottone bottone-piccolo bottone-primario"
+          etichetta={`Leggi le ${daApi.length} rimaste tramite l'API`}
+          disabilitato={!haChiave}
+          domanda={`Costo stimato ${formattaDollari(stima.minimo * daApi.length)} – ${formattaDollari(stima.massimo * daApi.length)}. Procedo?`}
+          conferma="Procedi"
+          onConferma={async () => {
+            let ok = 0
+            for (const [i, id] of daApi.entries()) {
+              setAvanzamento(`Leggo tramite l'API: ${i + 1} di ${daApi.length}…`)
+              try {
+                if ((await recuperaTestoCompleto(id, true)).ok) ok += 1
+              } catch {
+                // Si passa alla successiva: l'errore resta nel registro.
+              }
+            }
+            setAvanzamento(null)
+            setDaApi([])
+            setEsito(`${ok} testi completi letti tramite l'API.`)
+          }}
+        />
+      )}
+    </div>
+  )
+}
 
 function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
   const aggiorna = useStudio((s) => s.aggiornaFonte)
@@ -237,6 +370,24 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
           />
         </label>
         {campo('rivista', 'Rivista o editore')}
+        {f.pagine?.length ? (
+          <label className="campo-blocco">
+            <span className="etichetta">Numero stampato della prima pagina del PDF</span>
+            <input
+              className="campo"
+              inputMode="numeric"
+              value={f.paginaIniziale ?? 1}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value, 10)
+                aggiorna(f.id, { paginaIniziale: Number.isFinite(n) && n > 0 ? n : 1 })
+              }}
+            />
+            <span className="nota">
+              Serve a citare la pagina giusta della rivista: se l'articolo inizia a p. 245, le citazioni dalla prima pagina del PDF diventano "p. 245".
+              Dopo una modifica, "Verifica le citazioni" nella scrittura aggiorna le pagine.
+            </span>
+          </label>
+        ) : null}
         {campo('doi', 'DOI')}
         {campo('url', 'URL')}
       </details>
@@ -275,9 +426,9 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
             if (!file) return
             setAllegato('Estraggo il testo…')
             try {
-              const testo = await testoDaPdf(file)
-              aggiorna(f.id, { testo, testoCompleto: true })
-              setAllegato(`Testo allegato: ${Math.round(testo.length / 1000)} mila caratteri. Ora puoi rifare la scheda sul testo completo.`)
+              const { testo, pagine } = await testoDaPdf(file)
+              aggiorna(f.id, { testo, pagine, testoCompleto: true })
+              setAllegato(`Testo allegato: ${pagine.length} pagine, ${Math.round(testo.length / 1000)} mila caratteri. Ora puoi rifare la scheda sul testo completo.`)
             } catch (err) {
               setAllegato(err instanceof Error ? err.message : 'Lettura non riuscita.')
             }
@@ -296,6 +447,8 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
         />
       </div>
       {allegato && <p className="nota">{allegato}</p>}
+
+      <TestoCompleto f={f} />
 
       <Scheda f={f} />
     </article>
@@ -484,6 +637,7 @@ export function Biblioteca() {
         </button>
       </div>
       {caricamento && <p className="nota">{caricamento}</p>}
+      <TestoCompletoPerTutte />
 
       {fonti.length === 0 ? (
         <p className="nota">
@@ -502,6 +656,7 @@ export function Biblioteca() {
                   <span className={`stato-fonte stato-fonte-${f.stato}`}>{ETICHETTA_STATO_FONTE[f.stato]}</span>
                   <span>{ETICHETTA_ORIGINE[f.origine]}</span>
                   <span>{statoScheda(f)}</span>
+                  {f.testoCompleto ? <span className="nota-ok">testo completo{f.pagine?.length ? ' con pagine' : ''}</span> : puòAvereTestoCompleto(f) && f.oaUrl ? <span className="oa">open access</span> : null}
                 </span>
                 {f.temi.length > 0 && <TemiChips temi={f.temi} sola />}
               </button>

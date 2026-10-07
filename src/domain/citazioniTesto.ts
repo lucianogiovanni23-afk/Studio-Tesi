@@ -1,4 +1,5 @@
 import type { Citazione, Fonte, StileCitazione } from '../types'
+import { normalizza } from '../agents/citations'
 import { autoreAnno } from './bibliografia'
 
 /**
@@ -85,6 +86,30 @@ export function segmenti(paragrafo: string): Segmento[] {
 // Esportazione nello stile scelto
 // ---------------------------------------------------------------------------
 
+/**
+ * Pagina da indicare per un marcatore [F..] in un paragrafo: quella delle
+ * citazioni di quel marcatore la cui affermazione sta nel paragrafo; se non
+ * se ne ricava una sola, quella comune a tutte le citazioni del marcatore.
+ */
+export function paginaPerMarcatore(rif: string, paragrafo: string, citazioni: Citazione[]): number | null {
+  const proprie = citazioni.filter((c) => c.rif.toUpperCase() === rif.toUpperCase() && c.pagina)
+  if (proprie.length === 0) return null
+  const par = normalizza(paragrafo)
+  const qui = proprie.filter((c) => {
+    const inizio = normalizza(c.affermazione).replace(/[.,;:]+$/, '').slice(0, 40)
+    return inizio.length > 8 && par.includes(inizio)
+  })
+  const pagine = new Set((qui.length ? qui : proprie).map((c) => c.pagina))
+  return pagine.size === 1 ? [...pagine][0]! : null
+}
+
+/** Il paragrafo che contiene la posizione `indice` del testo. */
+function paragrafoIntorno(testo: string, indice: number): string {
+  const inizio = testo.lastIndexOf('\n\n', indice)
+  const fine = testo.indexOf('\n\n', indice)
+  return testo.slice(inizio < 0 ? 0 : inizio, fine < 0 ? testo.length : fine)
+}
+
 function fonteDiRif(rif: string, fonti: Fonte[]): Fonte | undefined {
   const n = Number(rif.slice(1))
   return fonti.find((f) => f.numero === n)
@@ -98,11 +123,11 @@ function rimandoCorso(rif: string, citazioni: Citazione[]): string {
 }
 
 /** Riferimento completo per le note a piè di pagina. */
-export function riferimentoCompleto(f: Fonte): string {
+export function riferimentoCompleto(f: Fonte, pagina?: number | null): string {
   const autori = f.autori.length ? f.autori.join(', ') : 'Autore n.d.'
   const anno = f.anno ?? 's.d.'
   const dove = [f.rivista, f.doi ? `doi:${f.doi}` : f.url].filter(Boolean).join(', ')
-  return `${autori} (${anno}), ${f.titolo}${dove ? `, ${dove}` : ''}.`
+  return `${autori} (${anno}), ${f.titolo}${dove ? `, ${dove}` : ''}${pagina ? `, p. ${pagina}` : ''}.`
 }
 
 const APICE = '⁰¹²³⁴⁵⁶⁷⁸⁹'
@@ -122,13 +147,14 @@ export function esportaTesto(testo: string, citazioni: Citazione[], fonti: Fonte
   const gruppo = /(?:\s*\[[FC]\d+\])+/g
   const note: string[] = []
 
-  const convertito = testo.replace(gruppo, (blocco) => {
+  const convertito = testo.replace(gruppo, (blocco: string, posizione: number) => {
+    const paragrafo = paragrafoIntorno(testo, posizione)
     const rifs = [...blocco.matchAll(MARCATORE)].map((m) => m[1].toUpperCase())
     if (stile === 'note') {
       const testi = rifs.map((r) => {
         if (r.startsWith('C')) return `Materiale del corso: ${rimandoCorso(r, citazioni)}.`
         const f = fonteDiRif(r, fonti)
-        return f ? riferimentoCompleto(f) : `Fonte ${r} non trovata in biblioteca.`
+        return f ? riferimentoCompleto(f, paginaPerMarcatore(r, paragrafo, citazioni)) : `Fonte ${r} non trovata in biblioteca.`
       })
       note.push(testi.join(' '))
       return apice(note.length)
@@ -136,7 +162,9 @@ export function esportaTesto(testo: string, citazioni: Citazione[], fonti: Fonte
     const voci = rifs.map((r) => {
       if (r.startsWith('C')) return rimandoCorso(r, citazioni)
       const f = fonteDiRif(r, fonti)
-      return f ? autoreAnno(f, false) : `fonte ${r}?`
+      if (!f) return `fonte ${r}?`
+      const pagina = paginaPerMarcatore(r, paragrafo, citazioni)
+      return pagina ? `${autoreAnno(f, false)}, p. ${pagina}` : autoreAnno(f, false)
     })
     return ` (${[...new Set(voci)].join('; ')})`
   })
@@ -165,7 +193,7 @@ export function partiParagrafo(paragrafo: string, citazioni: Citazione[], fonti:
     const testi = rifs.map((r) => {
       if (r.startsWith('C')) return `Materiale del corso: ${rimandoCorso(r, citazioni)}.`
       const f = fonteDiRif(r, fonti)
-      return f ? riferimentoCompleto(f) : `Fonte ${r} non trovata in biblioteca.`
+      return f ? riferimentoCompleto(f, paginaPerMarcatore(r, paragrafo, citazioni)) : `Fonte ${r} non trovata in biblioteca.`
     })
     parti.push({ tipo: 'nota', testo: testi.join(' ') })
     ultimo = m.index + m[0].length

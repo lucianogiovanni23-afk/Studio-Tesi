@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import { autoreAnno } from '../domain/bibliografia'
-import { coloreCitazione, coloreMarcatore, paragrafi, segmenti } from '../domain/citazioniTesto'
+import { coloreCitazione, coloreMarcatore, paginaPerMarcatore, paragrafi, segmenti } from '../domain/citazioniTesto'
 import { useStudio } from '../store'
 import type { Citazione, Fonte } from '../types'
 import { Esito } from './Esito'
@@ -11,14 +11,16 @@ const GIUDIZIO = {
   non_supportata: 'il Revisore la ritiene non supportata',
 }
 
-function etichetta(rif: string, citazioni: Citazione[], fonti: Fonte[], stile: boolean): string {
+function etichetta(rif: string, citazioni: Citazione[], fonti: Fonte[], stile: boolean, paragrafo: string): string {
   if (!stile) return rif
   if (rif.startsWith('C')) {
     const p = citazioni.find((c) => c.rif === rif && c.passaggio)?.passaggio
     return p ? `(corso, p. ${p.pagine[0]})` : '(corso)'
   }
   const f = fonti.find((x) => x.numero === Number(rif.slice(1)))
-  return f ? autoreAnno(f) : `(${rif}?)`
+  if (!f) return `(${rif}?)`
+  const pagina = paginaPerMarcatore(rif, paragrafo, citazioni)
+  return pagina ? `(${autoreAnno(f, false)}, p. ${pagina})` : autoreAnno(f)
 }
 
 /** Scheda di una citazione: estratto letterale, esito del controllo in codice, giudizio e fonte. */
@@ -51,7 +53,7 @@ export function DettaglioCitazioni({ rif, citazioni }: { rif: string; citazioni:
             <p className="affermazione">{c.affermazione}</p>
             <blockquote className="estratto">«{c.estratto}»</blockquote>
             <p className="nota">
-              {c.testuale && <Esito esito={c.testuale} />} {c.giudizio && <span>{GIUDIZIO[c.giudizio]}</span>}
+              {c.testuale && <Esito esito={c.testuale} />} {c.pagina && <strong>p. {c.pagina}</strong>} {c.giudizio && <span>{GIUDIZIO[c.giudizio]}</span>}
               {c.motivo && <span> — {c.motivo}</span>}
             </p>
           </div>
@@ -86,7 +88,7 @@ export function TestoCitato({ testo, citazioni, stile = false, classe = '' }: { 
                   aria-expanded={aperto?.p === p && aperto.k === k}
                   onClick={() => setAperto(aperto?.p === p && aperto.k === k ? null : { p, k, rif: seg.rif })}
                 >
-                  {etichetta(seg.rif, citazioni, fonti, stile)}
+                  {etichetta(seg.rif, citazioni, fonti, stile, par)}
                 </button>
               ),
             )}

@@ -1,3 +1,4 @@
+import { paginaEstratto } from '../domain/pagine'
 import { useStudio } from '../store'
 import type { Consegna, EstrattoVerificato, Fonte, SchedaLettura } from '../types'
 import { ApiError, chiamataStrutturata, creaClient } from './api'
@@ -29,8 +30,12 @@ export function stimaScheda(f: Fonte, modello: string): Stima {
 }
 
 /** Controlla in codice ogni frase chiave sul testo della fonte. */
-export function verificaFrasi(frasi: string[], testo: string): EstrattoVerificato[] {
-  return frasi.map((t) => ({ testo: t, esito: verificaEstratto(t, testo) }))
+export function verificaFrasi(frasi: string[], testo: string, fonte?: Fonte): EstrattoVerificato[] {
+  return frasi.map((t) => {
+    const esito = verificaEstratto(t, testo)
+    const pagina = fonte && esito !== 'non_trovato' && esito !== 'rif_sconosciuto' ? paginaEstratto(fonte, t) : null
+    return { testo: t, esito, ...(pagina ? { pagina } : {}) }
+  })
 }
 
 const inCorso = new Set<string>()
@@ -86,7 +91,7 @@ export async function preparaScheda(fonteId: string): Promise<{ scartate: number
     })
 
     const r = consegna.risultato
-    const verificate = verificaFrasi(r.frasi_chiave ?? [], testo)
+    const verificate = verificaFrasi(r.frasi_chiave ?? [], testo, fonte)
     const tenute = verificate.filter((v) => v.esito === 'verificato' || v.esito === 'approssimato')
     const scheda: SchedaLettura = {
       domanda: r.domanda,
