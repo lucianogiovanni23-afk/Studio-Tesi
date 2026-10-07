@@ -351,39 +351,40 @@ h3 {
 }
 
 /* --- iPad: tocchi da 44px e testo da almeno 15px anche nei componenti nuovi --- */
-.modo-ipad .info-bottone {
+.app.modo-ipad .info-bottone {
   width: 44px;
   height: 44px;
 }
 
-.modo-ipad .bib-cerca-campo,
-.modo-ipad .bib-vista button,
-.modo-ipad .rev-scheda,
-.modo-ipad .sotto-voce,
-.modo-ipad .menu-tendina-elenco button,
-.modo-ipad .fisarmonica-interruttore,
-.modo-ipad .bottone-icona,
-.modo-ipad .testa-agente {
+.app.modo-ipad .bib-cerca-campo,
+.app.modo-ipad .bib-vista button,
+.app.modo-ipad .rev-scheda,
+.app.modo-ipad .sotto-voce,
+.app.modo-ipad .menu-tendina-elenco button,
+.app.modo-ipad .fisarmonica-interruttore,
+.app.modo-ipad .bottone-icona,
+.app.modo-ipad .testa-agente {
   min-height: 44px;
 }
 
-.modo-ipad .bottone-icona {
+.app.modo-ipad .bottone-icona {
   min-width: 44px;
 }
 
-.modo-ipad small,
-.modo-ipad .testa-passo,
-.modo-ipad .fisarmonica-riassunto,
-.modo-ipad .corso-stato,
-.modo-ipad .sc-capitoli-etichetta,
-.modo-ipad .sc-sopratitolo-cap,
-.modo-ipad .sc-passo-cerchio,
-.modo-ipad .sc-passo-riassunto,
-.modo-ipad .imp-testa-sotto,
-.modo-ipad .imp-stato,
-.modo-ipad .avviso-chiave,
-.modo-ipad .rev-scarica-altro,
-.modo-ipad .bib-vista button,
-.modo-ipad .info-fumetto {
+.app.modo-ipad small,
+.app.modo-ipad .testa-passo,
+.app.modo-ipad .fisarmonica-riassunto,
+.app.modo-ipad .corso-stato,
+.app.modo-ipad .sc-capitoli-etichetta,
+.app.modo-ipad .sc-sopratitolo-cap,
+.app.modo-ipad .sc-passo-cerchio,
+.app.modo-ipad .sc-passo-riassunto,
+.app.modo-ipad .imp-testa-sotto,
+.app.modo-ipad .imp-stato,
+.app.modo-ipad .avviso-chiave,
+.app.modo-ipad .rev-scarica-altro,
+.app.modo-ipad .bib-vista button,
+.app.modo-ipad .info-fumetto,
+.app.modo-ipad .rev-dato-testi span {
   font-size: 15px;
 }

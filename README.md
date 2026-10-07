@@ -420,6 +420,15 @@ scritto dal browser con l'API di GitHub (Impostazioni → Sincronizzazione fra d
 
 ## Avvio e collaudo
 
+Dopo il riordino delle pagine i collaudi sono stati adeguati ai nuovi posti dei comandi (schede,
+fisarmoniche, cassetti, menu "Chiedi allo scrittore", barra laterale) senza togliere controlli,
+e se ne è aggiunto uno nuovo (48 controlli): ricomincia da capo con le lezioni che restano e la
+copia "Prima del ripristino", le quattro schede delle Impostazioni, il pulsante dei suoni, il
+cassetto dell'indice, il menu dello scrittore, il cassetto di una fonte, il giorno/notte
+dell'ufficio e nessuno scorrimento orizzontale su iPhone in 21 viste. Il collaudo ha trovato due
+problemi, corretti: misure da iPad (tocchi 44 px, testo 15 px) nei componenti nuovi e la conferma
+dopo il ripristino che non si vedeva. Passano tutti: 409 controlli in 12 collaudi.
+
 ```bash
 npm install
 npm run dev      # http://localhost:5173
