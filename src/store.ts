@@ -217,7 +217,8 @@ export interface StatoStudio {
   sbloccaInterfaccia: () => void
 
   // file di progetto
-  sostituisciProgetto: (p: Progetto) => void
+  /** Sostituisce il progetto; poi si va nell'ufficio, o nella schermata indicata. */
+  sostituisciProgetto: (p: Progetto, dopo?: Schermata) => void
   segnaSalvatoSuFile: () => void
 }
 
@@ -546,8 +547,8 @@ export const useStudio = create<StatoStudio>()(
           return { agenti }
         }),
 
-      sostituisciProgetto: (progetto) =>
-        set(() => ({ progetto, capitoloAperto: null, sezioneAperta: null, schermata: 'ufficio', agenti: agentiVuoti() })),
+      sostituisciProgetto: (progetto, dopo = 'ufficio') =>
+        set(() => ({ progetto, capitoloAperto: null, sezioneAperta: null, schermata: dopo, agenti: agentiVuoti() })),
       segnaSalvatoSuFile: () => conProgetto(set, () => ({ salvatoSuFileIl: adesso() })),
     }),
     {

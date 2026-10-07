@@ -349,3 +349,41 @@ h3 {
     opacity: 0.45;
   }
 }
+
+/* --- iPad: tocchi da 44px e testo da almeno 15px anche nei componenti nuovi --- */
+.modo-ipad .info-bottone {
+  width: 44px;
+  height: 44px;
+}
+
+.modo-ipad .bib-cerca-campo,
+.modo-ipad .bib-vista button,
+.modo-ipad .rev-scheda,
+.modo-ipad .sotto-voce,
+.modo-ipad .menu-tendina-elenco button,
+.modo-ipad .fisarmonica-interruttore,
+.modo-ipad .bottone-icona,
+.modo-ipad .testa-agente {
+  min-height: 44px;
+}
+
+.modo-ipad .bottone-icona {
+  min-width: 44px;
+}
+
+.modo-ipad small,
+.modo-ipad .testa-passo,
+.modo-ipad .fisarmonica-riassunto,
+.modo-ipad .corso-stato,
+.modo-ipad .sc-capitoli-etichetta,
+.modo-ipad .sc-sopratitolo-cap,
+.modo-ipad .sc-passo-cerchio,
+.modo-ipad .sc-passo-riassunto,
+.modo-ipad .imp-testa-sotto,
+.modo-ipad .imp-stato,
+.modo-ipad .avviso-chiave,
+.modo-ipad .rev-scarica-altro,
+.modo-ipad .bib-vista button,
+.modo-ipad .info-fumetto {
+  font-size: 15px;
+}

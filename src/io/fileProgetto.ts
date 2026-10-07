@@ -141,5 +141,5 @@ export function fileCorsoControllati(progetto: Progetto, corpus: Record<string, 
 export async function apriProgetto(anteprima: AnteprimaFile) {
   const { progetto, corpus } = anteprima.dati
   await importaCorpus(corpus)
-  useStudio.getState().sostituisciProgetto({ ...progetto, courseFiles: fileCorsoControllati(progetto, corpus) })
+  useStudio.getState().sostituisciProgetto({ ...progetto, courseFiles: fileCorsoControllati(progetto, corpus) }, 'impostazioni')
 }

@@ -12,7 +12,8 @@ export async function ripristinaTenendoIlCorso() {
   const { progetto, sostituisciProgetto } = useStudio.getState()
   const nuovo = { ...progettoIniziale(), courseFiles: progetto.courseFiles, quadro: progetto.quadro }
   await tieniSoloNelCorpus(new Set(progetto.courseFiles.map((f) => f.id)))
-  sostituisciProgetto(nuovo)
+  // Si resta nelle Impostazioni, così si vede la conferma.
+  sostituisciProgetto(nuovo, 'impostazioni')
 }
 
 /** Cosa sparirà, per farlo vedere prima di confermare. */
