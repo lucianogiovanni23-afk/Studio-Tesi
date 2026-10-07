@@ -117,9 +117,9 @@ textarea {
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: calc(10px + env(safe-area-inset-top)) 20px 10px;
-  background: rgba(255, 253, 248, 0.92);
+  gap: 12px;
+  padding: calc(8px + env(safe-area-inset-top)) 20px 8px;
+  background: rgba(255, 253, 248, 0.94);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--bordo);
@@ -130,7 +130,14 @@ textarea {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  flex: 0 1 320px;
+  flex: 0 1 280px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
 }
 
 .marchio-segno {
@@ -143,14 +150,18 @@ textarea {
   flex: none;
 }
 
+.marchio-testi {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .marchio-nome {
-  margin: 0;
   font-weight: 700;
   color: var(--oliva-scuro);
 }
 
 .marchio-titolo {
-  margin: 0;
   font-size: 0.8rem;
   color: var(--inchiostro-3);
   white-space: nowrap;
@@ -160,50 +171,177 @@ textarea {
 
 .navigazione {
   display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  gap: 2px;
   flex: 1;
-}
-
-.navigazione::-webkit-scrollbar {
-  display: none;
+  justify-content: center;
+  min-width: 0;
 }
 
 .nav-voce {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   border: 0;
   background: none;
   padding: 0 14px;
   min-height: var(--tocco);
   border-radius: 999px;
   color: var(--inchiostro-2);
+  font: inherit;
   font-weight: 550;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.nav-voce .icona-nav {
+  flex: none;
+}
+
+.nav-nome {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-numero {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--crema-2);
+  color: var(--inchiostro-2);
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
 .nav-voce:hover {
   background: var(--crema-2);
 }
 
-.nav-attiva {
+.nav-attiva,
+.nav-attiva:hover {
   background: var(--oliva);
   color: var(--bianco);
 }
 
-.nav-attiva:hover {
-  background: var(--oliva-scuro);
+.nav-attiva .nav-numero {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--bianco);
 }
 
-.pallino {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--terracotta);
+.testata-azioni {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.bottone-testata {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: var(--tocco);
+  min-height: var(--tocco);
+  padding: 0 12px;
+  border: 1px solid var(--bordo);
+  border-radius: 999px;
+  background: var(--carta);
+  color: var(--inchiostro-2);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.bottone-testata:hover {
+  background: var(--crema-2);
+}
+
+.bottone-testata.nav-attiva {
+  border-color: var(--oliva);
+}
+
+/* Sotto i 1250 px le etichette delle azioni lasciano spazio ai passi. */
+@media (max-width: 1250px) {
+  .testata-etichetta {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .bottone-testata {
+    padding: 0;
+  }
+  .marchio {
+    flex-basis: 220px;
+  }
+}
+
+@media (max-width: 1050px) and (min-width: 701px) {
+  .nav-voce .icona-nav,
+  .marchio-testi {
+    display: none;
+  }
+  .marchio {
+    flex: none;
+  }
+  .nav-voce {
+    padding: 0 10px;
+  }
+}
+
+/* Testa di ogni schermata: a che passo sei e a cosa serve la pagina. */
+.testa-schermata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 20px;
+  margin: 4px 0 16px;
+}
+
+.testa-schermata h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--inchiostro);
+}
+
+.testa-schermata p {
+  margin: 2px 0 0;
+  color: var(--inchiostro-2);
+  max-width: 70ch;
+}
+
+.sotto-schede {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--crema-2);
+}
+
+.sotto-voce {
+  min-height: 36px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--inchiostro-2);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.sotto-attiva {
+  background: var(--carta);
+  color: var(--inchiostro);
+  box-shadow: 0 1px 3px rgba(60, 50, 20, 0.15);
 }
 
 .contenuto {
@@ -669,29 +807,6 @@ textarea.campo {
 /* ------------------------------------------------------------------ */
 /* Cruscotto e scena                                                  */
 /* ------------------------------------------------------------------ */
-
-.cruscotto {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
-}
-
-.cruscotto-largo {
-  grid-template-columns: minmax(0, 1.45fr) minmax(380px, 1fr);
-  align-items: start;
-}
-
-.cruscotto-largo .cruscotto-scena {
-  position: sticky;
-  top: 132px;
-}
-
-.cruscotto-pannelli {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
 
 .scena {
   position: relative;
@@ -1591,14 +1706,6 @@ details summary {
 }
 
 @media (max-width: 700px) {
-  .testata {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .marchio {
-    flex: none;
-  }
   .contenuto {
     padding: 12px 12px 32px;
   }
@@ -1660,10 +1767,6 @@ details summary {
 .modo-ipad .errore-file,
 .modo-ipad .testa-progresso {
   font-size: 15px;
-}
-
-.marchio > div {
-  min-width: 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2712,16 +2815,8 @@ code {
   .avviso-sync {
     margin: 10px 12px 0;
   }
-  .testata .sync-chip {
-    position: absolute;
-    top: calc(14px + env(safe-area-inset-top));
-    right: 12px;
-  }
   .testata .sync-testo {
     display: none;
-  }
-  .testata:has(.sync-chip) .marchio {
-    padding-right: 44px;
   }
 }
 
@@ -2822,4 +2917,468 @@ code {
 a.bottone {
   color: inherit;
   text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Inizio                                                             */
+/* ------------------------------------------------------------------ */
+
+.inizio {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.inizio-largo {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: start;
+}
+
+.inizio > .guida {
+  grid-column: 1 / -1;
+}
+
+.inizio-colonna {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.prossimo {
+  border-left: 4px solid var(--oliva);
+}
+
+.prossimo.tono-urgente {
+  border-left-color: var(--terracotta);
+}
+
+.prossimo h2 {
+  margin: 0 0 6px;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--inchiostro-3);
+}
+
+.prossimo-testo {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+  line-height: 1.45;
+  color: var(--inchiostro);
+}
+
+.altre-cose {
+  margin-top: 14px;
+}
+
+.altre-cose summary {
+  cursor: pointer;
+  color: var(--inchiostro-2);
+  font-weight: 550;
+  min-height: 32px;
+}
+
+.altre-cose .cosa-fare {
+  margin-top: 8px;
+}
+
+.la-tesi .pannello-testa {
+  margin-bottom: 4px;
+}
+
+.la-tesi-titolo {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.la-tesi-domanda {
+  margin: 0;
+  color: var(--inchiostro-2);
+  line-height: 1.5;
+}
+
+.avanzamento-grande {
+  margin: 4px 0 10px;
+  color: var(--inchiostro-2);
+}
+
+.avanzamento-grande strong {
+  font-family: var(--serif);
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--oliva-scuro);
+  margin-right: 4px;
+}
+
+.barra-pagine {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--crema-2);
+  overflow: hidden;
+}
+
+.barra-riempita {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--oliva);
+  transition: width 0.4s ease;
+}
+
+.barra-obiettivo {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid var(--oro);
+  border-right: 2px solid var(--oro);
+  background: rgba(201, 164, 58, 0.18);
+}
+
+.avanzamento-capitoli {
+  list-style: none;
+  margin: 14px 0 6px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.avanzamento-capitoli li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.avanzamento-cap-titolo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avanzamento-cap-pagine {
+  color: var(--inchiostro-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.barra-piccola {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--crema-2);
+  overflow: hidden;
+}
+
+.barra-piccola span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--oro);
+}
+
+.barra-piccola span.raggiunto {
+  background: var(--oliva);
+}
+
+.percorso {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.tappa {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bordo);
+}
+
+.tappa:last-child {
+  border-bottom: 0;
+}
+
+.tappa-numero {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--bordo);
+  color: var(--inchiostro-3);
+  font-weight: 700;
+}
+
+.tappa-in_corso .tappa-numero {
+  border-color: var(--oro);
+  color: var(--inchiostro);
+  background: var(--oro-chiaro);
+}
+
+.tappa-fatto .tappa-numero {
+  border-color: var(--oliva);
+  background: var(--oliva);
+  color: var(--bianco);
+}
+
+.tappa-titolo,
+.tappa-cosa {
+  margin: 0;
+}
+
+.tappa-cosa {
+  color: var(--inchiostro-2);
+  font-size: 0.92rem;
+}
+
+.tappa-corpo .nota {
+  margin: 2px 0 0;
+}
+
+.tappa-stato {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--crema-2);
+  color: var(--inchiostro-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.tappa-fatto .tappa-stato {
+  background: var(--oliva-chiaro);
+  color: var(--oliva-scuro);
+}
+
+.studio-3d summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 32px;
+}
+
+.studio-3d .scena {
+  margin-top: 12px;
+  height: 420px;
+  min-height: 0;
+}
+
+/* Guida */
+.guida h2 {
+  margin-top: 0;
+  font-family: var(--serif);
+}
+
+.guida-idea {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+.guida-passi {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .inizio .guida-passi {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.guida-passi li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.guida-passi p {
+  margin: 2px 0 0;
+  color: var(--inchiostro-2);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.guida-numero {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--oliva);
+  color: var(--bianco);
+  font-weight: 700;
+}
+
+.guida-colori {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.92rem;
+}
+
+.guida-colori span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.guida-colori i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.pallino-verde {
+  background: var(--verde-ok);
+}
+
+.pallino-ambra {
+  background: var(--ambra);
+}
+
+.pallino-rosso {
+  background: var(--rosso);
+}
+
+.campi-obiettivo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.campi-obiettivo legend {
+  margin-bottom: 6px;
+}
+
+.campi-obiettivo .campo-blocco {
+  width: 120px;
+  margin: 0;
+}
+
+.campi-obiettivo .nota {
+  flex-basis: 100%;
+}
+
+/* ------------------------------------------------------------------ */
+/* Telefono: barra dei passi in basso                                 */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 700px) {
+  .testata {
+    padding: calc(6px + env(safe-area-inset-top)) 12px 6px;
+    /* Senza filtro la barra fissa in basso si aggancia allo schermo e non alla testata. */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--carta);
+  }
+  .marchio {
+    flex: 1 1 auto;
+  }
+  .navigazione {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    justify-content: space-around;
+    gap: 0;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    background: var(--carta);
+    border-top: 1px solid var(--bordo);
+    box-shadow: 0 -4px 16px rgba(60, 50, 20, 0.06);
+  }
+  .nav-voce {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 54px;
+    padding: 4px 2px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+  }
+  .nav-voce .icona-nav {
+    display: block;
+  }
+  .nav-numero {
+    display: none;
+  }
+  .nav-attiva,
+  .nav-attiva:hover {
+    background: var(--oliva-chiaro);
+    color: var(--oliva-scuro);
+  }
+  .contenuto {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  .testa-schermata h1 {
+    font-size: 1.25rem;
+  }
+  .sotto-schede {
+    width: 100%;
+  }
+  .sotto-voce {
+    flex: 1;
+    padding: 0 8px;
+  }
+  .avanzamento-capitoli li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .avanzamento-capitoli .barra-piccola {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .tappa {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .tappa > .bottone {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+.modo-ipad .sotto-voce,
+.modo-ipad .bottone-testata {
+  min-height: 44px;
+}
+
+/* iPad: anche le nuove parti dell'Inizio e della guida restano sopra i 15 px. */
+.modo-ipad .prossimo h2,
+.modo-ipad .guida-passi p,
+.modo-ipad .guida-colori,
+.modo-ipad .guida-colori strong,
+.modo-ipad .guida-colori span,
+.modo-ipad .avanzamento-capitoli li,
+.modo-ipad .tappa-cosa,
+.modo-ipad .tappa-stato,
+.modo-ipad .nav-numero {
+  font-size: 15px;
+}
+
+.modo-ipad .nav-numero {
+  width: 24px;
+  height: 24px;
+}
+
+.modo-ipad .marchio-segno {
+  width: 44px;
+  height: 44px;
 }

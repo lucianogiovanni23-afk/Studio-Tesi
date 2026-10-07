@@ -1,4 +1,4 @@
-import type { Capitolo, Preferenze, Progetto, Sezione, VoceGlossario } from '../types'
+import type { Capitolo, Preferenze, Progetto, Sezione, VoceGlossario, ObiettivoPagine } from '../types'
 import { DOMANDA_PREDEFINITA, GLOSSARIO_INIZIALE, INDICE_INIZIALE, TITOLO_PREDEFINITO } from './dominio'
 
 export function nuovoId(prefisso: string): string {
@@ -56,6 +56,7 @@ export function progettoIniziale(): Progetto {
     quadro: null,
     usi: [],
     budgetMensile: null,
+    obiettivo: { ...OBIETTIVO_PREDEFINITO },
     creatoIl: adesso(),
     salvatoSuFileIl: null,
   }
@@ -70,6 +71,9 @@ export const MODELLI_PREDEFINITI: Preferenze['modelli'] = {
   revisore: 'claude-sonnet-5-5',
   chat: 'claude-sonnet-5-5',
 }
+
+/** Tesi triennale di 50-60 pagine; in Word con Times 12 e interlinea 1,5 una pagina tiene circa 300 parole. */
+export const OBIETTIVO_PREDEFINITO: ObiettivoPagine = { pagineMin: 50, pagineMax: 60, parolePerPagina: 300 }
 
 export function preferenzeIniziali(): Preferenze {
   return { modelli: { ...MODELLI_PREDEFINITI }, modalitaScena: 'auto', modoUso: 'auto' }
@@ -97,6 +101,7 @@ export function normalizzaProgetto(p: Progetto): Progetto {
     controllo: p.controllo ?? null,
     chat: p.chat ?? [],
     budgetMensile: p.budgetMensile ?? null,
+    obiettivo: p.obiettivo ?? { ...OBIETTIVO_PREDEFINITO },
     capitoli: p.capitoli.map((c) => ({
       ...c,
       sezioni: c.sezioni.map((s) => ({ ...nuovaSezione(s.titolo), ...s, fontiConfermate: s.fontiConfermate ?? false })),

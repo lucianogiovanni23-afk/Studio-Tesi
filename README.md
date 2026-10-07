@@ -206,6 +206,23 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
   rivista: la prima pagina stampata arriva dai cataloghi e si può correggere nei dati della
   fonte; "Verifica le citazioni" ricalcola le pagine.
 
+## Interfaccia: un percorso in quattro passi
+
+- **Menu**: Inizio · 1 Corso · 2 Fonti · 3 Scrittura · 4 Revisione · Chiedi, con Guida e
+  Impostazioni a destra. Biblioteca e "Cerca nuove fonti" sono schede dentro *Fonti*; lezioni e
+  glossario sono schede dentro *Corso*. Ogni pagina si apre con il passo e una frase su a cosa serve.
+- **Inizio**: il *prossimo passo* in evidenza (le altre cose da fare sono raccolte sotto),
+  l'**avanzamento** verso le 50–60 pagine (300 parole a pagina: Word, Times 12, interlinea 1,5;
+  obiettivo e parole per pagina si cambiano in Impostazioni → Tesi) con l'obiettivo di ogni
+  capitolo in proporzione alle sue sezioni, l'indice, il titolo con la domanda, il **percorso**
+  con lo stato dei quattro passi, i numeri essenziali.
+- **Guida** al primo avvio dentro l'Inizio (passi, colori delle citazioni, modalità gratuita,
+  sincronizzazione), da riaprire in qualunque momento con il tasto *Guida*.
+- La **barra degli agenti** compare solo quando un agente lavora, aspetta, ha finito o ha un
+  errore. La **scena 3D** è facoltativa: si apre e si carica solo a richiesta, e sul telefono non c'è.
+- **Telefono**: i passi stanno in una barra in basso con le icone, Guida e Impostazioni in alto,
+  niente scorrimento orizzontale.
+
 ## Computer e iPad: una sola app con due modi
 
 Ho scelto **una sola app che si adatta**, con due modi rilevati in automatico e modificabili a mano:
@@ -309,6 +326,13 @@ npm run dev      # http://localhost:5173
 npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-Tesi/)
 npm run lint
 ```
+
+Il collaudo del riordino aggiunge 28 controlli: menu a percorso, barra degli agenti nascosta a
+riposo, scena caricata solo a richiesta, guida al primo avvio (chiusa resta chiusa, si riapre dal
+tasto, porta al passo 1), schede dentro Corso e Fonti, avanzamento in pagine con obiettivo per
+capitolo, obiettivo modificabile, percorso con stato e collegamenti, iPhone con la barra in basso
+e senza scorrimento orizzontale. I collaudi precedenti sono stati adeguati ai nuovi nomi del menu
+e passano tutti.
 
 Il collaudo della modalità gratuita aggiunge 32 controlli senza chiave e senza nessuna chiamata
 all'API: quadro teorico con una risposta senza JSON (spiegata), una in due pezzi con il blocco di

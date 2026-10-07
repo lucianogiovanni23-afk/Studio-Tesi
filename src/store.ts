@@ -39,6 +39,7 @@ import type {
   StileCitazione,
   VoceGlossario,
   VoceUso,
+  ObiettivoPagine,
 } from './types'
 
 export const CHIAVE_API_STORAGE = 'studio-tesi.anthropic-api-key'
@@ -188,6 +189,7 @@ export interface StatoStudio {
   registraUso: (v: Omit<VoceUso, 'id' | 'data'>) => void
   azzeraUsi: () => void
   setBudget: (dollari: number | null) => void
+  setObiettivo: (o: Partial<ObiettivoPagine>) => void
 
   // agenti e registro
   patchAgente: (k: AgentKey, patch: Partial<AgentRuntime>) => void
@@ -483,6 +485,7 @@ export const useStudio = create<StatoStudio>()(
         })),
       azzeraUsi: () => conProgetto(set, () => ({ usi: [] })),
       setBudget: (budgetMensile) => conProgetto(set, () => ({ budgetMensile })),
+      setObiettivo: (o) => conProgetto(set, (p) => ({ obiettivo: { ...p.obiettivo, ...o } })),
 
       patchAgente: (k, patch) => set((s) => ({ agenti: { ...s.agenti, [k]: { ...s.agenti[k], ...patch } } })),
       aggiungiLog: (kind, agente, messaggio) =>

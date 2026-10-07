@@ -5,6 +5,8 @@ import { AgentiBar } from './components/AgentiBar'
 import { ModalitaCarta } from './components/ModalitaCarta'
 import { PonteClaude } from './components/PonteClaude'
 import { useModoUso } from './hooks/useModoUso'
+import { BottoneGuida, GuidaFinestra } from './components/Guida'
+import { NavigazionePrincipale, TestaSchermata } from './components/Navigazione'
 import { avviaCopieAutomatiche } from './io/copie'
 import { avviaSincronizzazione } from './io/sincronizzazione'
 import { AvvisoSincronizzazione, ChipSincronizzazione } from './components/Sincronizzazione'
@@ -19,31 +21,6 @@ import { Ricerca } from './screens/Ricerca'
 import { Scrittura } from './screens/Scrittura'
 import { useStudio } from './store'
 import type { Schermata } from './types'
-
-const VOCI: { id: Schermata; nome: string }[] = [
-  { id: 'cruscotto', nome: 'Cruscotto' },
-  { id: 'scrittura', nome: 'Scrittura' },
-  { id: 'biblioteca', nome: 'Biblioteca' },
-  { id: 'ricerca', nome: 'Ricerca' },
-  { id: 'corso', nome: 'Corso' },
-  { id: 'revisione', nome: 'Revisione' },
-  { id: 'glossario', nome: 'Glossario' },
-  { id: 'chat', nome: 'Chat' },
-  { id: 'impostazioni', nome: 'Impostazioni' },
-]
-
-/** Su iPad vengono prima le schermate di lettura e decisione. */
-const ORDINE_IPAD: Schermata[] = [
-  'cruscotto',
-  'scrittura',
-  'biblioteca',
-  'revisione',
-  'chat',
-  'glossario',
-  'corso',
-  'ricerca',
-  'impostazioni',
-]
 
 /**
  * Il corpus del corso vive in IndexedDB, separato dal progetto: all'avvio si
@@ -112,51 +89,54 @@ export default function App() {
     window.scrollTo({ top: 0 })
   }, [schermata])
 
-  const voci = modo === 'ipad' ? ORDINE_IPAD.map((id) => VOCI.find((v) => v.id === id)!) : VOCI
-
   return (
-    <div className={`app modo-${modo}`}>
+    <div className={`app modo-${modo} schermata-${schermata}`}>
       <header className="testata">
-        <div className="marchio">
+        <button type="button" className="marchio" onClick={() => vai('cruscotto')} aria-label="Studio tesi: vai all'inizio">
           <span className="marchio-segno" aria-hidden>
             <svg viewBox="0 0 32 32" width="28" height="28">
               <ellipse cx="13" cy="17" rx="7" ry="10" fill="#6b7d2e" transform="rotate(-25 13 17)" />
               <ellipse cx="21" cy="14" rx="5" ry="8" fill="#c9a43a" transform="rotate(30 21 14)" />
             </svg>
           </span>
-          <div>
-            <p className="marchio-nome">Studio tesi</p>
-            <p className="marchio-titolo" title={titolo}>
+          <span className="marchio-testi">
+            <span className="marchio-nome">Studio tesi</span>
+            <span className="marchio-titolo" title={titolo}>
               {titolo}
-            </p>
-          </div>
+            </span>
+          </span>
+        </button>
+        <NavigazionePrincipale />
+        <div className="testata-azioni">
+          <ChipSincronizzazione onApri={() => vai('impostazioni')} />
+          <BottoneGuida />
+          <button
+            type="button"
+            className={`bottone-testata nav-voce ${schermata === 'impostazioni' ? 'nav-attiva' : ''}`}
+            aria-current={schermata === 'impostazioni' ? 'page' : undefined}
+            onClick={() => vai('impostazioni')}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="12" cy="12" r="3.2" />
+              <path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" />
+            </svg>
+            <span className="testata-etichetta">Impostazioni</span>
+          </button>
         </div>
-        <nav className="navigazione" aria-label="Schermate">
-          {voci.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              className={`nav-voce ${schermata === v.id ? 'nav-attiva' : ''}`}
-              aria-current={schermata === v.id ? 'page' : undefined}
-              onClick={() => vai(v.id)}
-            >
-              {v.nome}
-            </button>
-          ))}
-        </nav>
-        <ChipSincronizzazione onApri={() => vai('impostazioni')} />
       </header>
 
       <AvvisoSincronizzazione />
 
       <AgentiBar />
 
-      <div className="contenuto">
+      <main className="contenuto">
+        <TestaSchermata />
         <Schermo s={schermata} />
-      </div>
+      </main>
 
       <ModalitaCarta />
       <PonteClaude />
+      <GuidaFinestra />
     </div>
   )
 }

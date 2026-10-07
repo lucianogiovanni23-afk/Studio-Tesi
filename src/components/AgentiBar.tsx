@@ -10,15 +10,20 @@ const TESTO_STATO = {
   errore: 'errore',
 }
 
-/** Stato dei quattro agenti, visibile in ogni schermata; tocca per il ragionamento. */
+/**
+ * Stato degli agenti: compare solo quando qualcuno lavora, aspetta, ha finito
+ * o ha avuto un errore. Tocca un agente per il suo ragionamento.
+ */
 export function AgentiBar() {
   const agenti = useStudio((s) => s.agenti)
   const nuvoletta = useStudio((s) => s.nuvoletta)
   const apri = useStudio((s) => s.apriNuvoletta)
+  const attivi = AGENTI.filter((a) => agenti[a.key].status !== 'riposo')
+  if (attivi.length === 0) return null
 
   return (
-    <div className="agenti-bar">
-      {AGENTI.map((a) => {
+    <div className="agenti-bar" aria-label="Agenti al lavoro">
+      {attivi.map((a) => {
         const r = agenti[a.key]
         return (
           <div key={a.key} className="agenti-voce">

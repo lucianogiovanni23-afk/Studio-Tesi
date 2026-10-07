@@ -191,10 +191,29 @@ function Tesi() {
   const caso = useStudio((s) => s.progetto.casoAziendale)
   const setStile = useStudio((s) => s.setStileCitazione)
   const setCaso = useStudio((s) => s.setCaso)
+  const obiettivo = useStudio((s) => s.progetto.obiettivo)
+  const setObiettivo = useStudio((s) => s.setObiettivo)
+  const numero = (v: string, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(v) || min)))
 
   return (
     <section className="pannello">
       <h2>Tesi</h2>
+      <fieldset className="campi-obiettivo">
+        <legend className="etichetta">Lunghezza della tesi</legend>
+        <label className="campo-blocco">
+          <span className="etichetta">Pagine, da</span>
+          <input className="campo" type="number" inputMode="numeric" min={10} max={300} value={obiettivo.pagineMin} onChange={(e) => setObiettivo({ pagineMin: numero(e.target.value, 10, 300) })} />
+        </label>
+        <label className="campo-blocco">
+          <span className="etichetta">a</span>
+          <input className="campo" type="number" inputMode="numeric" min={10} max={300} value={obiettivo.pagineMax} onChange={(e) => setObiettivo({ pagineMax: Math.max(obiettivo.pagineMin, numero(e.target.value, 10, 300)) })} />
+        </label>
+        <label className="campo-blocco">
+          <span className="etichetta">Parole per pagina</span>
+          <input className="campo" type="number" inputMode="numeric" min={150} max={600} value={obiettivo.parolePerPagina} onChange={(e) => setObiettivo({ parolePerPagina: numero(e.target.value, 150, 600) })} />
+        </label>
+        <span className="nota">300 parole è una pagina Word in Times 12 con interlinea 1,5. Se il relatore chiede un altro formato, cambia il numero.</span>
+      </fieldset>
       <label className="campo-blocco">
         <span className="etichetta">Stile di citazione</span>
         <select className="campo" value={stile} onChange={(e) => setStile(e.target.value as StileCitazione)}>

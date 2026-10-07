@@ -366,6 +366,8 @@ export interface Progetto {
   usi: VoceUso[]
   /** Tetto di spesa mensile in dollari; null = nessun tetto. */
   budgetMensile: number | null
+  /** Lunghezza attesa della tesi, in pagine Word (Times 12, interlinea 1,5). */
+  obiettivo: ObiettivoPagine
   creatoIl: string
   salvatoSuFileIl: string | null
 }
@@ -378,6 +380,12 @@ export type ModalitaScena = 'auto' | 'completa' | 'ridotta' | 'spenta'
 export type ModoUso = 'auto' | 'computer' | 'ipad'
 
 export type ModelSlot = 'bibliotecario' | 'selezione' | 'lettore' | 'scrittore' | 'revisore' | 'chat'
+
+export interface ObiettivoPagine {
+  pagineMin: number
+  pagineMax: number
+  parolePerPagina: number
+}
 
 export interface Preferenze {
   modelli: Record<ModelSlot, string>

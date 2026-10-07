@@ -8,6 +8,8 @@ import { useLargo } from '../hooks/useLayoutMode'
 import { costoDelMese, paroleCapitolo, useStudio } from '../store'
 import type { StatoCapitolo } from '../types'
 import { useQualitaScena } from '../scene/qualita'
+import { GuidaIniziale } from '../components/Guida'
+import { avanzamento, percorso, type StatoPasso } from '../domain/avanzamento'
 
 // La scena 3D si carica a parte: con la modalità "spenta" non si scarica nemmeno.
 const Scene = lazy(() => import('../scene/Scene').then((m) => ({ default: m.Scene })))
@@ -19,16 +21,119 @@ function TitoloEDomanda() {
   const domanda = useStudio((s) => s.progetto.domanda)
   const setTitolo = useStudio((s) => s.setTitolo)
   const setDomanda = useStudio((s) => s.setDomanda)
+  const [modifica, setModifica] = useState(false)
   return (
-    <section className="pannello">
-      <label className="campo-blocco">
-        <span className="etichetta">Titolo</span>
-        <textarea className="campo campo-titolo" rows={2} value={titolo} onChange={(e) => setTitolo(e.target.value)} />
-      </label>
-      <label className="campo-blocco">
-        <span className="etichetta">Domanda di ricerca</span>
-        <textarea className="campo" rows={4} value={domanda} onChange={(e) => setDomanda(e.target.value)} />
-      </label>
+    <section className="pannello la-tesi">
+      <div className="pannello-testa">
+        <span className="etichetta">La tua tesi</span>
+        <button type="button" className="bottone bottone-vuoto bottone-piccolo" onClick={() => setModifica((m) => !m)}>
+          {modifica ? 'Fatto' : 'Modifica'}
+        </button>
+      </div>
+      {modifica ? (
+        <>
+          <label className="campo-blocco">
+            <span className="etichetta">Titolo</span>
+            <textarea className="campo campo-titolo" rows={2} value={titolo} onChange={(e) => setTitolo(e.target.value)} />
+          </label>
+          <label className="campo-blocco">
+            <span className="etichetta">Domanda di ricerca</span>
+            <textarea className="campo" rows={4} value={domanda} onChange={(e) => setDomanda(e.target.value)} />
+          </label>
+        </>
+      ) : (
+        <>
+          <h2 className="la-tesi-titolo">{titolo}</h2>
+          <p className="la-tesi-domanda">{domanda}</p>
+        </>
+      )}
+    </section>
+  )
+}
+
+const pagine = (n: number) => n.toLocaleString('it-IT', { maximumFractionDigits: 1 })
+
+/** Pagine scritte rispetto all'obiettivo (50-60 pagine), per tutta la tesi e per capitolo. */
+function Avanzamento() {
+  const progetto = useStudio((s) => s.progetto)
+  const a = useMemo(() => avanzamento(progetto), [progetto])
+  const fineScala = a.pagineMax * 1.1
+  return (
+    <section className="pannello avanzamento" aria-labelledby="titolo-avanzamento">
+      <div className="pannello-testa">
+        <h2 id="titolo-avanzamento">Avanzamento</h2>
+        <span className="nota">obiettivo {a.pagineMin}–{a.pagineMax} pagine</span>
+      </div>
+      <p className="avanzamento-grande">
+        <strong>{pagine(a.pagine)}</strong> {a.pagine === 1 ? 'pagina' : 'pagine'} scritte
+      </p>
+      <div
+        className="barra-pagine"
+        role="meter"
+        aria-label="Pagine scritte"
+        aria-valuemin={0}
+        aria-valuemax={a.pagineMax}
+        aria-valuenow={a.pagine}
+      >
+        <span className="barra-riempita" style={{ width: `${Math.min(100, (a.pagine / fineScala) * 100)}%` }} />
+        <span className="barra-obiettivo" style={{ left: `${(a.pagineMin / fineScala) * 100}%`, width: `${((a.pagineMax - a.pagineMin) / fineScala) * 100}%` }} />
+      </div>
+      <p className="nota">
+        {a.parole.toLocaleString('it-IT')} parole ·{' '}
+        {a.mancano > 0
+          ? `ne mancano circa ${a.mancano} pagine per arrivare a ${a.pagineMin}`
+          : a.pagine > a.pagineMax
+            ? `oltre le ${a.pagineMax} pagine: valuta dove sintetizzare`
+            : 'sei dentro l\'obiettivo'}
+      </p>
+      <ul className="avanzamento-capitoli">
+        {a.capitoli.map((c) => (
+          <li key={c.id}>
+            <span className="avanzamento-cap-titolo">
+              {c.numero}. {c.titolo}
+            </span>
+            <span className="barra-piccola" aria-hidden>
+              <span style={{ width: `${Math.min(100, (c.pagine / c.obiettivoMax) * 100)}%` }} className={c.pagine >= c.obiettivoMin ? 'raggiunto' : ''} />
+            </span>
+            <span className="avanzamento-cap-pagine">
+              {pagine(c.pagine)} / {c.obiettivoMin}–{c.obiettivoMax} pp.
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="nota">Una pagina è circa {progetto.obiettivo.parolePerPagina} parole (Word, Times 12, interlinea 1,5). L'obiettivo si cambia nelle Impostazioni.</p>
+    </section>
+  )
+}
+
+const ETICHETTA_PASSO: Record<StatoPasso, string> = { da_iniziare: 'da iniziare', in_corso: 'in corso', fatto: 'fatto' }
+
+function Percorso() {
+  const progetto = useStudio((s) => s.progetto)
+  const vai = useStudio((s) => s.vai)
+  const passi = useMemo(() => percorso(progetto), [progetto])
+  return (
+    <section className="pannello" aria-labelledby="titolo-percorso">
+      <h2 id="titolo-percorso">Il percorso</h2>
+      <ol className="percorso">
+        {passi.map((p) => (
+          <li key={p.id} className={`tappa tappa-${p.stato}`}>
+            <span className="tappa-numero" aria-hidden>
+              {p.stato === 'fatto' ? '✓' : p.numero}
+            </span>
+            <div className="tappa-corpo">
+              <p className="tappa-titolo">
+                <strong>{p.titolo}</strong> <span className="tappa-stato">{ETICHETTA_PASSO[p.stato]}</span>
+              </p>
+              <p className="tappa-cosa">{p.cosa}</p>
+              <p className="nota">{p.riassunto}</p>
+            </div>
+            <button type="button" className="bottone bottone-piccolo" onClick={() => vai(p.vai)} aria-label={`${p.titolo}: ${p.azione}`}>
+              {p.azione}
+            </button>
+          </li>
+        ))}
+      </ol>
     </section>
   )
 }
@@ -107,32 +212,43 @@ function Indice() {
   )
 }
 
-function CosaFare() {
+function ProssimoPasso() {
   const progetto = useStudio((s) => s.progetto)
   const haChiave = useStudio((s) => s.apiKey.length > 0)
   const vai = useStudio((s) => s.vai)
-  const voci = useMemo(() => suggerimenti(progetto, haChiave), [progetto, haChiave])
+  const voci = useMemo(() => {
+    // La nota sulla modalità gratuita è un'informazione, non un'urgenza: va in fondo.
+    const tutte = suggerimenti(progetto, haChiave)
+    return [...tutte.filter((v) => v.tono !== 'info'), ...tutte.filter((v) => v.tono === 'info')]
+  }, [progetto, haChiave])
+  const [prima, ...altre] = voci
+  const esegui = (v: (typeof voci)[number]) => {
+    if (v.vai === 'cruscotto') document.getElementById('indice')?.scrollIntoView({ behavior: 'smooth' })
+    else vai(v.vai)
+  }
 
   return (
-    <section className="pannello">
-      <h2>Cosa fare adesso</h2>
-      <ul className="cosa-fare">
-        {voci.map((v) => (
-          <li key={v.id} className={`tono-${v.tono}`}>
-            <span>{v.testo}</span>
-            <button
-              type="button"
-              className="bottone bottone-piccolo"
-              onClick={() => {
-                if (v.vai === 'cruscotto') document.getElementById('indice')?.scrollIntoView({ behavior: 'smooth' })
-                else vai(v.vai)
-              }}
-            >
-              {v.etichetta}
-            </button>
-          </li>
-        ))}
-      </ul>
+    <section className={`pannello prossimo tono-${prima.tono}`} aria-labelledby="titolo-prossimo">
+      <h2 id="titolo-prossimo">Prossimo passo</h2>
+      <p className="prossimo-testo">{prima.testo}</p>
+      <button type="button" className="bottone bottone-primario" onClick={() => esegui(prima)}>
+        {prima.etichetta}
+      </button>
+      {altre.length > 0 && (
+        <details className="altre-cose">
+          <summary>Altre cose da fare ({altre.length})</summary>
+          <ul className="cosa-fare">
+            {altre.map((v) => (
+              <li key={v.id} className={`tono-${v.tono}`}>
+                <span>{v.testo}</span>
+                <button type="button" className="bottone bottone-piccolo" onClick={() => esegui(v)}>
+                  {v.etichetta}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </section>
   )
 }
@@ -140,63 +256,62 @@ function CosaFare() {
 function Numeri() {
   const fonti = useStudio((s) => s.progetto.fonti.length)
   const usi = useStudio((s) => s.progetto.usi)
-  const capitoli = useStudio((s) => s.progetto.capitoli)
   const fileCorso = useStudio((s) => s.progetto.courseFiles.length)
+  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const mese = useMemo(() => costoDelMese(usi), [usi])
-  const parole = useMemo(() => capitoli.reduce((n, c) => n + paroleCapitolo(c), 0), [capitoli])
-  const perStato = useMemo(
-    () => Object.fromEntries(STATI.map((s) => [s, capitoli.filter((c) => c.stato === s).length])) as Record<StatoCapitolo, number>,
-    [capitoli],
-  )
 
   return (
-    <section className="pannello numeri">
+    <div className="numeri">
       <div>
         <strong>{fonti}</strong>
         <span>fonti in biblioteca</span>
       </div>
       <div>
-        <strong>{formattaDollari(mese)}</strong>
-        <span>costi di questo mese</span>
-      </div>
-      <div>
-        <strong>{parole.toLocaleString('it-IT')}</strong>
-        <span>parole scritte</span>
-      </div>
-      <div>
         <strong>{fileCorso}</strong>
         <span>file del corso</span>
       </div>
-      <p className="legenda-stati">
-        {STATI.map((s) => (
-          <span key={s} className={`stato-cap-${s}`}>
-            <i /> {ETICHETTA_STATO[s]}: {perStato[s]}
-          </span>
-        ))}
-      </p>
-    </section>
+      <div>
+        <strong>{haChiave || mese > 0 ? formattaDollari(mese) : 'gratis'}</strong>
+        <span>{haChiave || mese > 0 ? 'spesi questo mese' : 'modalità senza chiave'}</span>
+      </div>
+    </div>
+  )
+}
+
+/** La scena 3D degli agenti: facoltativa, si apre a richiesta e solo su schermi ampi. */
+function Studio3D() {
+  const qualita = useQualitaScena()
+  const [aperto, setAperto] = useState(false)
+  if (qualita === 'spenta') return null
+  return (
+    <details className="pannello studio-3d" onToggle={(e) => setAperto((e.target as HTMLDetailsElement).open)}>
+      <summary>Lo studio degli agenti (3D)</summary>
+      {aperto && (
+        <Suspense fallback={<div className="scena scena-carico">Preparo lo studio…</div>}>
+          <Scene qualita={qualita} />
+        </Suspense>
+      )}
+    </details>
   )
 }
 
 export function Cruscotto() {
-  const qualita = useQualitaScena()
-  const largo = useLargo(1180)
-
-  const scena =
-    qualita === 'spenta' ? null : (
-      <Suspense fallback={<div className="scena scena-carico">Preparo lo studio…</div>}>
-        <Scene qualita={qualita} />
-      </Suspense>
-    )
+  const largo = useLargo(1000)
+  const telefono = !useLargo(700)
 
   return (
-    <div className={`cruscotto ${largo ? 'cruscotto-largo' : ''}`}>
-      {scena && <div className="cruscotto-scena">{scena}</div>}
-      <div className="cruscotto-pannelli">
-        <TitoloEDomanda />
-        <CosaFare />
-        <Numeri />
+    <div className={`inizio ${largo ? 'inizio-largo' : ''}`}>
+      <GuidaIniziale />
+      <div className="inizio-colonna">
+        <ProssimoPasso />
+        <Avanzamento />
         <Indice />
+      </div>
+      <div className="inizio-colonna">
+        <TitoloEDomanda />
+        <Percorso />
+        <Numeri />
+        {!telefono && <Studio3D />}
       </div>
     </div>
   )
