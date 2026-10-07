@@ -9,6 +9,13 @@ import type { Schermata } from '../types'
  */
 
 const ICONE: Record<string, ReactNode> = {
+  ufficio: (
+    <>
+      <circle cx="8" cy="8" r="3" />
+      <circle cx="16.5" cy="8" r="3" />
+      <path d="M2.5 20c.6-4 3-6 5.5-6s4.9 2 5.5 6M11.6 15.2c1.2-1 2.9-1.4 4.9-1.2 2.5.3 4.4 2.2 4.9 6" />
+    </>
+  ),
   inizio: <path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-4.5v-5.5h-5V21H5a1 1 0 0 1-1-1z" />,
   corso: <path d="M4 6.5C6.5 5 9.5 5 12 6.5 14.5 5 17.5 5 20 6.5V19c-2.5-1.5-5.5-1.5-8 0-2.5-1.5-5.5-1.5-8 0zM12 6.5V19" />,
   fonti: <path d="M5 4h4v16H5zM10.5 4h4v16h-4zM16 5.2l3.8-1 3.2 15.5-3.8.8z" transform="translate(-1 0)" />,
@@ -33,12 +40,12 @@ interface Voce {
 }
 
 const VOCI: Voce[] = [
-  { id: 'inizio', nome: 'Inizio', schermate: ['cruscotto'] },
+  { id: 'ufficio', nome: 'Ufficio', schermate: ['ufficio', 'chat'] },
+  { id: 'inizio', nome: 'Panoramica', schermate: ['cruscotto'] },
   { id: 'corso', nome: 'Corso', numero: 1, schermate: ['corso', 'glossario'] },
   { id: 'fonti', nome: 'Fonti', numero: 2, schermate: ['biblioteca', 'ricerca', 'copertura'] },
   { id: 'scrittura', nome: 'Scrittura', numero: 3, schermate: ['scrittura'] },
   { id: 'revisione', nome: 'Revisione', numero: 4, schermate: ['revisione'] },
-  { id: 'chat', nome: 'Chiedi', schermate: ['chat'] },
 ]
 
 export function NavigazionePrincipale() {
@@ -96,6 +103,7 @@ const SCHEDE: Partial<Record<Schermata, { id: Schermata; nome: string }[]>> = {
 
 const INTRO: Record<Schermata, { titolo: string; frase: string } | null> = {
   cruscotto: null,
+  ufficio: null,
   corso: { titolo: '1 · Corso', frase: "Carica le lezioni: l'app ne ricava i concetti e il lessico da usare in tutta la tesi." },
   glossario: { titolo: '1 · Corso', frase: 'I termini tecnici come li usa il corso: lo Scrittore è obbligato a usarli.' },
   biblioteca: { titolo: '2 · Fonti', frase: 'Le fonti raccolte: leggile con le schede e scegli quali usare in ogni sezione.' },

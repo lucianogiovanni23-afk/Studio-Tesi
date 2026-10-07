@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { formattaDollari } from '../agents/costs'
 import { Conferma } from '../components/Conferma'
 import { IndiceEditor } from '../components/IndiceEditor'
@@ -7,12 +7,9 @@ import { suggerimenti } from '../domain/suggerimenti'
 import { useLargo } from '../hooks/useLayoutMode'
 import { costoDelMese, paroleCapitolo, useStudio } from '../store'
 import type { StatoCapitolo } from '../types'
-import { useQualitaScena } from '../scene/qualita'
 import { GuidaIniziale } from '../components/Guida'
 import { avanzamento, percorso, type StatoPasso } from '../domain/avanzamento'
 
-// La scena 3D si carica a parte: con la modalità "spenta" non si scarica nemmeno.
-const Scene = lazy(() => import('../scene/Scene').then((m) => ({ default: m.Scene })))
 
 const STATI: StatoCapitolo[] = ['da_fare', 'bozza', 'rivisto', 'approvato']
 
@@ -278,26 +275,8 @@ function Numeri() {
   )
 }
 
-/** La scena 3D degli agenti: facoltativa, si apre a richiesta e solo su schermi ampi. */
-function Studio3D() {
-  const qualita = useQualitaScena()
-  const [aperto, setAperto] = useState(false)
-  if (qualita === 'spenta') return null
-  return (
-    <details className="pannello studio-3d" onToggle={(e) => setAperto((e.target as HTMLDetailsElement).open)}>
-      <summary>Lo studio degli agenti (3D)</summary>
-      {aperto && (
-        <Suspense fallback={<div className="scena scena-carico">Preparo lo studio…</div>}>
-          <Scene qualita={qualita} />
-        </Suspense>
-      )}
-    </details>
-  )
-}
-
 export function Cruscotto() {
   const largo = useLargo(1000)
-  const telefono = !useLargo(700)
 
   return (
     <div className={`inizio ${largo ? 'inizio-largo' : ''}`}>
@@ -311,7 +290,6 @@ export function Cruscotto() {
         <TitoloEDomanda />
         <Percorso />
         <Numeri />
-        {!telefono && <Studio3D />}
       </div>
     </div>
   )

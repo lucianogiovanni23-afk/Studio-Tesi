@@ -11,38 +11,35 @@ import { segnaGuidaVista, useGuida } from './guidaStato'
 const PASSI: { numero: string; titolo: string; testo: string; vai?: Schermata }[] = [
   {
     numero: '1',
-    titolo: 'Corso',
-    testo: "Carica i PDF delle lezioni. L'app ne ricava i concetti (il quadro teorico) e il lessico che la tesi dovrà usare.",
-    vai: 'corso',
+    titolo: 'Corso · Giulia Romano',
+    testo: "Le dai i PDF delle lezioni: ne ricava il quadro teorico e il lessico che la tesi dovrà usare.",
   },
   {
     numero: '2',
-    titolo: 'Fonti',
-    testo: 'Cerca articoli nei cataloghi o aggiungi i tuoi PDF, poi prepara le schede di lettura (anche molte insieme).',
-    vai: 'biblioteca',
+    titolo: 'Fonti · Marco Ferrara',
+    testo: 'Gli dici su cosa cercare: consulta i cataloghi, tu approvi i risultati, lui prepara le schede di lettura.',
   },
   {
     numero: '3',
-    titolo: 'Scrittura',
-    testo: 'Una sezione alla volta: scegli le fonti, approva la scaletta, poi chiedi una bozza o scrivi tu. Ogni citazione è controllata sul testo della fonte.',
-    vai: 'scrittura',
+    titolo: 'Scrittura · Luca Esposito',
+    testo: 'Una sezione alla volta: scegliete le fonti, approvi la scaletta, lui scrive la bozza con citazioni verificate.',
   },
   {
     numero: '4',
-    titolo: 'Revisione',
-    testo: 'Incolla le osservazioni del relatore, fai controllare tutta la tesi, esporta in Word con la bibliografia.',
-    vai: 'revisione',
+    titolo: 'Revisione · Elena Conti',
+    testo: 'Le incolli le osservazioni del relatore, controlla tutta la tesi e prepara il file Word.',
   },
 ]
 
 function Contenuto({ chiudi }: { chiudi: () => void }) {
-  const vai = useStudio((s) => s.vai)
+  const scegliAgente = useStudio((s) => s.scegliAgente)
   const gratuita = useStudio((s) => !s.apiKey.trim())
   return (
     <>
       <p className="guida-idea">
-        Quattro assistenti ti aiutano a cercare fonti, scrivere e rivedere. <strong>Decidi sempre tu</strong>: niente entra
-        nella tesi senza la tua approvazione, e ogni citazione viene controllata sul testo della fonte.
+        Nell'<strong>Ufficio</strong> lavori con quattro persone: tocca una di loro e parlale. Ognuna ti dice che cosa
+        fare, e tu rispondi con un tocco o scrivendo. <strong>Decidi sempre tu</strong>: niente entra nella tesi senza la
+        tua approvazione, e ogni citazione viene controllata sul testo della fonte.
       </p>
       <ol className="guida-passi">
         {PASSI.map((p) => (
@@ -84,10 +81,10 @@ function Contenuto({ chiudi }: { chiudi: () => void }) {
           className="bottone"
           onClick={() => {
             chiudi()
-            vai('corso')
+            scegliAgente('lettore')
           }}
         >
-          Comincia dal corso
+          Comincia da Giulia
         </button>
       </div>
     </>

@@ -40,6 +40,7 @@ import type {
   VoceGlossario,
   VoceUso,
   ObiettivoPagine,
+  Battuta,
 } from './types'
 
 export const CHIAVE_API_STORAGE = 'studio-tesi.anthropic-api-key'
@@ -108,6 +109,12 @@ export interface StatoStudio {
   /** Domanda da proporre nella pagina di ricerca, per esempio dalla mappa di copertura. */
   domandaProposta: string
   concentrazione: boolean
+  /** L'agente con cui stai parlando nell'ufficio. */
+  agenteUfficio: AgentKey
+  /** Fino a quando (ms) l'agente scelto "parla" nella scena. */
+  parlaFino: number
+  /** Cresce a ogni scelta di una persona: la telecamera la raggiunge anche se era già scelta. */
+  inquadratura: number
   nuvoletta: AgentKey | null
   agenti: Record<AgentKey, AgentRuntime>
   log: LogEntry[]
@@ -125,6 +132,11 @@ export interface StatoStudio {
   apriFonte: (id: string | null) => void
   proponiRicerca: (domanda: string) => void
   setConcentrazione: (v: boolean) => void
+  scegliAgente: (k: AgentKey) => void
+  aggiungiBattuta: (k: AgentKey, b: Omit<Battuta, 'id' | 'data'>) => string
+  aggiornaBattuta: (k: AgentKey, id: string, testo: string) => void
+  svuotaConversazione: (k: AgentKey) => void
+  faiParlare: (ms: number) => void
   apriNuvoletta: (k: AgentKey | null) => void
 
   // progetto
@@ -250,13 +262,16 @@ export const useStudio = create<StatoStudio>()(
       preferenze: preferenzeIniziali(),
       apiKey: leggiChiave(),
 
-      schermata: 'cruscotto',
+      schermata: 'ufficio',
       capitoloAperto: null,
       sezioneAperta: null,
       cartaAperta: false,
       fonteAperta: null,
       domandaProposta: '',
       concentrazione: false,
+      agenteUfficio: 'lettore',
+      parlaFino: 0,
+      inquadratura: 0,
       nuvoletta: null,
       agenti: agentiVuoti(),
       log: [],
@@ -277,6 +292,17 @@ export const useStudio = create<StatoStudio>()(
       apriFonte: (fonteAperta) => set(() => ({ fonteAperta, ...(fonteAperta ? { schermata: 'biblioteca' as const } : {}) })),
       proponiRicerca: (domandaProposta) => set(() => ({ domandaProposta, schermata: 'ricerca' })),
       setConcentrazione: (concentrazione) => set(() => ({ concentrazione })),
+      scegliAgente: (agenteUfficio) => set((s) => ({ agenteUfficio, schermata: 'ufficio', inquadratura: s.inquadratura + 1 })),
+      faiParlare: (ms) => set(() => ({ parlaFino: Date.now() + ms })),
+      aggiungiBattuta: (k, b) => {
+        const id = nuovoId('battuta')
+        // Si tengono le ultime 120 battute per persona: bastano per il filo del discorso.
+        conProgetto(set, (p) => ({ conversazioni: { ...p.conversazioni, [k]: [...(p.conversazioni[k] ?? []), { ...b, id, data: adesso() }].slice(-120) } }))
+        return id
+      },
+      aggiornaBattuta: (k, id, testo) =>
+        conProgetto(set, (p) => ({ conversazioni: { ...p.conversazioni, [k]: (p.conversazioni[k] ?? []).map((b) => (b.id === id ? { ...b, testo } : b)) } })),
+      svuotaConversazione: (k) => conProgetto(set, (p) => ({ conversazioni: { ...p.conversazioni, [k]: [] } })),
       apriNuvoletta: (nuvoletta) => set(() => ({ nuvoletta })),
 
       setTitolo: (titolo) => conProgetto(set, () => ({ titolo })),
@@ -521,7 +547,7 @@ export const useStudio = create<StatoStudio>()(
         }),
 
       sostituisciProgetto: (progetto) =>
-        set(() => ({ progetto, capitoloAperto: null, sezioneAperta: null, schermata: 'cruscotto', agenti: agentiVuoti() })),
+        set(() => ({ progetto, capitoloAperto: null, sezioneAperta: null, schermata: 'ufficio', agenti: agentiVuoti() })),
       segnaSalvatoSuFile: () => conProgetto(set, () => ({ salvatoSuFileIl: adesso() })),
     }),
     {

@@ -212,7 +212,7 @@ function CartaCandidato({ c }: { c: Candidato }) {
   )
 }
 
-function InAttesa() {
+export function InAttesa() {
   const inAttesa = useStudio((s) => s.progetto.inAttesa)
   const decidi = useStudio((s) => s.decidiCandidato)
   const [filtro, setFiltro] = useState<'consigliati' | 'tutti'>('tutti')

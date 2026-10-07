@@ -1,40 +1,43 @@
 import type { AgentKey } from '../types'
 
-/** Posizioni nella scena, in metri. La telecamera guarda lo studio dal davanti. */
-export const CAMERA_CASA: [number, number, number] = [0, 5.4, 13]
-export const CAMERA_BERSAGLIO: [number, number, number] = [0, 1.6, -2]
+/**
+ * Un'unica sala open space, in metri. All'avvio la telecamera la mostra
+ * tutta, da lontano; quando lavori con una persona si avvicina a lei.
+ */
+export const CAMERA_CASA: [number, number, number] = [0, 3.2, 10.3]
+export const CAMERA_BERSAGLIO: [number, number, number] = [0, 1.6, -2.6]
 
 export interface Postazione {
   /** Centro della scrivania. */
   scrivania: [number, number]
+  /** Rotazione della scrivania verso il centro della sala. */
+  rotazione: number
 }
 
 export const POSTAZIONI: Record<AgentKey, Postazione> = {
-  bibliotecario: { scrivania: [-5.5, -1.0] },
-  lettore: { scrivania: [-2.2, -2.3] },
-  scrittore: { scrivania: [2.2, -2.3] },
-  revisore: { scrivania: [6.2, -1.2] },
+  lettore: { scrivania: [-4.5, -1.3], rotazione: 0.3 },
+  bibliotecario: { scrivania: [-1.5, -2.1], rotazione: 0.09 },
+  scrittore: { scrivania: [1.5, -2.1], rotazione: -0.09 },
+  revisore: { scrivania: [4.5, -1.3], rotazione: -0.3 },
 }
 
-export const SCAFFALE: [number, number] = [-7.9, -4.3]
-export const TAVOLO_CAPITOLI: [number, number] = [0, 2.1]
+/** Dove sta la persona rispetto alla sua scrivania (dietro, rivolta alla sala). */
+export const DIETRO_SCRIVANIA = -0.72
 
 export const COLORI = {
-  rovere: '#dcc6a1',
-  rovereScuro: '#b99a6c',
-  crema: '#f6f0e1',
-  bianco: '#fbfaf6',
-  oliva: '#6b7d2e',
-  olivaChiaro: '#93a35a',
-  oro: '#c9a43a',
-  cielo: '#8fc3e6',
-  terra: '#a9ad74',
-  tronco: '#76664f',
+  pavimento: '#d9d4cc',
+  parete: '#f3f2ee',
+  piano: '#f5f4f1',
+  rovere: '#c9a57a',
+  nero: '#1d1f22',
+  oliva: '#5f7128',
+  olivaScuro: '#3f4d1b',
+  tessuto: '#8d918b',
 }
 
 export const COLORE_STATO = {
-  da_fare: '#d8d2c2',
+  da_fare: '#cfcac0',
   bozza: '#d8b24a',
   rivisto: '#6fa8d6',
-  approvato: '#6b8a2e',
+  approvato: '#7d9a37',
 } as const

@@ -259,6 +259,15 @@ export interface ControlloTesi {
   scartati: number
 }
 
+/** Una battuta nella conversazione con un agente dell'ufficio. */
+export interface Battuta {
+  id: string
+  da: 'agente' | 'studente'
+  testo: string
+  data: string
+  tono?: 'ok' | 'errore'
+}
+
 export interface MessaggioChat {
   id: string
   ruolo: 'studente' | 'assistente'
@@ -361,6 +370,8 @@ export interface Progetto {
   osservazioni: Osservazione[]
   controllo: ControlloTesi | null
   chat: MessaggioChat[]
+  /** Le conversazioni nell'ufficio, una per persona. */
+  conversazioni: Partial<Record<AgentKey, Battuta[]>>
   courseFiles: CourseFile[]
   quadro: QuadroTeorico | null
   usi: VoceUso[]
@@ -397,6 +408,7 @@ export interface Preferenze {
 export type Tema = 'auto' | 'chiaro' | 'scuro'
 
 export type Schermata =
+  | 'ufficio'
   | 'cruscotto'
   | 'biblioteca'
   | 'ricerca'

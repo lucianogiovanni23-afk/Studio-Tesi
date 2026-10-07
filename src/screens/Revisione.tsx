@@ -77,7 +77,7 @@ function CartaProposta({ o, p }: { o: Osservazione; p: PropostaRevisione }) {
   )
 }
 
-function CartaOsservazione({ o }: { o: Osservazione }) {
+export function CartaOsservazione({ o }: { o: Osservazione }) {
   const aggiorna = useStudio((s) => s.aggiornaOsservazione)
   const rimuovi = useStudio((s) => s.rimuoviOsservazione)
   const etichetta = useEtichettaSezione()

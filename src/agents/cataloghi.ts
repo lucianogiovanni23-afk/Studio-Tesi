@@ -64,7 +64,9 @@ async function leggiJson(catalogo: Catalogo, url: string, signal?: AbortSignal):
       catalogo,
       scaduto
         ? 'non ha risposto entro 20 secondi'
-        : 'non raggiungibile dal browser (rete, blocco CORS o estensione del browser)',
+        : catalogo === 'semanticscholar'
+          ? 'non risponde dal browser (spesso limita le richieste senza chiave): gli altri cataloghi bastano'
+          : 'non raggiungibile dal browser (rete, blocco CORS o estensione del browser)',
     )
   }
   if (risposta.status === 429) throw new ErroreCatalogo(catalogo, 'troppe richieste (429): riprova fra qualche minuto')
@@ -182,10 +184,21 @@ function daCrossref(it: CrossrefItem): RisultatoCatalogo {
   }
 }
 
+/** Diventa vero se Crossref ha rifiutato una volta l'elenco dei campi: da lì si chiede il record completo. */
+let crossrefSenzaCampi = false
+
 export async function cercaCrossref(q: string, quanti: number, signal?: AbortSignal): Promise<RisultatoCatalogo[]> {
   const campi = 'DOI,title,author,issued,container-title,abstract,language,URL,is-referenced-by-count,page'
   const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=${quanti}&select=${campi}`
-  const dati = (await leggiJson('crossref', url, signal)) as { message?: { items?: CrossrefItem[] } }
+  let dati: { message?: { items?: CrossrefItem[] } }
+  try {
+    dati = (await leggiJson('crossref', crossrefSenzaCampi ? url.replace(/&select=[^&]*/, '') : url, signal)) as typeof dati
+  } catch (err) {
+    // Se Crossref rifiuta l'elenco dei campi (400), si chiede il record completo: pesa di più ma funziona.
+    if (crossrefSenzaCampi || !(err instanceof ErroreCatalogo) || !err.message.includes('400')) throw err
+    crossrefSenzaCampi = true
+    dati = (await leggiJson('crossref', url.replace(/&select=[^&]*/, ''), signal)) as typeof dati
+  }
   return (dati.message?.items ?? []).map(daCrossref)
 }
 

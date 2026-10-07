@@ -1,90 +1,24 @@
 import { costoStimato, modalitaGratuita } from '../agents/api'
 import { useMemo, useRef, useState } from 'react'
-import {
-  aggiungiAlCorpus,
-  collocazione,
-  estraiPdf,
-  pagineDaTesto,
-  cercaPassaggi,
-  rimuoviDalCorpus,
-  suddividi,
-} from '../agents/corpus'
+import { collocazione, cercaPassaggi, rimuoviDalCorpus } from '../agents/corpus'
 import { annullaQuadro, generaQuadro, stimaQuadro } from '../agents/lettoreCorso'
 import { ricavaLessico, stimaLessico } from '../agents/lessico'
-import { logAvviso, logOk } from '../agents/supervisor'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
-import { nuovoId } from '../domain/progettoIniziale'
+import { ACCETTA_CORSO as ACCETTA, caricaFileCorso } from '../io/fileCorso'
 import { estrazioneInCorso, quadroObsoleto, useStudio } from '../store'
 import type { CourseFile, Passaggio } from '../types'
 
-const ACCETTA = '.pdf,.txt,.md,application/pdf,text/plain,text/markdown'
 
 function formatta(byte: number): string {
   if (byte < 1024 * 1024) return `${Math.max(1, Math.round(byte / 1024))} KB`
   return `${(byte / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function tipo(file: File): CourseFile['kind'] | null {
-  const nome = file.name.toLowerCase()
-  if (nome.endsWith('.pdf') || file.type === 'application/pdf') return 'pdf'
-  if (nome.endsWith('.txt') || nome.endsWith('.md') || file.type.startsWith('text/')) return 'testo'
-  return null
-}
-
 function avanzamento(f: CourseFile): number {
   if (f.status === 'pronto' || f.status === 'errore') return 100
   if (f.status === 'lettura') return Math.round(f.progress / 2)
   return 50 + Math.round(((f.paginaCorrente ?? 0) / Math.max(1, f.pagine ?? 1)) * 50)
-}
-
-/** Estrae il testo dei file uno alla volta: su iPad la memoria è poca. */
-async function leggiFile(lista: FileList, suScartati: (nomi: string[]) => void) {
-  const st = useStudio.getState
-  const scartati: string[] = []
-  const coda: { file: File; kind: CourseFile['kind']; id: string }[] = []
-  for (const file of Array.from(lista)) {
-    const kind = tipo(file)
-    if (!kind) {
-      scartati.push(file.name)
-      continue
-    }
-    const id = nuovoId('corso')
-    coda.push({ file, kind, id })
-    st().aggiungiCourseFile({ id, name: file.name, size: file.size, kind, progress: 0, status: 'lettura' })
-  }
-  suScartati(scartati)
-
-  for (const voce of coda) {
-    const aggiorna = (patch: Partial<CourseFile>) => st().aggiornaCourseFile(voce.id, patch)
-    try {
-      let pagine: string[]
-      if (voce.kind === 'pdf') {
-        const buffer = await voce.file.arrayBuffer()
-        aggiorna({ progress: 100, status: 'estrazione' })
-        const esito = await estraiPdf(buffer, (corrente, totale) => aggiorna({ paginaCorrente: corrente, pagine: totale }))
-        if (esito.scansionato) {
-          throw new Error(
-            'Il PDF non ha testo selezionabile (è una scansione). Esportalo con il riconoscimento del testo (OCR) e ricaricalo.',
-          )
-        }
-        pagine = esito.pagine
-      } else {
-        const testo = await voce.file.text()
-        if (!testo.trim()) throw new Error('File di testo vuoto.')
-        pagine = pagineDaTesto(testo)
-      }
-      const passaggi = suddividi(voce.id, voce.file.name, pagine)
-      if (passaggi.length === 0) throw new Error('Nessun testo leggibile nel file.')
-      await aggiungiAlCorpus(voce.id, passaggi)
-      aggiorna({ status: 'pronto', progress: 100, pagine: pagine.length, paginaCorrente: pagine.length, passaggi: passaggi.length })
-      logOk(null, `Materiale del corso: "${voce.file.name}" letto — ${pagine.length} pagine, ${passaggi.length} passaggi.`)
-    } catch (err) {
-      const messaggio = err instanceof Error ? err.message : 'Lettura non riuscita.'
-      aggiorna({ status: 'errore', progress: 100, errore: messaggio })
-      logAvviso(null, `Materiale del corso: "${voce.file.name}" — ${messaggio}`)
-    }
-  }
 }
 
 function Caricamento() {
@@ -114,7 +48,7 @@ function Caricamento() {
         onDrop={(e) => {
           e.preventDefault()
           setTrascina(false)
-          if (e.dataTransfer.files.length) void leggiFile(e.dataTransfer.files, setScartati)
+          if (e.dataTransfer.files.length) void caricaFileCorso(e.dataTransfer.files, setScartati)
         }}
       >
         <button type="button" className="bottone bottone-primario" onClick={() => input.current?.click()}>
@@ -131,7 +65,7 @@ function Caricamento() {
           multiple
           hidden
           onChange={(e) => {
-            if (e.target.files?.length) void leggiFile(e.target.files, setScartati)
+            if (e.target.files?.length) void caricaFileCorso(e.target.files, setScartati)
             e.target.value = ''
           }}
         />

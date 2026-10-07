@@ -19,6 +19,7 @@ import { Biblioteca } from './screens/Biblioteca'
 import { Chat } from './screens/Chat'
 import { Revisione } from './screens/Revisione'
 import { Ricerca } from './screens/Ricerca'
+import { Ufficio } from './screens/Ufficio'
 import { Copertura } from './screens/Copertura'
 import { Scrittura } from './screens/Scrittura'
 import { useStudio } from './store'
@@ -60,6 +61,8 @@ function Schermo({ s }: { s: Schermata }) {
       return <Scrittura />
     case 'biblioteca':
       return <Biblioteca />
+    case 'ufficio':
+      return <Ufficio />
     case 'ricerca':
       return <Ricerca />
     case 'copertura':

@@ -2,15 +2,15 @@ import { useMemo, useRef, useState } from 'react'
 import { costoStimato, modalitaGratuita } from '../agents/api'
 import { fontiSenzaScheda, gruppiSchede, preparaScheda, preparaSchedeInBlocco, stimaScheda, stimaSchedeInBlocco, testoPerScheda, verificaFrasi } from '../agents/schede'
 import { puòAvereTestoCompleto, recuperaTestoCompleto, recuperaTuttiNelBrowser, stimaTestoCompleto } from '../agents/testoCompleto'
-import { logOk } from '../agents/supervisor'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
 import { TemiChips } from '../components/TemiChips'
 import { ETICHETTA_ORIGINE, ETICHETTA_STATO_FONTE, autoreAnno } from '../domain/bibliografia'
 import { ETICHETTA_TEMA } from '../domain/dominio'
 import { useLargo } from '../hooks/useLayoutMode'
-import { fonteDaPdf, testoDaPdf } from '../io/pdfPaper'
-import { giàInBiblioteca, useStudio } from '../store'
+import { testoDaPdf } from '../io/pdfPaper'
+import { aggiungiPdfInBiblioteca } from '../io/aggiungiPdf'
+import { useStudio } from '../store'
 import type { Fonte, SchedaLettura, StatoFonte, TemaFonte } from '../types'
 
 type Vista = 'schede' | 'tabella'
@@ -596,7 +596,6 @@ function Tabella({ fonti, onApri }: { fonti: Fonte[]; onApri: (id: string) => vo
 export function Biblioteca() {
   const fonti = useStudio((s) => s.progetto.fonti)
   const inAttesa = useStudio((s) => s.progetto.inAttesa.length)
-  const aggiungi = useStudio((s) => s.aggiungiFonte)
   const vai = useStudio((s) => s.vai)
   const largo = useLargo(1100)
   const input = useRef<HTMLInputElement>(null)
@@ -619,22 +618,9 @@ export function Biblioteca() {
 
   const caricaPdf = async (files: FileList | null) => {
     if (!files?.length) return
-    for (const file of Array.from(files)) {
-      setCaricamento(`Leggo "${file.name}"…`)
-      try {
-        const { fonte: nuova, nota } = await fonteDaPdf(file, (n, tot) => setCaricamento(`Leggo "${file.name}": pagina ${n} di ${tot}`))
-        if (giàInBiblioteca(useStudio.getState().progetto.fonti, nuova)) {
-          setCaricamento(`"${nuova.titolo}" è già in biblioteca.`)
-          continue
-        }
-        aggiungi(nuova)
-        setScelta(nuova.id)
-        logOk('bibliotecario', `PDF "${file.name}" aggiunto alla biblioteca.`)
-        setCaricamento(nota || `"${nuova.titolo}" aggiunto con i metadati di Crossref.`)
-      } catch (err) {
-        setCaricamento(`"${file.name}": ${err instanceof Error ? err.message : 'lettura non riuscita'}`)
-      }
-    }
+    const { aggiunte, note } = await aggiungiPdfInBiblioteca(files, setCaricamento)
+    if (aggiunte.length) setScelta(aggiunte[aggiunte.length - 1].id)
+    setCaricamento(note.join(' ') || null)
   }
 
   const elenco = (

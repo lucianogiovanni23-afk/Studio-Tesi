@@ -62,7 +62,7 @@ function StileProposta({ testo }: { testo: string }) {
   )
 }
 
-function PannelloProposta({ sez }: { sez: Sezione }) {
+export function PannelloProposta({ sez }: { sez: Sezione }) {
   const proposta = useScrittore((s) => s.proposte[sez.id])
   if (!proposta) return null
   const sostituisce = proposta.indice === null ? sez.testo.trim().length > 0 : true

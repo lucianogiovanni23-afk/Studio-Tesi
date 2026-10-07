@@ -206,6 +206,41 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
   rivista: la prima pagina stampata arriva dai cataloghi e si può correggere nei dati della
   fonte; "Verifica le citazioni" ricalcola le pagine.
 
+## L'Ufficio: si lavora parlando con gli agenti
+
+All'apertura l'app mostra l'**Ufficio**: un open space moderno in 3D con quattro persone in
+giacca e cravatta che interpretano gli agenti:
+- **Giulia Romano**, lettrice del corso;
+- **Marco Ferrara**, bibliotecario;
+- **Luca Esposito**, scrittore;
+- **Elena Conti**, revisora.
+
+- **Sala unica**: vetrata a tutta parete sulla campagna calabrese, soffitto con luci lineari,
+  parete a listelli verde oliva, libreria con un libro per ogni fonte, schermo con l'avanzamento
+  dei capitoli, zona relax e tavolo riunioni. All'avvio la telecamera mostra tutta la sala; quando
+  scegli una persona si avvicina a lei con un movimento fluido, e "Tutta la sala" la riporta
+  indietro. Illuminazione morbida con luce d'ambiente generata in locale e ombre a contatto.
+- **Conversazione**: sul computer è un pannello semitrasparente sopra la scena (il centro ottico
+  si sposta perché il pannello non copra le persone). Ogni persona si presenta, dice che cosa fare
+  in base allo stato della tesi e offre le risposte possibili come pulsanti: al massimo tre
+  subito, le altre dietro "Altre opzioni". Le schede da guardare (risultati di ricerca, fonti
+  della sezione, scaletta, bozza, osservazione) compaiono dentro la conversazione. Le azioni
+  chiamano le stesse funzioni delle pagine di dettaglio, quindi controlli e verifiche restano
+  identici.
+- **Che cosa fa ogni persona**:
+  - **Giulia**: lezioni (anche 25 file), quadro teorico, lessico.
+  - **Marco**: ricerca dal campo di testo o per la prima sezione scoperta, approvazione dei
+    risultati, schede in blocco, testi completi, PDF.
+  - **Luca**: approvazione dell'indice, scelta della sezione, fonti, scaletta, bozza, foglio,
+    controllo delle citazioni.
+  - **Elena**: osservazioni del relatore, controllo della tesi, controllo approfondito, file Word.
+- **Domande libere**: scrivendo a una persona le si fa una domanda; risponde dal suo ruolo e
+  conosce tutta la tesi, con lo stesso contesto in cache della vecchia chat (in modalità gratuita
+  passa da Claude.ai). Lo storico di ogni persona si salva nel progetto e si sincronizza.
+- **Telefono e iPad in verticale**: niente 3D, i ritratti delle quattro persone e la conversazione
+  a tutta larghezza.
+- Le pagine di dettaglio restano nel menu: Panoramica, Corso, Fonti, Scrittura, Revisione.
+
 ## Interfaccia: un percorso in quattro passi
 
 - **Menu**: Inizio · 1 Corso · 2 Fonti · 3 Scrittura · 4 Revisione · Chiedi, con Guida e
@@ -343,6 +378,21 @@ npm run dev      # http://localhost:5173
 npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-Tesi/)
 npm run lint
 ```
+
+Il collaudo dell'Ufficio aggiunge 28 controlli, tutti in modalità gratuita:
+- avvio sull'Ufficio con la sala 3D, le quattro persone e la presentazione di Giulia;
+- Giulia: lezioni caricate dalla conversazione, quadro teorico tramite Claude.ai con le verifiche
+  raccontate, proposta del lessico;
+- Marco: ricerca scritta nel campo di testo con piano e selezione, risultati approvati dentro la
+  conversazione, passo successivo proposto;
+- Luca: indice approvato e passaggio alla scelta delle fonti, cambio di sezione;
+- Elena: osservazione del relatore e domanda libera con il suo ruolo e il contesto;
+- storico per persona e dopo la ricarica, scelta della persona toccando il cartellino nella
+  scena, nessuna chiamata a pagamento, telefono senza 3D e senza scorrimento orizzontale.
+
+I collaudi precedenti sono stati adeguati: la chat è diventata la domanda libera a Elena, con gli
+stessi controlli su streaming, cache e storia; la scena ora sta nell'Ufficio. Passano tutti: 356
+controlli in totale.
 
 Il collaudo degli strumenti aggiunge 31 controlli:
 - tema: automatico chiaro e scuro, scelto a mano, contrasto del testo, persistenza, carta chiara;

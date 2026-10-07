@@ -55,6 +55,7 @@ export function progettoIniziale(): Progetto {
     courseFiles: [],
     quadro: null,
     usi: [],
+    conversazioni: {},
     budgetMensile: null,
     obiettivo: { ...OBIETTIVO_PREDEFINITO },
     creatoIl: adesso(),
@@ -100,6 +101,7 @@ export function normalizzaProgetto(p: Progetto): Progetto {
     osservazioni: (p.osservazioni ?? []).map((o) => ({ ...o, proposte: o.proposte ?? [], lettura: o.lettura ?? '' })),
     controllo: p.controllo ?? null,
     chat: p.chat ?? [],
+    conversazioni: p.conversazioni ?? {},
     budgetMensile: p.budgetMensile ?? null,
     obiettivo: p.obiettivo ?? { ...OBIETTIVO_PREDEFINITO },
     capitoli: p.capitoli.map((c) => ({

@@ -61,6 +61,7 @@ export type ErrorKind =
   | 'rete'
   | 'budget_superato'
   | 'solo_api'
+  | 'credito_esaurito'
   | 'sconosciuto'
 
 export class ApiError extends Error {
@@ -113,6 +114,14 @@ export function toApiError(err: unknown): ApiError {
 
   if (err instanceof Anthropic.BadRequestError) {
     const testo = (err.message ?? '').toLowerCase()
+    if (testo.includes('credit balance')) {
+      return new ApiError(
+        'credito_esaurito',
+        "La chiave funziona, ma il credito Anthropic è finito. Puoi aggiungerne dalla console, oppure togliere la chiave in Impostazioni: l'app torna alla modalità gratuita tramite Claude.ai.",
+        400,
+        false,
+      )
+    }
     if ((testo.includes('web search') || testo.includes('web fetch')) && (testo.includes('not enabled') || testo.includes('disabled'))) {
       return new ApiError(
         'ricerca_web_disabilitata',

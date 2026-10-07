@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import type { AgentKey } from '../types'
-import { CAMERA_BERSAGLIO, CAMERA_CASA, POSTAZIONI } from './layout'
+import { CAMERA_BERSAGLIO, CAMERA_CASA, DIETRO_SCRIVANIA, POSTAZIONI } from './layout'
 
 /** Riferimento minimo a OrbitControls: bastano il bersaglio e update(). */
 export interface ControlliOrbita {
@@ -11,7 +11,7 @@ export interface ControlliOrbita {
   update: () => void
 }
 
-const DURATA = 1.1
+const DURATA = 1.4
 
 /**
  * Transizione fluida verso la postazione scelta (o la vista d'insieme). Con
@@ -41,9 +41,10 @@ export function CameraRig({
     daPos.current.copy(camera.position)
     daBers.current.copy(controlli.current?.target ?? new THREE.Vector3(...CAMERA_BERSAGLIO))
     if (fuoco) {
+      // Primo piano della persona scelta, un po' dall'alto come chi le si siede davanti.
       const [x, z] = POSTAZIONI[fuoco].scrivania
-      aBers.current.set(x, 1.3, z - 0.4)
-      aPos.current.set(x * 0.7, 3.6, z + 5.6)
+      aBers.current.set(x, 1.12, z + DIETRO_SCRIVANIA)
+      aPos.current.set(x * 0.82, 2.35, z + 3.7)
     } else {
       aPos.current.set(...CAMERA_CASA)
       aBers.current.set(...CAMERA_BERSAGLIO)
