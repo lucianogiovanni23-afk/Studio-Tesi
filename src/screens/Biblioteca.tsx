@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { formattaDollari } from '../agents/costs'
-import { preparaScheda, stimaScheda, testoPerScheda, verificaFrasi } from '../agents/schede'
+import { costoStimato, modalitaGratuita } from '../agents/api'
+import { fontiSenzaScheda, gruppiSchede, preparaScheda, preparaSchedeInBlocco, stimaScheda, stimaSchedeInBlocco, testoPerScheda, verificaFrasi } from '../agents/schede'
 import { puòAvereTestoCompleto, recuperaTestoCompleto, recuperaTuttiNelBrowser, stimaTestoCompleto } from '../agents/testoCompleto'
 import { logOk } from '../agents/supervisor'
 import { Conferma } from '../components/Conferma'
@@ -26,7 +26,6 @@ function statoScheda(f: Fonte): string {
 
 function Scheda({ f }: { f: Fonte }) {
   const aggiorna = useStudio((s) => s.aggiornaFonte)
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const modello = useStudio((s) => s.preferenze.modelli.bibliotecario)
   const [lavoro, setLavoro] = useState(false)
   const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
@@ -54,9 +53,9 @@ function Scheda({ f }: { f: Fonte }) {
     <Conferma
       classe={f.scheda ? 'bottone bottone-vuoto bottone-piccolo' : 'bottone bottone-primario'}
       etichetta={f.scheda ? 'Rifai la scheda' : 'Prepara la scheda di lettura'}
-      domanda={`${f.scheda ? 'La scheda attuale sarà sostituita. ' : ''}Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)}. Procedo?`}
+      domanda={`${f.scheda ? 'La scheda attuale sarà sostituita. ' : ''}${costoStimato(stima)}. Procedo?`}
       conferma="Prepara"
-      disabilitato={!haChiave || lavoro}
+      disabilitato={lavoro}
       onConferma={() => void prepara()}
     />
   )
@@ -72,7 +71,6 @@ function Scheda({ f }: { f: Fonte }) {
           una scheda sul testo completo.
         </p>
       )}
-      {!haChiave && <p className="nota">Serve la chiave API per preparare la scheda.</p>}
       {lavoro && <p className="in-corso">Il Bibliotecario sta leggendo la fonte…</p>}
       {messaggio && <p className={messaggio.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'}>{messaggio.testo}</p>}
 
@@ -154,6 +152,7 @@ function TestoCompleto({ f }: { f: Fonte }) {
   const [stato, setStato] = useState<'fermo' | 'browser' | 'api'>('fermo')
   const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'avviso' | 'errore'; testo: string } | null>(null)
   const [bloccato, setBloccato] = useState(false)
+  const [indirizzo, setIndirizzo] = useState<string | null>(null)
   if (f.testoCompleto) {
     return (
       <p className="nota nota-ok">
@@ -177,7 +176,13 @@ function TestoCompleto({ f }: { f: Fonte }) {
         setMessaggio({ tono: 'avviso', testo: 'Il documento trovato non sembra questo articolo (il titolo non compare nelle prime pagine): non l\'ho usato.' })
       } else {
         setBloccato(true)
-        setMessaggio({ tono: 'avviso', testo: conApi ? 'Neanche tramite l\'API è stato possibile leggere il documento.' : 'Il sito che ospita la versione gratuita non permette al browser di scaricarla direttamente.' })
+        setIndirizzo(e.indirizzi[0] ?? null)
+        setMessaggio({
+          tono: 'avviso',
+          testo: conApi
+            ? 'Neanche tramite l\'API è stato possibile leggere il documento.'
+            : `Il sito che ospita la versione gratuita non permette al browser di scaricarla direttamente.${haChiave ? '' : ' Aprila dal link qui sotto, scarica il PDF e allegalo a questa fonte: è gratis.'}`,
+        })
       }
     } catch (err) {
       setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Errore.' })
@@ -200,12 +205,16 @@ function TestoCompleto({ f }: { f: Fonte }) {
           <button type="button" className="bottone" onClick={() => void prova(false)}>
             Cerca il testo completo (gratis)
           </button>
-          {bloccato && (
+          {bloccato && indirizzo && !haChiave && (
+            <a className="bottone" href={indirizzo} target="_blank" rel="noreferrer">
+              Apri la versione gratuita
+            </a>
+          )}
+          {bloccato && haChiave && (
             <Conferma
               classe="bottone bottone-primario"
               etichetta="Leggilo tramite l'API"
-              disabilitato={!haChiave}
-              domanda={`Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)} (dipende dalla lunghezza del PDF). Procedo?`}
+              domanda={`${costoStimato(stima)} (dipende dalla lunghezza del PDF). Procedo?`}
               conferma="Procedi"
               onConferma={() => void prova(true)}
             />
@@ -222,6 +231,53 @@ function TestoCompleto({ f }: { f: Fonte }) {
 // ---------------------------------------------------------------------------
 
 /** Testo completo per tutte le fonti: prima gratis dal browser, poi (se vuoi) tramite l'API per le rimaste. */
+/** Schede di più fonti in pochi passaggi: in modalità gratuita è il modo più rapido. */
+function SchedeInBlocco() {
+  const fonti = useStudio((s) => s.progetto.fonti)
+  const modello = useStudio((s) => s.preferenze.modelli.bibliotecario)
+  const lavoro = useStudio((s) => s.agenti.bibliotecario.status === 'lavoro')
+  const [avanzamento, setAvanzamento] = useState<string | null>(null)
+  const [esito, setEsito] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
+  const senza = useMemo(() => fontiSenzaScheda(fonti), [fonti])
+  if (senza.length < 2 && !esito) return null
+  const gruppi = gruppiSchede(senza).length
+  const stima = stimaSchedeInBlocco(senza, modello)
+  const passaggi = `${gruppi} ${gruppi === 1 ? 'passaggio' : 'passaggi'}${modalitaGratuita() ? ' su Claude.ai' : ''}`
+
+  return (
+    <div className="testo-completo-tutte">
+      {avanzamento ? (
+        <span className="in-corso">{avanzamento}</span>
+      ) : (
+        senza.length >= 2 && (
+          <Conferma
+            classe="bottone bottone-piccolo"
+            etichetta={`Prepara le schede di ${senza.length} fonti insieme`}
+            domanda={`${senza.length} fonti in ${passaggi}. ${costoStimato(stima)}. Procedo?`}
+            conferma="Prepara"
+            disabilitato={lavoro}
+            onConferma={async () => {
+              setEsito(null)
+              try {
+                const r = await preparaSchedeInBlocco(
+                  senza.map((f) => f.id),
+                  (g, tot) => setAvanzamento(`Schede di lettura: gruppo ${g} di ${tot}…`),
+                )
+                setEsito({ tono: 'ok', testo: `${r.fatte} schede pronte${r.frasiScartate ? `; ${r.frasiScartate} frasi chiave scartate perché non si ritrovano nel testo` : ''}.` })
+              } catch (err) {
+                const annullato = err instanceof DOMException && err.name === 'AbortError'
+                setEsito({ tono: 'errore', testo: annullato ? 'Interrotto: le schede già pronte restano salvate.' : err instanceof Error ? err.message : 'Errore.' })
+              }
+              setAvanzamento(null)
+            }}
+          />
+        )
+      )}
+      {esito && <span className={esito.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'}>{esito.testo}</span>}
+    </div>
+  )
+}
+
 function TestoCompletoPerTutte() {
   const fonti = useStudio((s) => s.progetto.fonti)
   const haChiave = useStudio((s) => s.apiKey.length > 0)
@@ -254,12 +310,11 @@ function TestoCompletoPerTutte() {
         )
       )}
       {esito && <span className="nota">{esito}</span>}
-      {daApi.length > 0 && !avanzamento && (
+      {daApi.length > 0 && !avanzamento && haChiave && (
         <Conferma
           classe="bottone bottone-piccolo bottone-primario"
           etichetta={`Leggi le ${daApi.length} rimaste tramite l'API`}
-          disabilitato={!haChiave}
-          domanda={`Costo stimato ${formattaDollari(stima.minimo * daApi.length)} – ${formattaDollari(stima.massimo * daApi.length)}. Procedo?`}
+          domanda={`${costoStimato(stima, daApi.length)}. Procedo?`}
           conferma="Procedi"
           onConferma={async () => {
             let ok = 0
@@ -638,6 +693,7 @@ export function Biblioteca() {
       </div>
       {caricamento && <p className="nota">{caricamento}</p>}
       <TestoCompletoPerTutte />
+      <SchedeInBlocco />
 
       {fonti.length === 0 ? (
         <p className="nota">

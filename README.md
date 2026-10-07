@@ -256,6 +256,28 @@ biologia, se non come causa di un effetto finanziario in una frase).
   serve un backend che la nasconda."*
 - Niente `alert`, `confirm`, `prompt`: tutte le conferme sono in linea.
 
+## Modalità gratuita (senza chiave API)
+
+Senza chiave l'app è gratuita: ogni comando degli agenti passa da **Claude.ai** con un copia e
+incolla, al posto dell'API.
+
+- Tutte le chiamate partono da un solo punto (`agents/api.ts`); senza chiave vengono deviate su
+  `agents/ponte.ts`, che compone la richiesta completa: istruzioni, materiale, schema JSON della
+  risposta. Una finestra guida lo studente: **Copia la richiesta → Apri Claude.ai → incolla la
+  risposta**. Il resto non cambia: il JSON viene letto e controllato, le citazioni e gli estratti
+  verificati in codice, i passi non validi ripetuti dal Controllore.
+- La finestra accetta la risposta solo se il JSON è completo. Toglie i blocchi di codice e il testo
+  intorno, e accetta anche una risposta arrivata in più pezzi ("continua"). Quando il Controllore
+  scarta una risposta, spiega il motivo e la nuova richiesta lo dice anche a Claude.
+- Al posto del costo stimato compare "Gratis tramite Claude.ai"; budget e consuntivo non servono.
+- **Più efficiente**: le schede di lettura si possono preparare **in blocco** (fino a 6 fonti e
+  90.000 caratteri per passaggio). Funziona anche con la chiave API e riduce le chiamate.
+- **Cosa non c'è** senza chiave: la ricerca web e quella sui siti istituzionali (servono gli
+  strumenti di ricerca dell'API, i cui risultati l'app verifica). Restano i cataloghi accademici,
+  gratuiti, e i PDF caricati dallo studente; quando un editore blocca il download, l'app mostra il
+  link alla versione gratuita da scaricare e allegare.
+- Claude.ai gratuito ha un limite di messaggi al giorno.
+
 ## Sincronizzazione fra dispositivi
 
 Senza un server, i dati passano da un **repository GitHub privato** dello studente, letto e
@@ -287,6 +309,13 @@ npm run dev      # http://localhost:5173
 npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-Tesi/)
 npm run lint
 ```
+
+Il collaudo della modalità gratuita aggiunge 32 controlli senza chiave e senza nessuna chiamata
+all'API: quadro teorico con una risposta senza JSON (spiegata), una in due pezzi con il blocco di
+codice, uno scarto del Controllore con il motivo mostrato e una risposta valida (estratti
+verificati); annullamento; ricerca con i soli cataloghi; chat; bozza dello Scrittore con un
+estratto vero (verde) e uno inventato (rosso); quattro schede in un passaggio con una mancante
+richiesta di nuovo e una frase inventata scartata; finestra a tutto schermo su iPhone.
 
 Il collaudo della sincronizzazione aggiunge 26 controlli con GitHub simulato e due dispositivi
 (un iPhone e un computer) sullo stesso repository: repository pubblico rifiutato, token sbagliato

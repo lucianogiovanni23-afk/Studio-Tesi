@@ -144,6 +144,20 @@ export const SCHEMA_SCHEDA = consegna(
   }),
 )
 
+/** Più schede in una sola consegna: ogni scheda porta l'etichetta della fonte (S1, S2…). */
+export const SCHEMA_SCHEDE = consegna(
+  oggetto({
+    schede: {
+      type: 'array',
+      minItems: 1,
+      items: oggetto({
+        id: { type: 'string', description: 'Etichetta della fonte, per esempio "S1".' },
+        ...((SCHEMA_SCHEDA.properties as { risultato: { properties: Record<string, unknown> } }).risultato.properties),
+      }),
+    },
+  }),
+)
+
 const CITAZIONE = oggetto({
   rif: { type: 'string', description: 'Etichetta del riferimento usata nel testo, per esempio "F12" o "C3".' },
   affermazione: { type: 'string', description: 'La frase del testo che questa citazione sostiene.' },

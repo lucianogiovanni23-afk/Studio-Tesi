@@ -1,3 +1,4 @@
+import { costoStimato, modalitaGratuita } from '../agents/api'
 import { useMemo, useRef, useState } from 'react'
 import {
   aggiungiAlCorpus,
@@ -8,7 +9,6 @@ import {
   rimuoviDalCorpus,
   suddividi,
 } from '../agents/corpus'
-import { formattaDollari } from '../agents/costs'
 import { annullaQuadro, generaQuadro, stimaQuadro } from '../agents/lettoreCorso'
 import { ricavaLessico, stimaLessico } from '../agents/lessico'
 import { logAvviso, logOk } from '../agents/supervisor'
@@ -194,9 +194,7 @@ function Quadro() {
   const pronti = useStudio((s) => s.progetto.courseFiles.filter((f) => f.status === 'pronto').length)
   const occupato = useStudio((s) => estrazioneInCorso(s.progetto))
   const lettore = useStudio((s) => s.agenti.lettore)
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const modello = useStudio((s) => s.preferenze.modelli.lettore)
-  const vai = useStudio((s) => s.vai)
   const [errore, setErrore] = useState<string | null>(null)
   const [aperto, setAperto] = useState<string | null>(null)
 
@@ -227,14 +225,7 @@ function Quadro() {
 
       {obsoleto && <p className="allerta">Hai cambiato i file del corso dopo l'ultima generazione: conviene aggiornare il quadro.</p>}
 
-      {!haChiave ? (
-        <p className="allerta">
-          Serve la chiave API.{' '}
-          <button type="button" className="link" onClick={() => vai('impostazioni')}>
-            Impostazioni
-          </button>
-        </p>
-      ) : pronti === 0 ? (
+      {pronti === 0 ? (
         <p className="nota">Carica almeno un file del corso per generare il quadro.</p>
       ) : inCorso ? (
         <div className="riga-editor">
@@ -249,7 +240,7 @@ function Quadro() {
           etichetta={quadro ? 'Aggiorna il quadro teorico' : 'Genera il quadro teorico'}
           domanda={
             stima
-              ? `Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)} con ${modello}. Procedo?`
+              ? `${costoStimato(stima)}${modalitaGratuita() ? '' : ` con ${modello}`}. Procedo?`
               : 'Procedo?'
           }
           conferma="Genera"
@@ -363,7 +354,6 @@ function Lessico() {
   const glossario = useStudio((s) => s.progetto.glossario)
   const pronti = useStudio((s) => s.progetto.courseFiles.filter((f) => f.status === 'pronto').length)
   const occupato = useStudio((s) => estrazioneInCorso(s.progetto))
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const modello = useStudio((s) => s.preferenze.modelli.lettore)
   const lettore = useStudio((s) => s.agenti.lettore)
   const vai = useStudio((s) => s.vai)
@@ -385,8 +375,8 @@ function Lessico() {
         <Conferma
           classe="bottone bottone-primario"
           etichetta={delCorso.length ? 'Aggiorna il lessico del corso' : 'Ricava il lessico del corso'}
-          disabilitato={!haChiave || pronti === 0 || occupato}
-          domanda={stima ? `Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)}. Procedo?` : 'Procedo?'}
+          disabilitato={pronti === 0 || occupato}
+          domanda={stima ? `${costoStimato(stima)}. Procedo?` : 'Procedo?'}
           conferma="Ricava"
           onConferma={async () => {
             setMessaggio(null)
@@ -402,7 +392,6 @@ function Lessico() {
           }}
         />
       )}
-      {!haChiave && <p className="nota">Serve la chiave API.</p>}
       {messaggio && <p className={messaggio.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'}>{messaggio.testo}</p>}
       {delCorso.length > 0 && (
         <>

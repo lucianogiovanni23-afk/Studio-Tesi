@@ -1,7 +1,7 @@
+import { costoStimato } from '../agents/api'
 import { useMemo, useState } from 'react'
 import { annullaRicerca, avviaRicerca, stimaRicerca, useRicerca, type OpzioniRicerca } from '../agents/bibliotecario'
 import { CATALOGHI, provaCataloghi, type EsitoProva } from '../agents/cataloghi'
-import { formattaDollari } from '../agents/costs'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
 import { TemiChips } from '../components/TemiChips'
@@ -13,17 +13,18 @@ import type { Candidato } from '../types'
 const ICONA_PASSO = { attesa: '○', corso: '…', ok: '✓', avviso: '!', errore: '✕', saltato: '–' }
 
 function Modulo() {
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
+  const gratuita = useStudio((s) => !s.apiKey.trim())
   const modelli = useStudio((s) => s.preferenze.modelli)
-  const vai = useStudio((s) => s.vai)
   const inCorso = useRicerca((s) => s.inCorso)
   const [domanda, setDomanda] = useState('')
-  const [opzioni, setOpzioni] = useState<OpzioniRicerca>({ cataloghi: true, istituzionali: true, web: true })
+  const [scelte, setOpzioni] = useState<OpzioniRicerca>({ cataloghi: true, istituzionali: true, web: true })
+  // Senza chiave la ricerca web non è disponibile: restano i cataloghi.
+  const opzioni = gratuita ? { ...scelte, istituzionali: false, web: false } : scelte
   const stima = useMemo(() => stimaRicerca(opzioni), [opzioni, modelli]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const casella = (k: keyof OpzioniRicerca, testo: string, nota: string) => (
     <label className="interruttore">
-      <input type="checkbox" checked={opzioni[k]} onChange={(e) => setOpzioni({ ...opzioni, [k]: e.target.checked })} disabled={inCorso} />
+      <input type="checkbox" checked={opzioni[k]} onChange={(e) => setOpzioni({ ...scelte, [k]: e.target.checked })} disabled={inCorso || (gratuita && k !== 'cataloghi')} />
       <span>
         {testo}
         <small className="nota"> — {nota}</small>
@@ -49,14 +50,13 @@ function Modulo() {
       {casella('istituzionali', 'Siti istituzionali', 'ISMEA, ISTAT, CREA-RICA, ARPACAL, Copernicus e altri')}
       {casella('web', 'Web generico', 'studi e rapporti anche in spagnolo e inglese')}
 
-      {!haChiave ? (
-        <p className="allerta">
-          Serve la chiave API per il piano di ricerca e la selezione.{' '}
-          <button type="button" className="link" onClick={() => vai('impostazioni')}>
-            Impostazioni
-          </button>
+      {gratuita && (
+        <p className="nota">
+          Modalità gratuita: la ricerca usa i cataloghi accademici, gratuiti. I siti istituzionali e il web richiedono la
+          ricerca web dell'API; i rapporti di ISMEA, ISTAT e simili puoi scaricarli tu e aggiungerli in Biblioteca come PDF.
         </p>
-      ) : inCorso ? (
+      )}
+      {inCorso ? (
         <div className="riga-editor">
           <span className="in-corso">Il Bibliotecario sta cercando…</span>
           <button type="button" className="bottone bottone-vuoto" onClick={annullaRicerca}>
@@ -68,7 +68,7 @@ function Modulo() {
           classe="bottone bottone-primario"
           etichetta="Cerca"
           disabilitato={domanda.trim().length < 8 || !(opzioni.cataloghi || opzioni.istituzionali || opzioni.web)}
-          domanda={`Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)} (i cataloghi sono gratuiti). Procedo?`}
+          domanda={`${costoStimato(stima)} (i cataloghi sono gratuiti). Procedo?`}
           conferma="Avvia la ricerca"
           onConferma={() => void avviaRicerca(domanda.trim(), opzioni)}
         />

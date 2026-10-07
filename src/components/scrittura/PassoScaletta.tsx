@@ -1,5 +1,5 @@
+import { costoStimato } from '../../agents/api'
 import { useState } from 'react'
-import { formattaDollari } from '../../agents/costs'
 import { proponiScaletta, stimaComando, useScrittore } from '../../agents/scrittore'
 import { useStudio } from '../../store'
 import type { Capitolo, Sezione } from '../../types'
@@ -9,7 +9,6 @@ import { Conferma } from '../Conferma'
 export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
   const setScaletta = useStudio((s) => s.setScaletta)
   const approva = useStudio((s) => s.approvaScaletta)
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const inCorso = useScrittore((s) => s.inCorso)
   const lacune = useScrittore((s) => s.lacune[sez.id])
   const [errore, setErrore] = useState<string | null>(null)
@@ -46,7 +45,7 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
   }
 
   const occupato = inCorso !== null
-  const stima = haChiave ? stimaComando(cap, sez, 'scaletta') : null
+  const stima = stimaComando(cap, sez, 'scaletta')
   const punti = sez.scaletta
   const cambia = (i: number, v: string) => setScaletta(cap.id, sez.id, punti.map((x, j) => (j === i ? v : x)))
   const sposta = (i: number, d: -1 | 1) => {
@@ -97,11 +96,11 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
           etichetta={punti.length ? 'Proponi un\'altra scaletta' : 'Proponi una scaletta'}
           domanda={
             stima
-              ? `Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)}${stima.cache ? ' (materiale già in cache)' : ''}. Procedo?`
+              ? `${costoStimato(stima)}${stima.cache ? ' (materiale già in cache)' : ''}. Procedo?`
               : 'Procedo?'
           }
           conferma="Proponi"
-          disabilitato={!haChiave || occupato}
+          disabilitato={occupato}
           onConferma={async () => {
             setErrore(null)
             try {

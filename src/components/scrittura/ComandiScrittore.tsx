@@ -1,5 +1,5 @@
+import { costoStimato, modalitaGratuita } from '../../agents/api'
 import { useState } from 'react'
-import { formattaDollari } from '../../agents/costs'
 import { controllaInCodice, giudicaCitazioni, stimaGiudizio, type EsitoControllo } from '../../agents/revisoreCitazioni'
 import {
   accettaProposta,
@@ -104,7 +104,6 @@ function PannelloProposta({ sez }: { sez: Sezione }) {
 }
 
 export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: Sezione; paragrafo: number | null }) {
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const inCorso = useScrittore((s) => s.inCorso)
   const richiesta = useScrittore((s) => s.richiesta)
   const setRichiesta = (r: string) => useScrittore.setState({ richiesta: r })
@@ -124,16 +123,16 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
   }
 
   const comando = (c: Exclude<Comando, 'scaletta'>, abilitato: boolean, motivo: string, azione: () => Promise<void>) => {
-    const stima = haChiave && abilitato ? stimaComando(cap, sez, c) : null
+    const stima = abilitato ? stimaComando(cap, sez, c) : null
     return (
       <Conferma
         key={c}
         classe="bottone bottone-piccolo"
         etichetta={NOME[c]}
-        disabilitato={!haChiave || !abilitato || inCorso !== null}
+        disabilitato={!abilitato || inCorso !== null}
         domanda={
           stima
-            ? `${NOME[c]}: costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)}${stima.cache ? ', materiale già in cache' : ''}. Procedo?`
+            ? `${NOME[c]}: ${costoStimato(stima).replace('Costo', 'costo')}${stima.cache && !modalitaGratuita() ? ', materiale già in cache' : ''}. Procedo?`
             : motivo
         }
         conferma="Procedi"
@@ -162,8 +161,6 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
           Verifica le citazioni
         </button>
       </div>
-
-      {!haChiave && <p className="nota">Per i comandi dello Scrittore serve la chiave API (Impostazioni).</p>}
       {!sez.fontiConfermate && <p className="nota">I comandi si attivano dopo l'approvazione delle fonti della sezione; la bozza anche dopo la scaletta.</p>}
       {sez.fontiConfermate && (
         <p className="nota paragrafo-scelto">
@@ -209,8 +206,7 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
                 <Conferma
                   classe="bottone bottone-piccolo"
                   etichetta="Chiedi il giudizio del Revisore"
-                  disabilitato={!haChiave}
-                  domanda={stimaG ? `Il Revisore giudica se ogni estratto sostiene davvero l'affermazione. Costo stimato ${formattaDollari(stimaG.minimo)} – ${formattaDollari(stimaG.massimo)}. Procedo?` : 'Procedo?'}
+                  domanda={stimaG ? `Il Revisore giudica se ogni estratto sostiene davvero l'affermazione. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?'}
                   conferma="Procedi"
                   onConferma={async () => {
                     setGiudizioInCorso(true)

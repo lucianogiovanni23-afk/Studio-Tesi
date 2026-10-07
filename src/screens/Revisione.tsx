@@ -1,5 +1,5 @@
+import { costoStimato } from '../agents/api'
 import { useMemo, useState } from 'react'
-import { formattaDollari } from '../agents/costs'
 import {
   accettaPropostaRevisione,
   controlloConRevisore,
@@ -80,7 +80,6 @@ function CartaProposta({ o, p }: { o: Osservazione; p: PropostaRevisione }) {
 function CartaOsservazione({ o }: { o: Osservazione }) {
   const aggiorna = useStudio((s) => s.aggiornaOsservazione)
   const rimuovi = useStudio((s) => s.rimuoviOsservazione)
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const etichetta = useEtichettaSezione()
   const [lavoro, setLavoro] = useState(false)
   const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
@@ -114,8 +113,7 @@ function CartaOsservazione({ o }: { o: Osservazione }) {
           <Conferma
             classe={o.proposte.length ? 'bottone bottone-piccolo' : 'bottone bottone-primario'}
             etichetta={o.proposte.length ? 'Chiedi nuove proposte' : 'Chiedi le proposte al Revisore'}
-            disabilitato={!haChiave}
-            domanda={`Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)}${o.proposte.length ? '; le proposte attuali saranno sostituite' : ''}. Procedo?`}
+            domanda={`${costoStimato(stima)}${o.proposte.length ? '; le proposte attuali saranno sostituite' : ''}. Procedo?`}
             conferma="Procedi"
             onConferma={async () => {
               setLavoro(true)
@@ -132,7 +130,6 @@ function CartaOsservazione({ o }: { o: Osservazione }) {
           />
         )
       )}
-      {!haChiave && <p className="nota">Per le proposte serve la chiave API.</p>}
       {messaggio && <p className={messaggio.tono === 'ok' ? 'nota' : 'allerta allerta-errore'}>{messaggio.testo}</p>}
       {o.proposte.length > 0 && (
         <ul className="elenco-proposte">
@@ -216,7 +213,6 @@ const NOME_TIPO: Record<TipoRilievo, string> = {
 
 function Controllo() {
   const controllo = useStudio((s) => s.progetto.controllo)
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
   const apri = useStudio((s) => s.apriSezione)
   const etichetta = useEtichettaSezione()
   const [filtro, setFiltro] = useState<TipoRilievo | ''>('')
@@ -248,8 +244,7 @@ function Controllo() {
           <Conferma
             classe="bottone bottone-primario"
             etichetta="Controllo completo con il Revisore"
-            disabilitato={!haChiave}
-            domanda={`Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)}. Procedo?`}
+            domanda={`${costoStimato(stima)}. Procedo?`}
             conferma="Procedi"
             onConferma={async () => {
               setLavoro(true)

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import { del, get, set as idbSet } from 'idb-keyval'
 import { AGENT_KEYS } from './agents/agenti'
-import { impostaControlloBudget, impostaRegistratoreUso } from './agents/api'
+import { impostaControlloBudget, impostaModalitaGratuita, impostaRegistratoreUso } from './agents/api'
 import { costoUso, risparmioCache } from './agents/costs'
 import {
   adesso,
@@ -529,6 +529,9 @@ export const useStudio = create<StatoStudio>()(
     },
   ),
 )
+
+// Senza chiave API gli agenti lavorano gratis tramite Claude.ai.
+impostaModalitaGratuita(() => !useStudio.getState().apiKey.trim())
 
 // Prima di ogni chiamata: se il budget del mese è esaurito, la chiamata non parte.
 impostaControlloBudget(() => {

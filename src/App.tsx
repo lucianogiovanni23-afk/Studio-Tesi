@@ -3,6 +3,7 @@ import { caricaCorpus, rimuoviDalCorpus } from './agents/corpus'
 import { installaHookControllore, logAvviso } from './agents/supervisor'
 import { AgentiBar } from './components/AgentiBar'
 import { ModalitaCarta } from './components/ModalitaCarta'
+import { PonteClaude } from './components/PonteClaude'
 import { useModoUso } from './hooks/useModoUso'
 import { avviaCopieAutomatiche } from './io/copie'
 import { avviaSincronizzazione } from './io/sincronizzazione'
@@ -100,7 +101,6 @@ export default function App() {
   const schermata = useStudio((s) => s.schermata)
   const vai = useStudio((s) => s.vai)
   const titolo = useStudio((s) => s.progetto.titolo)
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
 
   useEffect(() => installaHookControllore(), [])
   useEffect(() => {
@@ -141,7 +141,6 @@ export default function App() {
               onClick={() => vai(v.id)}
             >
               {v.nome}
-              {v.id === 'impostazioni' && !haChiave && <span className="pallino" aria-label="manca la chiave API" />}
             </button>
           ))}
         </nav>
@@ -157,6 +156,7 @@ export default function App() {
       </div>
 
       <ModalitaCarta />
+      <PonteClaude />
     </div>
   )
 }

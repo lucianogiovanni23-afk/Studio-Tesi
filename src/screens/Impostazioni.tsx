@@ -22,7 +22,28 @@ function Chiave() {
 
   return (
     <section className="pannello">
-      <h2>Chiave API Anthropic</h2>
+      <h2>Come lavorano gli agenti</h2>
+      {apiKey ? (
+        <p className="nota">
+          <strong>Con la chiave API</strong>: gli agenti lavorano da soli e paghi a consumo. Togliendo la chiave si torna alla
+          modalità gratuita.
+        </p>
+      ) : (
+        <div className="banda banda-info">
+          <p>
+            <strong>Modalità gratuita attiva.</strong> Ogni comando prepara una richiesta completa: la copi su{' '}
+            <a href="https://claude.ai/new" target="_blank" rel="noreferrer">
+              claude.ai
+            </a>{' '}
+            (basta un account gratuito), incolli qui la risposta e l'app la controlla come sempre: citazioni, estratti, lessico.
+          </p>
+          <p className="nota">
+            Funziona tutto tranne la ricerca sul web e sui siti istituzionali (restano i cataloghi accademici e i PDF che
+            carichi tu). Claude.ai gratuito ha un limite di messaggi al giorno: se lo raggiungi, riprendi il giorno dopo.
+          </p>
+        </div>
+      )}
+      <h3>Chiave API Anthropic (facoltativa)</h3>
       <AvvisoChiave />
       {apiKey ? (
         <div className="riga-editor">

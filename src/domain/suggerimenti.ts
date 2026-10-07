@@ -34,10 +34,10 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (!haChiave) {
     fuori.push({
       id: 'chiave',
-      testo: 'Inserisci la chiave API Anthropic: senza, gli agenti non possono lavorare.',
-      tono: 'urgente',
+      testo: 'Modalità gratuita: ogni comando degli agenti passa da Claude.ai, con un copia e incolla. Con una chiave API lavorerebbero da soli.',
+      tono: 'info',
       vai: 'impostazioni',
-      etichetta: 'Impostazioni',
+      etichetta: 'Come funziona',
     })
   }
   if (!p.indiceApprovato) {

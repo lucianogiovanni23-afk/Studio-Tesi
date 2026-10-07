@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Chi } from '../types'
-import { normalizzaUso, sommaUsi, type UsoNormalizzato } from './costs'
+import { formattaDollari, normalizzaUso, sommaUsi, type Stima, type UsoNormalizzato } from './costs'
+import { chiediAClaudeAi } from './ponte'
 import type { JsonSchema } from './schemas'
 
 /**
@@ -59,6 +60,7 @@ export type ErrorKind =
   | 'errore_server'
   | 'rete'
   | 'budget_superato'
+  | 'solo_api'
   | 'sconosciuto'
 
 export class ApiError extends Error {
@@ -183,7 +185,30 @@ export function toApiError(err: unknown): ApiError {
   return new ApiError('sconosciuto', 'Errore inatteso durante la chiamata API.')
 }
 
+// ---------------------------------------------------------------------------
+// Modalità gratuita
+// ---------------------------------------------------------------------------
+
+let gratuita: () => boolean = () => false
+
+/** Lo store indica qui se si lavora senza chiave, cioè tramite Claude.ai. */
+export function impostaModalitaGratuita(fn: () => boolean) {
+  gratuita = fn
+}
+
+export function modalitaGratuita(): boolean {
+  return gratuita()
+}
+
+/** Il costo da mostrare prima di un comando: in modalità gratuita non c'è. */
+export function costoStimato(stima: Pick<Stima, 'minimo' | 'massimo'>, volte = 1): string {
+  if (gratuita()) return 'Gratis tramite Claude.ai (copia e incolla)'
+  return `Costo stimato ${formattaDollari(stima.minimo * volte)} – ${formattaDollari(stima.massimo * volte)}`
+}
+
 export function creaClient(apiKey: string): Anthropic {
+  // Senza chiave le chiamate passano da Claude.ai: il client non serve.
+  if (gratuita()) return {} as Anthropic
   const chiave = apiKey.trim()
   if (!chiave) {
     throw new ApiError('chiave_mancante', 'Manca la chiave API Anthropic: incollala nel pannello impostazioni.')
@@ -226,6 +251,7 @@ export function impostaControlloBudget(fn: ControlloBudget) {
 
 /** Ogni chiamata passa da qui prima di partire: nessun comando può aggirare il budget. */
 function verificaBudget() {
+  if (gratuita()) return
   const messaggio = controlloBudget?.()
   if (messaggio) throw new ApiError('budget_superato', messaggio, null, false)
 }
@@ -293,7 +319,14 @@ function leggiJson<T>(risposta: Anthropic.Message): T {
 }
 
 /** Output strutturato: la risposta è JSON conforme allo schema, senza parsing di etichette. */
+/** In modalità gratuita la risposta arriva da Claude.ai, già controllata dalla finestra del ponte. */
+async function viaClaudeAi<T>(opts: ChiamataBase & { schema: JsonSchema }): Promise<T> {
+  const testo = await chiediAClaudeAi({ chi: opts.chi, azione: opts.azione, system: opts.system, messages: opts.messages, schema: opts.schema as Record<string, unknown>, signal: opts.signal })
+  return JSON.parse(testo) as T
+}
+
 export async function chiamataStrutturata<T>(opts: ChiamataBase & { schema: JsonSchema }): Promise<T> {
+  if (gratuita()) return viaClaudeAi<T>(opts)
   verificaBudget()
   const risposta = await opts.client.messages.create(
     {
@@ -318,6 +351,11 @@ export async function chiamataStrutturata<T>(opts: ChiamataBase & { schema: Json
 export async function chiamataStrutturataStream<T>(
   opts: ChiamataBase & { schema: JsonSchema; onAvvio?: () => void },
 ): Promise<T> {
+  if (gratuita()) {
+    // Le chiamate gemelle non hanno una cache da sfruttare: partono subito, una dopo l'altra.
+    opts.onAvvio?.()
+    return viaClaudeAi<T>(opts)
+  }
   verificaBudget()
   const stream = opts.client.messages.stream(
     {
@@ -372,6 +410,12 @@ export async function chiamataConStrumenti(
     nomeToolConsegna: string
   },
 ): Promise<RisultatoStrumenti> {
+  if (gratuita()) {
+    throw new ApiError(
+      'solo_api',
+      "Questa funzione usa la ricerca o la lettura web dell'API, che Claude.ai non può restituire all'app in modo verificabile: nella modalità gratuita non è disponibile.",
+    )
+  }
   const messaggi: Messaggio[] = [...opts.messages]
   const blocchi: Anthropic.ContentBlock[] = []
   let consegna: unknown | null = null
@@ -418,6 +462,11 @@ export async function chiamataConStrumenti(
 
 /** Chat in streaming: invoca `onTesto` a ogni frammento ricevuto. */
 export async function chiamataChatStream(opts: ChiamataBase & { onTesto: (frammento: string) => void }): Promise<string> {
+  if (gratuita()) {
+    const testo = (await chiediAClaudeAi({ chi: opts.chi, azione: opts.azione, system: opts.system, messages: opts.messages, signal: opts.signal })).trim()
+    opts.onTesto(testo)
+    return testo
+  }
   verificaBudget()
   const stream = opts.client.messages.stream(
     {

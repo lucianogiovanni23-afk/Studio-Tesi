@@ -16,9 +16,8 @@ const SPUNTI = [
 export function Chat() {
   const messaggi = useStudio((s) => s.progetto.chat)
   const svuota = useStudio((s) => s.svuotaChat)
-  const haChiave = useStudio((s) => s.apiKey.length > 0)
+  const gratuita = useStudio((s) => !s.apiKey.trim())
   const modello = useStudio((s) => s.preferenze.modelli.chat)
-  const vai = useStudio((s) => s.vai)
   const inCorso = useChat((s) => s.inCorso)
   const errore = useChat((s) => s.errore)
   const [testo, setTesto] = useState('')
@@ -28,8 +27,8 @@ export function Chat() {
   const stima = useMemo(() => {
     void progetto // serve solo da segnale di ricalcolo
     void modello
-    return haChiave ? stimaMessaggio() : null
-  }, [haChiave, progetto, modello])
+    return gratuita ? null : stimaMessaggio()
+  }, [gratuita, progetto, modello])
 
   useEffect(() => {
     fine.current?.scrollIntoView({ block: 'end' })
@@ -58,7 +57,7 @@ export function Chat() {
         {messaggi.length === 0 && (
           <div className="spunti">
             {SPUNTI.map((s) => (
-              <button key={s} type="button" className="tema tema-spento" disabled={!haChiave || inCorso} onClick={() => invia(s)}>
+              <button key={s} type="button" className="tema tema-spento" disabled={inCorso} onClick={() => invia(s)}>
                 {s}
               </button>
             ))}
@@ -74,15 +73,7 @@ export function Chat() {
       </div>
 
       {errore && <p className="allerta allerta-errore">{errore}</p>}
-      {!haChiave ? (
-        <p className="allerta">
-          Serve la chiave API.{' '}
-          <button type="button" className="link" onClick={() => vai('impostazioni')}>
-            Impostazioni
-          </button>
-        </p>
-      ) : (
-        <form
+      <form
           className="chat-modulo"
           onSubmit={(e) => {
             e.preventDefault()
@@ -113,6 +104,7 @@ export function Chat() {
                 Invia
               </button>
             )}
+            {gratuita && <span className="nota">Gratis: ogni domanda passa da Claude.ai, con il contesto della tesi già pronto.</span>}
             {stima && (
               <span className="nota">
                 circa {formattaDollari(stima.minimo)} – {formattaDollari(stima.massimo)} a messaggio con {modello} (il contesto della tesi resta in cache per 5 minuti; il primo messaggio costa di più)
@@ -120,7 +112,6 @@ export function Chat() {
             )}
           </div>
         </form>
-      )}
     </section>
   )
 }
