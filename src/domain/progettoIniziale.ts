@@ -50,6 +50,8 @@ export function progettoIniziale(): Progetto {
     inAttesa: [],
     ricerche: [],
     osservazioni: [],
+    controllo: null,
+    chat: [],
     courseFiles: [],
     quadro: null,
     usi: [],
@@ -90,6 +92,9 @@ export function normalizzaProgetto(p: Progetto): Progetto {
   return {
     ...p,
     fonti: p.fonti.map((f) => (f.numero ? f : { ...f, numero: prossimo++ })),
+    osservazioni: (p.osservazioni ?? []).map((o) => ({ ...o, proposte: o.proposte ?? [], lettura: o.lettura ?? '' })),
+    controllo: p.controllo ?? null,
+    chat: p.chat ?? [],
     capitoli: p.capitoli.map((c) => ({
       ...c,
       sezioni: c.sezioni.map((s) => ({ ...nuovaSezione(s.titolo), ...s, fontiConfermate: s.fontiConfermate ?? false })),

@@ -193,12 +193,61 @@ export interface RegistroRicerca {
   passaggi: string[]
 }
 
+/** Una modifica proposta dal Revisore, da accettare o rifiutare una per una. */
+export interface PropostaRevisione {
+  id: string
+  capitoloId: string
+  sezioneId: string
+  /** "modifica" sostituisce un paragrafo; "commento" è un consiglio senza testo da sostituire. */
+  tipo: 'modifica' | 'commento'
+  /** Il paragrafo attuale, così com'è nel testo (verificato in codice). */
+  originale: string
+  proposta: string
+  motivo: string
+  stato: 'in_attesa' | 'accettata' | 'rifiutata'
+  avviso?: string
+}
+
 export interface Osservazione {
   id: string
   testo: string
+  /** Capitolo a cui si riferisce, oppure null per tutta la tesi. */
   capitoloId: string | null
   data: string
   stato: 'aperta' | 'risolta'
+  proposte: PropostaRevisione[]
+  /** Come il Revisore ha letto l'osservazione. */
+  lettura: string
+}
+
+export type TipoRilievo = 'terminologia' | 'ripetizione' | 'materia' | 'coerenza' | 'citazioni'
+
+export interface RilievoTesi {
+  id: string
+  tipo: TipoRilievo
+  origine: 'codice' | 'revisore'
+  capitoloId: string | null
+  sezioneId: string | null
+  /** Il passo del testo interessato, copiato dalla tesi. */
+  passo: string
+  problema: string
+  suggerimento: string
+}
+
+export interface ControlloTesi {
+  data: string
+  rilievi: RilievoTesi[]
+  /** true se c'è anche il giudizio del Revisore oltre al controllo in codice. */
+  conRevisore: boolean
+  /** Rilievi del Revisore scartati perché il passo citato non compare nella tesi. */
+  scartati: number
+}
+
+export interface MessaggioChat {
+  id: string
+  ruolo: 'studente' | 'assistente'
+  testo: string
+  data: string
 }
 
 // ---------------------------------------------------------------------------
@@ -294,6 +343,8 @@ export interface Progetto {
   inAttesa: Candidato[]
   ricerche: RegistroRicerca[]
   osservazioni: Osservazione[]
+  controllo: ControlloTesi | null
+  chat: MessaggioChat[]
   courseFiles: CourseFile[]
   quadro: QuadroTeorico | null
   usi: VoceUso[]

@@ -208,3 +208,36 @@ export const SCHEMA_GIUDIZI = consegna(
     },
   }),
 )
+
+export const SCHEMA_OSSERVAZIONE = consegna(
+  oggetto({
+    lettura: { type: 'string', description: 'Come hai interpretato l\'osservazione del relatore, in una o due frasi.' },
+    proposte: {
+      type: 'array',
+      minItems: 0,
+      items: oggetto({
+        posizione: { type: 'string', description: 'Sezione e paragrafo, esattamente come etichettati: per esempio "1.2 §3".' },
+        tipo: { type: 'string', enum: ['modifica', 'commento'] },
+        originale: { type: 'string', description: 'Per una modifica: il paragrafo attuale COPIATO ALLA LETTERA. Per un commento: stringa vuota.' },
+        proposta: { type: 'string', description: 'Per una modifica: il paragrafo riscritto, con gli stessi marcatori [F..] [C..]. Per un commento: il consiglio.' },
+        motivo: { type: 'string', description: 'Perché questa modifica risponde all\'osservazione.' },
+      }),
+    },
+  }),
+)
+
+export const SCHEMA_CONTROLLO = consegna(
+  oggetto({
+    rilievi: {
+      type: 'array',
+      minItems: 0,
+      items: oggetto({
+        tipo: { type: 'string', enum: ['terminologia', 'ripetizione', 'materia', 'coerenza'] },
+        sezione: { type: 'string', description: 'Etichetta della sezione, per esempio "3.2".' },
+        passo: { type: 'string', description: 'Il passo interessato, COPIATO ALLA LETTERA dal testo della tesi (una frase o parte di frase).' },
+        problema: stringa,
+        suggerimento: stringa,
+      }),
+    },
+  }),
+)

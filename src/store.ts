@@ -22,6 +22,10 @@ import type {
   Candidato,
   Capitolo,
   Citazione,
+  ControlloTesi,
+  MessaggioChat,
+  Osservazione,
+  PropostaRevisione,
   CourseFile,
   Fonte,
   ModelSlot,
@@ -145,6 +149,18 @@ export interface StatoStudio {
   /** Sostituisce testo e citazioni conservando prima il testo corrente fra le versioni. */
   applicaTesto: (capitoloId: string, sezioneId: string, testo: string, citazioni: Citazione[], nota: string, autore: Autore) => void
   setCitazioni: (capitoloId: string, sezioneId: string, citazioni: Citazione[]) => void
+
+  // revisione e chat
+  aggiungiOsservazione: (testo: string, capitoloId: string | null) => string
+  aggiornaOsservazione: (id: string, patch: Partial<Osservazione>) => void
+  rimuoviOsservazione: (id: string) => void
+  aggiornaPropostaRevisione: (osservazioneId: string, propostaId: string, patch: Partial<PropostaRevisione>) => void
+  setControllo: (c: ControlloTesi | null) => void
+  aggiungiMessaggio: (m: MessaggioChat) => void
+  aggiornaMessaggio: (id: string, testo: string) => void
+  svuotaChat: () => void
+  /** Segna come "usate" le fonti citate nei capitoli, con i capitoli in cui compaiono. */
+  segnaFontiCitate: () => number
 
   // glossario
   aggiungiVoce: (v: Omit<VoceGlossario, 'id'>) => void
@@ -351,6 +367,52 @@ export const useStudio = create<StatoStudio>()(
         conProgetto(set, (p) => ({
           capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) => mappaSezione(c, sezioneId, (s) => ({ ...s, citazioni }))),
         })),
+
+      aggiungiOsservazione: (testo, capitoloId) => {
+        const id = nuovoId('oss')
+        conProgetto(set, (p) => ({
+          osservazioni: [{ id, testo, capitoloId, data: adesso(), stato: 'aperta', proposte: [], lettura: '' }, ...p.osservazioni],
+        }))
+        return id
+      },
+      aggiornaOsservazione: (id, patch) =>
+        conProgetto(set, (p) => ({ osservazioni: p.osservazioni.map((o) => (o.id === id ? { ...o, ...patch } : o)) })),
+      rimuoviOsservazione: (id) => conProgetto(set, (p) => ({ osservazioni: p.osservazioni.filter((o) => o.id !== id) })),
+      aggiornaPropostaRevisione: (oid, pid, patch) =>
+        conProgetto(set, (p) => ({
+          osservazioni: p.osservazioni.map((o) =>
+            o.id === oid ? { ...o, proposte: o.proposte.map((x) => (x.id === pid ? { ...x, ...patch } : x)) } : o,
+          ),
+        })),
+      setControllo: (controllo) => conProgetto(set, () => ({ controllo })),
+      aggiungiMessaggio: (m) => conProgetto(set, (p) => ({ chat: [...p.chat, m].slice(-200) })),
+      aggiornaMessaggio: (id, testo) =>
+        conProgetto(set, (p) => ({ chat: p.chat.map((m) => (m.id === id ? { ...m, testo } : m)) })),
+      svuotaChat: () => conProgetto(set, () => ({ chat: [] })),
+      segnaFontiCitate: () => {
+        let segnate = 0
+        conProgetto(set, (p) => {
+          const perFonte = new Map<number, globalThis.Set<string>>()
+          for (const c of p.capitoli) {
+            for (const s of c.sezioni) {
+              for (const m of s.testo.matchAll(/\[F(\d+)\]/g)) {
+                const n = Number(m[1])
+                if (!perFonte.has(n)) perFonte.set(n, new Set())
+                perFonte.get(n)!.add(c.id)
+              }
+            }
+          }
+          return {
+            fonti: p.fonti.map((f) => {
+              const capitoli = perFonte.get(f.numero)
+              if (!capitoli) return f
+              segnate += 1
+              return { ...f, stato: 'usata' as const, usataIn: [...new Set([...f.usataIn, ...capitoli])] }
+            }),
+          }
+        })
+        return segnate
+      },
 
       aggiungiVoce: (v) => conProgetto(set, (p) => ({ glossario: [...p.glossario, { ...v, id: nuovoId('gl') }] })),
       aggiornaVoce: (id, patch) =>

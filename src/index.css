@@ -2338,3 +2338,190 @@ code {
   display: inline-flex;
   align-items: center;
 }
+
+/* ------------------------------------------------------------------ */
+/* Revisione e chat (fase 4)                                          */
+/* ------------------------------------------------------------------ */
+
+.schede-rev {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.elenco-osservazioni,
+.elenco-proposte,
+.elenco-rilievi {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.osservazione {
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  background: var(--bianco);
+}
+
+.oss-risolta {
+  opacity: 0.7;
+}
+
+.testo-osservazione {
+  margin: 8px 0 12px;
+  padding: 10px 14px;
+  border-left: 4px solid var(--terracotta);
+  background: var(--terracotta-chiaro);
+  border-radius: 0 var(--raggio-piccolo) var(--raggio-piccolo) 0;
+  white-space: pre-wrap;
+}
+
+.proposta-rev {
+  border-top: 1px solid var(--crema-2);
+  padding: 12px 0;
+}
+
+.proposta-rev-testa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.stato-prop-rifiutata {
+  opacity: 0.6;
+}
+
+.prima-dopo {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+@media (min-width: 900px) {
+  .prima-dopo {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.testo-prima,
+.testo-dopo {
+  padding: 10px 12px;
+  border-radius: var(--raggio-piccolo);
+}
+
+.testo-prima {
+  background: #f6e9e5;
+}
+
+.testo-dopo {
+  background: #e9f1e0;
+}
+
+.testo-prima p,
+.testo-dopo p {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.consiglio-testo {
+  background: var(--cielo-chiaro);
+  padding: 10px 12px;
+  border-radius: var(--raggio-piccolo);
+}
+
+.filtri-tipo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.rilievo {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--crema-2);
+}
+
+.rilievo p {
+  margin: 4px 0;
+}
+
+.bibliografia {
+  padding-left: 1.4em;
+  font-family: var(--serif);
+}
+
+.bibliografia li {
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.chat-messaggi {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 58vh;
+  min-height: 240px;
+  overflow-y: auto;
+  padding: 8px 2px;
+  margin-bottom: 10px;
+}
+
+.spunti {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.messaggio {
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 16px;
+}
+
+.messaggio-studente {
+  align-self: flex-end;
+  background: var(--oliva);
+  color: var(--bianco);
+  border-bottom-right-radius: 4px;
+}
+
+.messaggio-assistente {
+  align-self: flex-start;
+  background: var(--crema);
+  border: 1px solid var(--bordo);
+  border-bottom-left-radius: 4px;
+}
+
+.messaggio-chi {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 650;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.messaggio-testo {
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.chat-modulo textarea {
+  margin-bottom: 8px;
+}
+
+.modo-ipad .messaggio-chi,
+.modo-ipad .testo-prima p,
+.modo-ipad .testo-dopo p {
+  font-size: 15px;
+}

@@ -15,7 +15,7 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 | 1. Fondamenta | indice, capitoli, versioni, glossario; dominio olio/Calabria; scena 3D moderna; modi computer/iPad; Salva/Apri progetto; materiale del corso e quadro teorico | **fatta** |
 | 2. Biblioteca e ricerca | cataloghi accademici, fonti istituzionali, web verificato, schede di lettura, tabella della letteratura | **fatta** |
 | 3. Scrittura | scaletta da approvare, bozze, riscritture, alternative, citazioni verificate | **fatta** |
-| 4. Revisione | osservazioni del relatore, coerenza fra capitoli, bibliografia, chat | da fare |
+| 4. Revisione | osservazioni del relatore, coerenza fra capitoli, bibliografia, chat | **fatta** |
 | 5. Sincronizzazione | facoltativa, opzioni da proporre prima | da fare |
 
 ## Cosa c'è nella fase 1
@@ -133,6 +133,34 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
   per perderlo. Per questo il materiale comune viene costruito una sola volta per sezione e
   ricostruito solo quando cambiano fonti, scaletta o corso.
 
+## Cosa c'è nella fase 4
+
+- **Osservazioni del relatore**: le incolli e le colleghi a un capitolo (o a tutta la tesi). Il
+  Revisore riceve il testo a paragrafi etichettati ("1.2 §3"), spiega come ha letto
+  l'osservazione e propone modifiche puntuali (un paragrafo alla volta, con prima e dopo) o
+  consigli. Il codice controlla che il paragrafo "prima" esista davvero in quella posizione,
+  altrimenti la proposta viene scartata e contata; i marcatori nuovi senza citazione vengono
+  tolti e segnalati. Accetti o rifiuti **una per una**: la modifica accettata entra nel testo e il
+  testo precedente resta fra le versioni. L'osservazione si chiude quando decidi tu.
+- **Controllo di tutta la tesi**:
+  - in codice, gratuito: varianti del glossario usate al posto del termine scelto, frasi
+    ripetute fra sezioni, parole spia di sconfinamenti di materia, citazioni rosse e marcatori
+    senza citazione;
+  - con il Revisore, su richiesta e con stima: coerenza fra capitoli, punti di vista raccolta e
+    frantoio mescolati, analisi su una sola campagna, termini e materia. Ogni rilievo deve citare
+    un passo che esiste davvero nella tesi, altrimenti viene scartato.
+  Ogni rilievo porta alla sezione interessata.
+- **Bibliografia** generata dai metadati veri delle fonti effettivamente citate nel testo, in
+  ordine alfabetico, nello stile scelto (autore-anno: "Rossi, P. e Bianchi, S. (2023). Titolo.
+  Rivista. DOI"; note: "P. Rossi, S. Bianchi, Titolo, in «Rivista», 2023, DOI"), più il materiale
+  del corso citato. Segnala i marcatori senza fonte e le fonti mai citate; si copia o si scarica;
+  un bottone segna come "usate" le fonti citate, con i capitoli.
+- **Chat sulla tesi** (Sonnet 5.5, effort basso, in streaming): conosce capitoli e testi,
+  biblioteca con le schede, quadro teorico, osservazioni, risultati da approvare, stato degli
+  agenti e costi, con lo stesso vincolo di materia. La parte stabile del contesto (tesi e
+  biblioteca) è in cache e resta identica fra i messaggi; quella che cambia spesso (osservazioni,
+  agenti, costi) sta dopo. La conversazione è salvata nel progetto; stima del costo per messaggio.
+
 ## Computer e iPad: una sola app con due modi
 
 Ho scelto **una sola app che si adatta**, con due modi rilevati in automatico e modificabili a mano:
@@ -192,6 +220,13 @@ npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-
 npm run lint
 ```
 
+Il collaudo della fase 4 aggiunge 36 controlli: progetto aperto da file con testi, citazioni e
+fonti; osservazione del relatore con una proposta valida, una con paragrafo inventato (scartata),
+un marcatore nuovo (tolto) e un consiglio; accettazione con versione; controllo in codice
+(termini, materia, citazioni) e del Revisore (un rilievo con passo inventato scartato);
+bibliografia nei due stili, materiale del corso, fonti non citate; chat in streaming con contesto
+in cache identico fra i messaggi; iPad.
+
 Il collaudo della fase 3 aggiunge 38 controlli con lo Scrittore simulato in streaming: blocchi
 prima delle approvazioni, scaletta corretta e approvata, bozza con citazioni verdi e rosse (un
 estratto parafrasato e una fonte non approvata), prefisso identico al byte fra i comandi,
@@ -220,10 +255,11 @@ src/
   domain/      dominio della tesi, progetto iniziale, suggerimenti, etichette
   agents/      api, costi, corpus (pdf.js + BM25), citazioni, verifica URL, supervisore,
                prompt, schemi, Lettore del corso, cataloghi, Bibliotecario, schede,
-               Scrittore, controllo delle citazioni
+               Scrittore, controllo delle citazioni, Revisore, chat
   io/          Salva/Apri progetto, PDF dei paper
   scene/       scena 3D (ambiente, uliveto, scaffale, capitoli, agenti, telecamera)
-  screens/     cruscotto, scrittura, ricerca, biblioteca, corso, glossario, impostazioni, in arrivo
+  screens/     cruscotto, scrittura, ricerca, biblioteca, corso, revisione, glossario, chat,
+               impostazioni
   components/  conferme in linea, nuvolette, barra degli agenti, costi, modalità carta
   store.ts     Zustand + IndexedDB
 ```
