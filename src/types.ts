@@ -391,12 +391,16 @@ export interface Preferenze {
   modelli: Record<ModelSlot, string>
   modalitaScena: ModalitaScena
   modoUso: ModoUso
+  tema: Tema
 }
+
+export type Tema = 'auto' | 'chiaro' | 'scuro'
 
 export type Schermata =
   | 'cruscotto'
   | 'biblioteca'
   | 'ricerca'
+  | 'copertura'
   | 'corso'
   | 'scrittura'
   | 'revisione'

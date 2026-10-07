@@ -6,6 +6,7 @@ import { ModalitaCarta } from './components/ModalitaCarta'
 import { PonteClaude } from './components/PonteClaude'
 import { useModoUso } from './hooks/useModoUso'
 import { BottoneGuida, GuidaFinestra } from './components/Guida'
+import { BottoneCerca, CercaOvunque } from './components/CercaOvunque'
 import { NavigazionePrincipale, TestaSchermata } from './components/Navigazione'
 import { avviaCopieAutomatiche } from './io/copie'
 import { avviaSincronizzazione } from './io/sincronizzazione'
@@ -18,6 +19,7 @@ import { Biblioteca } from './screens/Biblioteca'
 import { Chat } from './screens/Chat'
 import { Revisione } from './screens/Revisione'
 import { Ricerca } from './screens/Ricerca'
+import { Copertura } from './screens/Copertura'
 import { Scrittura } from './screens/Scrittura'
 import { useStudio } from './store'
 import type { Schermata } from './types'
@@ -60,6 +62,8 @@ function Schermo({ s }: { s: Schermata }) {
       return <Biblioteca />
     case 'ricerca':
       return <Ricerca />
+    case 'copertura':
+      return <Copertura />
     case 'corso':
       return <Corso />
     case 'revisione':
@@ -79,6 +83,11 @@ export default function App() {
   const vai = useStudio((s) => s.vai)
   const titolo = useStudio((s) => s.progetto.titolo)
 
+  const tema = useStudio((s) => s.preferenze.tema)
+  const concentrazione = useStudio((s) => s.concentrazione)
+  useEffect(() => {
+    document.documentElement.dataset.tema = tema
+  }, [tema])
   useEffect(() => installaHookControllore(), [])
   useEffect(() => {
     void sincronizzaCorpus()
@@ -90,7 +99,7 @@ export default function App() {
   }, [schermata])
 
   return (
-    <div className={`app modo-${modo} schermata-${schermata}`}>
+    <div className={`app modo-${modo} schermata-${schermata} ${concentrazione && schermata === 'scrittura' ? 'concentrazione' : ''}`}>
       <header className="testata">
         <button type="button" className="marchio" onClick={() => vai('cruscotto')} aria-label="Studio tesi: vai all'inizio">
           <span className="marchio-segno" aria-hidden>
@@ -109,6 +118,7 @@ export default function App() {
         <NavigazionePrincipale />
         <div className="testata-azioni">
           <ChipSincronizzazione onApri={() => vai('impostazioni')} />
+          <BottoneCerca />
           <BottoneGuida />
           <button
             type="button"
@@ -129,14 +139,15 @@ export default function App() {
 
       <AgentiBar />
 
-      <main className="contenuto">
+      <div className="contenuto">
         <TestaSchermata />
         <Schermo s={schermata} />
-      </main>
+      </div>
 
       <ModalitaCarta />
       <PonteClaude />
       <GuidaFinestra />
+      <CercaOvunque />
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { costoStimato } from '../agents/api'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { annullaRicerca, avviaRicerca, stimaRicerca, useRicerca, type OpzioniRicerca } from '../agents/bibliotecario'
 import { CATALOGHI, provaCataloghi, type EsitoProva } from '../agents/cataloghi'
 import { Conferma } from '../components/Conferma'
@@ -16,7 +16,11 @@ function Modulo() {
   const gratuita = useStudio((s) => !s.apiKey.trim())
   const modelli = useStudio((s) => s.preferenze.modelli)
   const inCorso = useRicerca((s) => s.inCorso)
-  const [domanda, setDomanda] = useState('')
+  // Se si arriva dalla mappa di copertura la domanda è già pronta (si usa una volta sola).
+  const [domanda, setDomanda] = useState(() => useStudio.getState().domandaProposta)
+  useEffect(() => {
+    if (useStudio.getState().domandaProposta) useStudio.setState({ domandaProposta: '' })
+  }, [])
   const [scelte, setOpzioni] = useState<OpzioniRicerca>({ cataloghi: true, istituzionali: true, web: true })
   // Senza chiave la ricerca web non è disponibile: restano i cataloghi.
   const opzioni = gratuita ? { ...scelte, istituzionali: false, web: false } : scelte

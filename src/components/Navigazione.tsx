@@ -35,7 +35,7 @@ interface Voce {
 const VOCI: Voce[] = [
   { id: 'inizio', nome: 'Inizio', schermate: ['cruscotto'] },
   { id: 'corso', nome: 'Corso', numero: 1, schermate: ['corso', 'glossario'] },
-  { id: 'fonti', nome: 'Fonti', numero: 2, schermate: ['biblioteca', 'ricerca'] },
+  { id: 'fonti', nome: 'Fonti', numero: 2, schermate: ['biblioteca', 'ricerca', 'copertura'] },
   { id: 'scrittura', nome: 'Scrittura', numero: 3, schermate: ['scrittura'] },
   { id: 'revisione', nome: 'Revisione', numero: 4, schermate: ['revisione'] },
   { id: 'chat', nome: 'Chiedi', schermate: ['chat'] },
@@ -79,11 +79,18 @@ const SCHEDE: Partial<Record<Schermata, { id: Schermata; nome: string }[]>> = {
   ],
   biblioteca: [
     { id: 'biblioteca', nome: 'Biblioteca' },
-    { id: 'ricerca', nome: 'Cerca nuove fonti' },
+    { id: 'ricerca', nome: 'Nuove fonti' },
+    { id: 'copertura', nome: 'Copertura' },
   ],
   ricerca: [
     { id: 'biblioteca', nome: 'Biblioteca' },
-    { id: 'ricerca', nome: 'Cerca nuove fonti' },
+    { id: 'ricerca', nome: 'Nuove fonti' },
+    { id: 'copertura', nome: 'Copertura' },
+  ],
+  copertura: [
+    { id: 'biblioteca', nome: 'Biblioteca' },
+    { id: 'ricerca', nome: 'Nuove fonti' },
+    { id: 'copertura', nome: 'Copertura' },
   ],
 }
 
@@ -93,6 +100,7 @@ const INTRO: Record<Schermata, { titolo: string; frase: string } | null> = {
   glossario: { titolo: '1 · Corso', frase: 'I termini tecnici come li usa il corso: lo Scrittore è obbligato a usarli.' },
   biblioteca: { titolo: '2 · Fonti', frase: 'Le fonti raccolte: leggile con le schede e scegli quali usare in ogni sezione.' },
   ricerca: { titolo: '2 · Fonti', frase: 'Cerca articoli nei cataloghi accademici: niente entra in biblioteca senza la tua approvazione.' },
+  copertura: { titolo: '2 · Fonti', frase: 'Quali sezioni hanno abbastanza fonti e quali vanno rinforzate.' },
   scrittura: { titolo: '3 · Scrittura', frase: 'Sezione per sezione: scegli le fonti, approva la scaletta, poi bozza. Ogni citazione è verificata sulla fonte.' },
   revisione: { titolo: '4 · Revisione', frase: 'Osservazioni del relatore, controllo di tutta la tesi, bibliografia ed esportazione in Word.' },
   chat: { titolo: 'Chiedi', frase: "Domande libere sulla tesi: l'assistente conosce capitoli, fonti e osservazioni." },

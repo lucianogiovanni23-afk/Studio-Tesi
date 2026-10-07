@@ -76,7 +76,7 @@ export const MODELLI_PREDEFINITI: Preferenze['modelli'] = {
 export const OBIETTIVO_PREDEFINITO: ObiettivoPagine = { pagineMin: 50, pagineMax: 60, parolePerPagina: 300 }
 
 export function preferenzeIniziali(): Preferenze {
-  return { modelli: { ...MODELLI_PREDEFINITI }, modalitaScena: 'auto', modoUso: 'auto' }
+  return { modelli: { ...MODELLI_PREDEFINITI }, modalitaScena: 'auto', modoUso: 'auto', tema: 'auto' }
 }
 
 /** Firma dei file del corso pronti: cambia quando se ne aggiunge o toglie uno. */

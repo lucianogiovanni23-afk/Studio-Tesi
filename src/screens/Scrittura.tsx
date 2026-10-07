@@ -326,12 +326,41 @@ function ConCitazioni({ sez }: { sez: Sezione }) {
   )
 }
 
+/** In concentrazione resta solo il testo: una barra sottile dice dove sei e come uscire. */
+function BarraConcentrazione({ titolo, parole }: { titolo: string; parole: number }) {
+  const esci = useStudio((s) => s.setConcentrazione)
+  const parolePerPagina = useStudio((s) => s.progetto.obiettivo.parolePerPagina)
+  useEffect(() => {
+    const suTasto = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') esci(false)
+    }
+    window.addEventListener('keydown', suTasto)
+    return () => {
+      window.removeEventListener('keydown', suTasto)
+      esci(false)
+    }
+  }, [esci])
+  return (
+    <div className="barra-concentrazione" role="region" aria-label="Modalità concentrazione">
+      <span className="barra-concentrazione-titolo">{titolo}</span>
+      <span className="nota">
+        {parole} parole · circa {(parole / parolePerPagina).toLocaleString('it-IT', { maximumFractionDigits: 1 })} pagine
+      </span>
+      <button type="button" className="bottone bottone-piccolo" onClick={() => esci(false)}>
+        Esci <span className="tasto">Esc</span>
+      </button>
+    </div>
+  )
+}
+
 export function Scrittura() {
   const capitoli = useStudio((s) => s.progetto.capitoli)
   const capId = useStudio((s) => s.capitoloAperto)
   const sezId = useStudio((s) => s.sezioneAperta)
   const apri = useStudio((s) => s.apriSezione)
   const setCarta = useStudio((s) => s.setCarta)
+  const concentrazione = useStudio((s) => s.concentrazione)
+  const setConcentrazione = useStudio((s) => s.setConcentrazione)
   const modo = useModoUso()
   const largo = useLargo(1100)
   const tre = modo === 'computer' && largo
@@ -379,6 +408,7 @@ export function Scrittura() {
       )}
 
       <main className="colonna-testo">
+        {concentrazione && sez && <BarraConcentrazione titolo={`${indiceCap + 1}.${cap.sezioni.indexOf(sez) + 1} ${sez.titolo}`} parole={contaParoleTesto(sez.testo)} />}
         <div className="testa-sezione">
           <div>
             <p className="sopratitolo">
@@ -387,9 +417,14 @@ export function Scrittura() {
             <h2>{sez ? `${indiceCap + 1}.${cap.sezioni.indexOf(sez) + 1} ${sez.titolo}` : 'Nessuna sezione'}</h2>
             {sez?.obiettivo && <p className="obiettivo">{sez.obiettivo}</p>}
           </div>
-          <button type="button" className="bottone" onClick={() => setCarta(true)}>
-            Modalità carta
-          </button>
+          <div className="riga-editor azioni-sezione">
+            <button type="button" className="bottone" onClick={() => setConcentrazione(true)}>
+              Concentrazione
+            </button>
+            <button type="button" className="bottone" onClick={() => setCarta(true)}>
+              Modalità carta
+            </button>
+          </div>
         </div>
 
         {sez ? (

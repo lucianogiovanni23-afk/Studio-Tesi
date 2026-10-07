@@ -12,7 +12,7 @@ import { MODELLI_PREDEFINITI } from '../domain/progettoIniziale'
 import { apriProgetto, leggiFileProgetto, salvaProgetto, type AnteprimaFile } from '../io/fileProgetto'
 import { useModoUso } from '../hooks/useModoUso'
 import { useStudio } from '../store'
-import type { ModalitaScena, ModelSlot, ModoUso, StileCitazione } from '../types'
+import type { ModalitaScena, ModelSlot, ModoUso, StileCitazione, Tema } from '../types'
 
 function Chiave() {
   const apiKey = useStudio((s) => s.apiKey)
@@ -251,6 +251,14 @@ function Dispositivo() {
   return (
     <section className="pannello">
       <h2>Questo dispositivo</h2>
+      <label className="campo-blocco">
+        <span className="etichetta">Tema</span>
+        <select className="campo" value={preferenze.tema} onChange={(e) => setPreferenze({ tema: e.target.value as Tema })}>
+          <option value="auto">Automatico (come il dispositivo)</option>
+          <option value="chiaro">Chiaro</option>
+          <option value="scuro">Scuro</option>
+        </select>
+      </label>
       <label className="campo-blocco">
         <span className="etichetta">Modo d'uso</span>
         <select className="campo" value={preferenze.modoUso} onChange={(e) => setPreferenze({ modoUso: e.target.value as ModoUso })}>

@@ -103,6 +103,11 @@ export interface StatoStudio {
   capitoloAperto: string | null
   sezioneAperta: string | null
   cartaAperta: boolean
+  /** Fonte aperta in Biblioteca (anche arrivando dalla ricerca o dalla mappa di copertura). */
+  fonteAperta: string | null
+  /** Domanda da proporre nella pagina di ricerca, per esempio dalla mappa di copertura. */
+  domandaProposta: string
+  concentrazione: boolean
   nuvoletta: AgentKey | null
   agenti: Record<AgentKey, AgentRuntime>
   log: LogEntry[]
@@ -117,6 +122,9 @@ export interface StatoStudio {
   vai: (s: Schermata) => void
   apriSezione: (capitoloId: string, sezioneId: string | null) => void
   setCarta: (v: boolean) => void
+  apriFonte: (id: string | null) => void
+  proponiRicerca: (domanda: string) => void
+  setConcentrazione: (v: boolean) => void
   apriNuvoletta: (k: AgentKey | null) => void
 
   // progetto
@@ -246,6 +254,9 @@ export const useStudio = create<StatoStudio>()(
       capitoloAperto: null,
       sezioneAperta: null,
       cartaAperta: false,
+      fonteAperta: null,
+      domandaProposta: '',
+      concentrazione: false,
       nuvoletta: null,
       agenti: agentiVuoti(),
       log: [],
@@ -263,6 +274,9 @@ export const useStudio = create<StatoStudio>()(
       apriSezione: (capitoloAperto, sezioneAperta) =>
         set(() => ({ capitoloAperto, sezioneAperta, schermata: 'scrittura', nuvoletta: null })),
       setCarta: (cartaAperta) => set(() => ({ cartaAperta })),
+      apriFonte: (fonteAperta) => set(() => ({ fonteAperta, ...(fonteAperta ? { schermata: 'biblioteca' as const } : {}) })),
+      proponiRicerca: (domandaProposta) => set(() => ({ domandaProposta, schermata: 'ricerca' })),
+      setConcentrazione: (concentrazione) => set(() => ({ concentrazione })),
       apriNuvoletta: (nuvoletta) => set(() => ({ nuvoletta })),
 
       setTitolo: (titolo) => conProgetto(set, () => ({ titolo })),

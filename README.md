@@ -223,6 +223,23 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 - **Telefono**: i passi stanno in una barra in basso con le icone, Guida e Impostazioni in alto,
   niente scorrimento orizzontale.
 
+## Strumenti per lavorare meglio
+
+- **Cerca in tutta la tesi** (tasto in alto o Ctrl+K / ⌘K): un riquadro che cerca, in codice e
+  gratis, nel testo delle sezioni, nelle fonti (anche testo completo e schede), nelle lezioni
+  del corso, nel glossario, nelle osservazioni e nella chat. Le parole trovate sono evidenziate;
+  un risultato apre la sezione, la fonte o la pagina giusta.
+- **Mappa di copertura** (Fonti → Copertura): per ogni sezione conta le fonti scelte e quelle
+  citate. Senza fonti è rossa, con una sola ambra, con due o più verde. Suggerisce le fonti della
+  biblioteca che sembrano pertinenti e fa partire una ricerca già impostata per le sezioni da
+  rinforzare. In più c'è la griglia sezioni × fonti (● citata, ○ scelta, · forse utile) e
+  l'elenco delle fonti che nessuna sezione usa.
+- **Concentrazione** (Scrittura): restano solo il testo della sezione e una barra con titolo,
+  parole e pagine; Esc per uscire.
+- **Tema scuro**: automatico come il dispositivo, oppure chiaro o scuro a mano (Impostazioni →
+  Questo dispositivo). Tutti i colori sono variabili con una palette per tema; la modalità carta
+  resta un foglio chiaro.
+
 ## Computer e iPad: una sola app con due modi
 
 Ho scelto **una sola app che si adatta**, con due modi rilevati in automatico e modificabili a mano:
@@ -326,6 +343,15 @@ npm run dev      # http://localhost:5173
 npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-Tesi/)
 npm run lint
 ```
+
+Il collaudo degli strumenti aggiunge 31 controlli:
+- tema: automatico chiaro e scuro, scelto a mano, contrasto del testo, persistenza, carta chiara;
+- concentrazione: cosa sparisce, conteggio delle parole, uscita con Esc e con il tasto;
+- ricerca: Ctrl+K, testo della tesi con evidenziazione e apertura della sezione, testo completo
+  di una fonte, glossario, nessun risultato, Esc;
+- copertura: conteggi, fonte della sezione, suggerimenti, fonti non usate, filtro, griglia,
+  ricerca impostata e usata una volta sola;
+- iPhone: riquadro a tutto schermo, schede su una riga, niente scorrimento orizzontale.
 
 Il collaudo del riordino aggiunge 28 controlli: menu a percorso, barra degli agenti nascosta a
 riposo, scena caricata solo a richiesta, guida al primo avvio (chiusa resta chiusa, si riapre dal

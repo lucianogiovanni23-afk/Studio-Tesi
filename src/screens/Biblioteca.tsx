@@ -604,7 +604,8 @@ export function Biblioteca() {
   const [testo, setTesto] = useState('')
   const [tema, setTema] = useState<TemaFonte | ''>('')
   const [stato, setStato] = useState<StatoFonte | ''>('')
-  const [scelta, setScelta] = useState<string | null>(null)
+  const scelta = useStudio((s) => s.fonteAperta)
+  const setScelta = useStudio((s) => s.apriFonte)
   const [caricamento, setCaricamento] = useState<string | null>(null)
 
   const visibili = useMemo(() => {
