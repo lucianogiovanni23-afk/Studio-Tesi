@@ -39,40 +39,40 @@ export interface RaccoltaRicerca {
 function descriviErroreRicerca(codice: string): string {
   switch (codice) {
     case 'too_many_requests':
-      return 'La ricerca web ha superato il limite di richieste (rate limit). Attendi qualche minuto.'
+      return 'Troppe ricerche sul web in poco tempo. Aspetta qualche minuto.'
     case 'max_uses_exceeded':
-      return 'La ricerca web ha esaurito il numero massimo di ricerche consentite per questa chiamata.'
+      return 'Ho già fatto tutte le ricerche sul web che potevo per questa volta.'
     case 'query_too_long':
-      return 'Una query di ricerca era troppo lunga: servono query più brevi.'
+      return 'Una ricerca era troppo lunga: servono ricerche più corte.'
     case 'invalid_tool_input':
-      return 'Una query inviata alla ricerca web non era valida.'
+      return 'Una ricerca sul web era scritta male e non è partita.'
     case 'request_too_large':
-      return 'La richiesta di ricerca era troppo grande.'
+      return 'La ricerca era troppo grande.'
     case 'unavailable':
-      return 'La ricerca web è temporaneamente non disponibile.'
+      return 'In questo momento la ricerca sul web non funziona.'
     default:
-      return `La ricerca web ha restituito un errore (${codice}).`
+      return `La ricerca sul web non ha funzionato (errore ${codice}).`
   }
 }
 
 function descriviErroreLettura(codice: string): string {
   switch (codice) {
     case 'url_not_accessible':
-      return 'una pagina non era raggiungibile'
+      return 'una pagina non si apriva'
     case 'url_not_allowed':
-      return 'una pagina è bloccata (robots.txt, filtri di dominio o restrizioni)'
+      return 'una pagina non si lascia leggere (il sito la blocca)'
     case 'url_not_in_prior_context':
-      return "il modello ha tentato di leggere un URL che non veniva dalla ricerca: bloccato dall'API"
+      return "Claude ha provato ad aprire un link che non veniva dalla ricerca, e l'ho bloccato"
     case 'unsupported_content_type':
-      return 'una pagina aveva un formato non supportato'
+      return 'una pagina era in un formato che non so leggere'
     case 'too_many_requests':
-      return 'la lettura delle pagine ha superato il limite di richieste'
+      return 'troppe pagine aperte in poco tempo'
     case 'max_uses_exceeded':
-      return 'è stato raggiunto il numero massimo di pagine leggibili'
+      return 'ho già letto tutte le pagine che potevo'
     case 'url_too_long':
-      return 'un URL era troppo lungo'
+      return 'un link era troppo lungo'
     default:
-      return `la lettura di una pagina ha restituito un errore (${codice})`
+      return `una pagina non si è aperta (errore ${codice})`
   }
 }
 
@@ -178,7 +178,7 @@ export function raccogliRicerca(blocchi: Anthropic.ContentBlock[]): RaccoltaRice
     }
   }
 
-  for (const e of erroriLettura) errori.push(`Lettura delle pagine: ${e}.`)
+  for (const e of erroriLettura) errori.push(`Pagine web: ${e}.`)
 
   return {
     risultati: [...perUrl.values()],

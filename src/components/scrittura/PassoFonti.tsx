@@ -25,14 +25,14 @@ export function PassoFonti({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
       <section className="passo-scrittura passo-fatto">
         <div className="passo-testa">
           <h3>
-            <span className="passo-numero">1</span> Fonti della sezione approvate
+            <span className="passo-numero">1</span> Fonti scelte
           </h3>
           <button type="button" className="bottone bottone-piccolo bottone-vuoto" onClick={() => conferma(cap.id, sez.id, false)}>
             Modifica
           </button>
         </div>
         {approvate.length === 0 ? (
-          <p className="nota">Nessuna fonte della biblioteca: la sezione si basa sul materiale del corso.</p>
+          <p className="nota">Nessuna fonte: qui usi solo il materiale del corso.</p>
         ) : (
           <ul className="fonti-approvate">
             {approvate.map((f) => (
@@ -50,11 +50,11 @@ export function PassoFonti({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
   return (
     <section className="passo-scrittura passo-attivo">
       <h3>
-        <span className="passo-numero">1</span> Scegli e approva le fonti della sezione
+        <span className="passo-numero">1</span> Scegli le fonti
       </h3>
       <p className="nota">
-        Lo Scrittore potrà citare solo queste fonti (e il materiale del corso). In cima ci sono le più vicine al titolo e
-        all'obiettivo della sezione.
+        Lo Scrittore userà solo queste fonti, più il materiale del corso. In alto trovi quelle che c'entrano di più con
+        questa parte.
       </p>
       {fonti.length === 0 ? (
         <p className="nota">
@@ -62,7 +62,7 @@ export function PassoFonti({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
           <button type="button" className="link" onClick={() => vai('ricerca')}>
             Fai una ricerca
           </button>{' '}
-          oppure approva la sezione con il solo materiale del corso.
+          oppure vai avanti solo con il materiale del corso.
         </p>
       ) : (
         <ul className="scelta-fonti">
@@ -76,8 +76,8 @@ export function PassoFonti({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
                 />
                 <span>
                   <code>[F{f.numero}]</code> <strong>{autoreAnno(f, false)}</strong> {f.titolo}
-                  {peso > 0 && <small className="nota-ok"> · pertinente</small>}
-                  {!f.testoCompleto && <small className="nota"> · solo abstract</small>}
+                  {peso > 0 && <small className="nota-ok"> · c'entra</small>}
+                  {!f.testoCompleto && <small className="nota"> · solo il riassunto</small>}
                   {f.temi.length > 0 && <TemiChips temi={f.temi} sola />}
                 </span>
               </label>
@@ -93,7 +93,7 @@ export function PassoFonti({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
           conferma(cap.id, sez.id, true)
         }}
       >
-        {scelte.length ? `Approvo queste ${scelte.length} fonti` : 'Approvo: nessuna fonte, solo il corso'}
+        {scelte.length ? `Uso queste ${scelte.length} fonti` : 'Solo il corso, niente fonti'}
       </button>
     </section>
   )

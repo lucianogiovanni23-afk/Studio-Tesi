@@ -96,7 +96,7 @@ async function scaricaConApi(url: string): Promise<TestoConPagine | null> {
     model: s.preferenze.modelli.selezione,
     maxTokens: 300,
     chi: 'bibliotecario',
-    azione: 'testo completo open access',
+    azione: 'testo completo gratuito',
     system: [{ type: 'text', text: 'Leggi l\'indirizzo indicato con web_fetch e poi rispondi solo "fatto".' }],
     messages: [{ role: 'user', content: `Leggi con web_fetch questo documento: ${url}` }],
     // Versione base del tool: funziona su tutti i modelli, anche su Haiku 4.5.
@@ -121,7 +121,7 @@ export type EsitoTestoCompleto =
  */
 export async function recuperaTestoCompleto(fonteId: string, conApi = false): Promise<EsitoTestoCompleto> {
   const f = useStudio.getState().progetto.fonti.find((x) => x.id === fonteId)
-  if (!f) throw new ApiError('sconosciuto', 'Fonte non trovata.')
+  if (!f) throw new ApiError('sconosciuto', 'Non trovo più questa fonte.')
   const { elenco, primaPagina } = await indirizzi(f)
   if (elenco.length === 0) return { ok: false, motivo: 'nessun_indirizzo', indirizzi: [] }
 
@@ -140,7 +140,7 @@ export async function recuperaTestoCompleto(fonteId: string, conApi = false): Pr
       oaUrl: url,
       paginaIniziale: f.paginaIniziale ?? primaPagina ?? 1,
     })
-    logOk('bibliotecario', `Testo completo di "${f.titolo}" ${conApi ? 'letto tramite l\'API' : 'scaricato dal browser'}: ${letto.pagine.length || 'senza'} pagine.`)
+    logOk('bibliotecario', `Ho trovato il testo completo di "${f.titolo}" ${conApi ? '(letto da Claude)' : '(scaricato direttamente)'}: ${letto.pagine.length || 'senza'} pagine.`)
     return { ok: true, via: conApi ? 'api' : 'browser', pagine: letto.pagine.length, url }
   }
   return { ok: false, motivo: scartatoPerTitolo ? 'non_corrisponde' : 'bloccato', indirizzi: elenco }

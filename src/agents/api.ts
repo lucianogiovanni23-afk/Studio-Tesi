@@ -14,11 +14,11 @@ import type { JsonSchema } from './schemas'
  */
 
 export const MODELLI_DISPONIBILI: { id: string; nome: string; nota: string }[] = [
-  { id: 'claude-opus-5-5', nome: 'Claude Opus 5.5', nota: 'La più alta qualità di scrittura' },
-  { id: 'claude-opus-5', nome: 'Claude Opus 5', nota: 'Molto capace, più caro' },
-  { id: 'claude-sonnet-5-5', nome: 'Claude Sonnet 5.5', nota: 'Il Sonnet più recente: veloce e conveniente' },
-  { id: 'claude-sonnet-5', nome: 'Claude Sonnet 5', nota: 'Generazione precedente, stesso prezzo' },
-  { id: 'claude-haiku-4-5', nome: 'Claude Haiku 4.5', nota: 'Il più rapido ed economico' },
+  { id: 'claude-opus-5-5', nome: 'Claude Opus 5.5', nota: 'Scrive meglio di tutti' },
+  { id: 'claude-opus-5', nome: 'Claude Opus 5', nota: 'Molto bravo, ma costa di più' },
+  { id: 'claude-sonnet-5-5', nome: 'Claude Sonnet 5.5', nota: 'Il Sonnet più nuovo: veloce e costa poco' },
+  { id: 'claude-sonnet-5', nome: 'Claude Sonnet 5', nota: 'La versione di prima, stesso prezzo' },
+  { id: 'claude-haiku-4-5', nome: 'Claude Haiku 4.5', nota: 'Il più veloce e il più economico' },
 ]
 
 /** Haiku 4.5 non accetta il parametro effort: su quel modello va omesso. */
@@ -106,7 +106,7 @@ export function toApiError(err: unknown): ApiError {
   if (err instanceof Anthropic.AuthenticationError) {
     return new ApiError(
       'chiave_non_valida',
-      'Chiave API non valida o revocata (401). Controlla di aver incollato la chiave giusta nel pannello impostazioni.',
+      'La chiave API non funziona: forse è sbagliata o è stata cancellata. Controlla di aver incollato quella giusta nelle impostazioni.',
       401,
       false,
     )
@@ -117,7 +117,7 @@ export function toApiError(err: unknown): ApiError {
     if (testo.includes('credit balance')) {
       return new ApiError(
         'credito_esaurito',
-        "La chiave funziona, ma il credito Anthropic è finito. Puoi aggiungerne dalla console, oppure togliere la chiave in Impostazioni: l'app torna alla modalità gratuita tramite Claude.ai.",
+        "La chiave va, ma il credito su Anthropic è finito. Puoi ricaricarlo dalla console di Anthropic, oppure togliere la chiave nelle impostazioni: così l'app torna gratis con Claude.ai.",
         400,
         false,
       )
@@ -125,7 +125,7 @@ export function toApiError(err: unknown): ApiError {
     if ((testo.includes('web search') || testo.includes('web fetch')) && (testo.includes('not enabled') || testo.includes('disabled'))) {
       return new ApiError(
         'ricerca_web_disabilitata',
-        "La ricerca o la lettura web è disattivata per la tua organizzazione. Un amministratore la riattiva dalla Console Anthropic, in Settings → Privacy. È attiva per impostazione predefinita: se vedi questo messaggio, qualcuno l'ha disattivata.",
+        "La ricerca sul web è spenta per il tuo account. Chi gestisce l'account può riaccenderla dalla Console Anthropic, in Settings → Privacy. Di solito è accesa: se vedi questo messaggio, qualcuno l'ha spenta.",
         400,
         false,
       )
@@ -133,7 +133,7 @@ export function toApiError(err: unknown): ApiError {
     if (testo.includes('prompt is too long') || testo.includes('context') || testo.includes('exceed')) {
       return new ApiError(
         'contesto_troppo_lungo',
-        'Il materiale supera la finestra di contesto del modello. Scegli la profondità di lettura "sintetica" o carica meno PDF scansionati: preferisco fermarmi piuttosto che tagliare il testo di nascosto.',
+        'C\'è troppo materiale da leggere in una volta sola. Scegli la lettura "sintetica" o carica meno PDF scansionati: preferisco fermarmi piuttosto che tagliare il testo senza dirtelo.',
         400,
         false,
       )
@@ -141,18 +141,18 @@ export function toApiError(err: unknown): ApiError {
     if (testo.includes('model')) {
       return new ApiError(
         'modello_non_trovato',
-        `Il modello richiesto non è disponibile per questa chiave. Scegline un altro nel pannello impostazioni. Dettaglio: ${err.message}`,
+        `Con la tua chiave questo modello non si può usare. Scegline un altro nelle impostazioni. Dettaglio: ${err.message}`,
         400,
         false,
       )
     }
-    return new ApiError('richiesta_non_valida', `Richiesta rifiutata dall'API (400). ${err.message}`, 400, false)
+    return new ApiError('richiesta_non_valida', `Anthropic ha rifiutato la richiesta. ${err.message}`, 400, false)
   }
 
   if (err instanceof Anthropic.NotFoundError) {
     return new ApiError(
       'modello_non_trovato',
-      `Modello o endpoint non trovato (404). Controlla l'ID del modello nel pannello impostazioni. Dettaglio: ${err.message}`,
+      `Non trovo il modello scelto. Controllalo nelle impostazioni. Dettaglio: ${err.message}`,
       404,
       false,
     )
@@ -161,7 +161,7 @@ export function toApiError(err: unknown): ApiError {
   if (err instanceof Anthropic.RateLimitError) {
     return new ApiError(
       'limite_richieste',
-      'Limite di richieste raggiunto (429). Attendo il tempo indicato dal server e riprovo.',
+      'Troppe richieste in poco tempo. Aspetto un attimo e riprovo.',
       429,
       true,
       leggiRetryAfter(err),
@@ -171,27 +171,27 @@ export function toApiError(err: unknown): ApiError {
   if (err instanceof Anthropic.APIError) {
     const status = err.status ?? null
     if (status === 529) {
-      return new ApiError('sovraccarico', "L'API è temporaneamente sovraccarica (529). Riprovo fra poco.", 529, true)
+      return new ApiError('sovraccarico', 'Anthropic in questo momento è sovraccarico. Riprovo fra poco.', 529, true)
     }
     if (status !== null && status >= 500) {
-      return new ApiError('errore_server', `Errore del server Anthropic (${status}). Riprovo fra poco.`, status, true)
+      return new ApiError('errore_server', `Anthropic ha un problema sui suoi server (errore ${status}). Riprovo fra poco.`, status, true)
     }
     if (status === null) {
       return new ApiError(
         'rete',
-        'Impossibile raggiungere api.anthropic.com. Controlla la connessione, un proxy o un blocco del browser.',
+        'Non riesco a collegarmi ad Anthropic. Controlla internet, oppure se il browser o la rete lo stanno bloccando.',
         null,
         true,
       )
     }
-    return new ApiError('sconosciuto', `Errore imprevisto dall'API (${status}). ${err.message}`, status, false)
+    return new ApiError('sconosciuto', `Qualcosa è andato storto (errore ${status}). ${err.message}`, status, false)
   }
 
   if (err instanceof Error) {
     if (err.name === 'AbortError') throw err
-    return new ApiError('sconosciuto', `Errore inatteso: ${err.message}`)
+    return new ApiError('sconosciuto', `Qualcosa è andato storto: ${err.message}`)
   }
-  return new ApiError('sconosciuto', 'Errore inatteso durante la chiamata API.')
+  return new ApiError('sconosciuto', 'Qualcosa è andato storto mentre parlavo con Claude.')
 }
 
 // ---------------------------------------------------------------------------
@@ -211,8 +211,8 @@ export function modalitaGratuita(): boolean {
 
 /** Il costo da mostrare prima di un comando: in modalità gratuita non c'è. */
 export function costoStimato(stima: Pick<Stima, 'minimo' | 'massimo'>, volte = 1): string {
-  if (gratuita()) return 'Gratis tramite Claude.ai (copia e incolla)'
-  return `Costo stimato ${formattaDollari(stima.minimo * volte)} – ${formattaDollari(stima.massimo * volte)}`
+  if (gratuita()) return 'Gratis con Claude.ai (copia e incolla)'
+  return `Costa circa ${formattaDollari(stima.minimo * volte)} – ${formattaDollari(stima.massimo * volte)}`
 }
 
 export function creaClient(apiKey: string): Anthropic {
@@ -220,7 +220,7 @@ export function creaClient(apiKey: string): Anthropic {
   if (gratuita()) return {} as Anthropic
   const chiave = apiKey.trim()
   if (!chiave) {
-    throw new ApiError('chiave_mancante', 'Manca la chiave API Anthropic: incollala nel pannello impostazioni.')
+    throw new ApiError('chiave_mancante', 'Manca la chiave API: incollala nelle impostazioni.')
   }
   return new Anthropic({
     apiKey: chiave,
@@ -305,7 +305,7 @@ function leggiJson<T>(risposta: Anthropic.Message): T {
   if (risposta.stop_reason === 'max_tokens') {
     throw new ApiError(
       'richiesta_non_valida',
-      'La risposta è stata troncata dal limite di token prima di completare il JSON. Riprovo chiedendo un testo più compatto.',
+      'La risposta era troppo lunga e si è interrotta a metà. Riprovo chiedendo un testo più corto.',
       null,
       true,
     )
@@ -313,17 +313,17 @@ function leggiJson<T>(risposta: Anthropic.Message): T {
   if (risposta.stop_reason === 'refusal') {
     throw new ApiError(
       'richiesta_non_valida',
-      'Il modello ha rifiutato la richiesta per motivi di sicurezza. Riformula il compito o prova un altro modello nelle impostazioni.',
+      'Claude non ha voluto fare questo lavoro. Prova a chiederlo in un altro modo o scegli un altro modello nelle impostazioni.',
       null,
       false,
     )
   }
   const testo = testoDi(risposta)
-  if (!testo) throw new ApiError('sconosciuto', "L'API ha risposto senza contenuto: nessun JSON da leggere.", null, true)
+  if (!testo) throw new ApiError('sconosciuto', 'Claude ha mandato una risposta vuota.', null, true)
   try {
     return JSON.parse(testo) as T
   } catch {
-    throw new ApiError('sconosciuto', 'La risposta non è JSON valido nonostante lo schema richiesto.', null, true)
+    throw new ApiError('sconosciuto', 'La risposta di Claude non è nel formato giusto.', null, true)
   }
 }
 
@@ -422,7 +422,7 @@ export async function chiamataConStrumenti(
   if (gratuita()) {
     throw new ApiError(
       'solo_api',
-      "Questa funzione usa la ricerca o la lettura web dell'API, che Claude.ai non può restituire all'app in modo verificabile: nella modalità gratuita non è disponibile.",
+      "Questa funzione cerca e legge pagine sul web, e con Claude.ai l'app non può controllare cosa trova. Per questo nella modalità gratis non c'è: serve la chiave API.",
     )
   }
   const messaggi: Messaggio[] = [...opts.messages]
@@ -463,7 +463,7 @@ export async function chiamataConStrumenti(
 
   throw new ApiError(
     'sconosciuto',
-    'La ricerca non si è conclusa dopo diverse continuazioni. Riprovo con una richiesta più mirata.',
+    'La ricerca andava avanti senza finire mai. Riprovo con una richiesta più precisa.',
     null,
     true,
   )

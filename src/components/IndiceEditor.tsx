@@ -36,7 +36,7 @@ export function IndiceEditor() {
             <Conferma
               classe="icona"
               etichetta="✕"
-              domanda={c.sezioni.some((s) => s.testo.trim()) ? 'Il capitolo contiene testo: eliminarlo?' : 'Eliminare il capitolo?'}
+              domanda={c.sezioni.some((s) => s.testo.trim()) ? 'Nel capitolo c\'è del testo. Lo cancello?' : 'Cancello il capitolo?'}
               conferma="Elimina"
               pericolosa
               onConferma={() => st().rimuoviCapitolo(c.id)}
@@ -70,7 +70,7 @@ export function IndiceEditor() {
                   <Conferma
                     classe="icona"
                     etichetta="✕"
-                    domanda={s.testo.trim() ? 'La sezione contiene testo: eliminarla?' : 'Eliminare la sezione?'}
+                    domanda={s.testo.trim() ? 'Nella sezione c\'è del testo. La cancello?' : 'Cancello la sezione?'}
                     conferma="Elimina"
                     pericolosa
                     onConferma={() => st().rimuoviSezione(c.id, s.id)}
@@ -80,7 +80,7 @@ export function IndiceEditor() {
                   className="campo campo-obiettivo"
                   rows={2}
                   value={s.obiettivo}
-                  placeholder="Obiettivo della sezione: che cosa deve dimostrare"
+                  placeholder="A cosa serve questa sezione? Cosa deve dimostrare?"
                   onChange={(e) => st().aggiornaSezione(c.id, s.id, { obiettivo: e.target.value })}
                   aria-label={`Obiettivo della sezione ${i + 1}.${j + 1}`}
                 />

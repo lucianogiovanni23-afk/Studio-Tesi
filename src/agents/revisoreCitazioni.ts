@@ -37,7 +37,7 @@ export interface EsitoControllo {
 export function controllaInCodice(capitoloId: string, sezioneId: string): EsitoControllo {
   const s = useStudio.getState()
   const sez = s.progetto.capitoli.find((c) => c.id === capitoloId)?.sezioni.find((x) => x.id === sezioneId)
-  if (!sez) throw new ApiError('sconosciuto', 'Sezione non trovata.')
+  if (!sez) throw new ApiError('sconosciuto', 'Non trovo più questa sezione.')
   const fonti = s.progetto.fonti
   const aggiornate = sez.citazioni.map((c) => {
     const testo = testoDiRiferimento(c)
@@ -79,8 +79,8 @@ interface Giudizi {
 export async function giudicaCitazioni(capitoloId: string, sezioneId: string): Promise<void> {
   const s = useStudio.getState()
   const sez = s.progetto.capitoli.find((c) => c.id === capitoloId)?.sezioni.find((x) => x.id === sezioneId)
-  if (!sez) throw new ApiError('sconosciuto', 'Sezione non trovata.')
-  if (sez.citazioni.length === 0) throw new ApiError('sconosciuto', 'Questa sezione non ha citazioni da giudicare.')
+  if (!sez) throw new ApiError('sconosciuto', 'Non trovo più questa sezione.')
+  if (sez.citazioni.length === 0) throw new ApiError('sconosciuto', 'In questa sezione non ci sono citazioni da controllare.')
 
   const elenco = sez.citazioni
     .map((c, i) => {
@@ -95,11 +95,11 @@ export async function giudicaCitazioni(capitoloId: string, sezioneId: string): P
     .join('\n\n')
 
   const client = creaClient(s.apiKey)
-  s.patchAgente('revisore', { status: 'lavoro', etichetta: 'giudico le citazioni…', errore: null })
+  s.patchAgente('revisore', { status: 'lavoro', etichetta: 'controllo se le citazioni reggono…', errore: null })
   try {
     const consegna = await sorveglia<Consegna<Giudizi>>({
       agente: 'revisore',
-      passo: 'Giudizio sulle citazioni',
+      passo: 'Controllo delle citazioni',
       esegui: (_t, suggerimento) =>
         chiamataStrutturata<Consegna<Giudizi>>({
           client,
@@ -130,11 +130,11 @@ export async function giudicaCitazioni(capitoloId: string, sezioneId: string): P
         return g ? { ...c, giudizio: g.giudizio, motivo: g.motivo } : c
       })
     useStudio.getState().setCitazioni(capitoloId, sezioneId, aggiornate)
-    useStudio.getState().patchAgente('revisore', { status: 'fatto', etichetta: 'citazioni giudicate', passaggi: consegna.passaggi, errore: null })
+    useStudio.getState().patchAgente('revisore', { status: 'fatto', etichetta: 'citazioni controllate', passaggi: consegna.passaggi, errore: null })
     const deboli = aggiornate.filter((c) => c.giudizio && c.giudizio !== 'supportata').length
-    logOk('revisore', `Citazioni di "${sez.titolo}": ${aggiornate.length} giudicate, ${deboli} parziali o non supportate.`)
+    logOk('revisore', `Citazioni di "${sez.titolo}": ne ho controllate ${aggiornate.length}, ${deboli} non reggono del tutto.`)
   } catch (err) {
-    useStudio.getState().patchAgente('revisore', { status: 'errore', etichetta: 'errore', errore: err instanceof Error ? err.message : 'Errore.' })
+    useStudio.getState().patchAgente('revisore', { status: 'errore', etichetta: "c'è stato un problema", errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     throw err
   }
 }

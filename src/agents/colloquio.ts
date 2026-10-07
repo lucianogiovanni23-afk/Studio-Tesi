@@ -16,8 +16,8 @@ const STORIA = 10
 
 function ruolo(k: AgentKey): string {
   const d = AGENTE[k]
-  return `In questa conversazione sei ${d.persona.nome}, ${d.persona.titolo.toLowerCase()} dello studio della tesi. Il tuo compito: ${d.ruolo}
-Parli in prima persona, con cortesia professionale e frasi brevi, come un collega in ufficio. Se la domanda riguarda il lavoro di un collega (Giulia Romano per il corso, Marco Ferrara per le fonti, Luca Esposito per la scrittura, Elena Conti per la revisione), rispondi comunque e indica a chi chiedere.`
+  return `In questa conversazione sei ${d.persona.femminile ? 'la' : 'il'} ${d.persona.nome.toLowerCase()} dello studio della tesi. Il tuo compito: ${d.ruolo}
+Parli in prima persona, in modo semplice e alla mano, come un collega simpatico in ufficio: frasi brevi, niente paroloni, dai del tu. Se la domanda riguarda il lavoro di un collega (la lettrice del corso per le lezioni, il bibliotecario per le fonti, lo scrittore per la scrittura, la revisora per i controlli), rispondi comunque e digli a chi chiedere.`
 }
 
 const lavori = new Set<AgentKey>()
@@ -54,7 +54,7 @@ export async function chiediAgente(k: AgentKey, domanda: string): Promise<void> 
       maxTokens: 2000,
       effort: 'low',
       chi: 'chat',
-      azione: `domanda a ${AGENTE[k].persona.nome}`,
+      azione: `domanda a ${AGENTE[k].persona.nome.toLowerCase()}`,
       system: [{ type: 'text', text: `${SYSTEM_CHAT}\n\n${ruolo(k)}` }],
       messages: messaggi,
       onTesto: (pezzo) => {
@@ -66,7 +66,7 @@ export async function chiediAgente(k: AgentKey, domanda: string): Promise<void> 
     useStudio.getState().faiParlare(Math.min(6000, 1500 + (finale || '').length * 25))
   } catch (err) {
     const annullato = err instanceof DOMException && err.name === 'AbortError'
-    useStudio.getState().aggiornaBattuta(k, id, annullato ? 'Va bene, lasciamo stare per ora.' : `Non sono riuscito a rispondere: ${toApiError(err).message}`)
+    useStudio.getState().aggiornaBattuta(k, id, annullato ? 'Va bene, lasciamo stare per ora.' : `Scusa, non sono riuscito a risponderti: ${toApiError(err).message}`)
   } finally {
     lavori.delete(k)
   }

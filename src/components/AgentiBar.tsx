@@ -4,10 +4,10 @@ import { PassaggiRagionamento } from './PassaggiRagionamento'
 
 const TESTO_STATO = {
   riposo: 'a riposo',
-  lavoro: 'al lavoro',
+  lavoro: 'sta lavorando',
   attesa: 'aspetta te',
   fatto: 'ha finito',
-  errore: 'errore',
+  errore: 'qualcosa non va',
 }
 
 /**

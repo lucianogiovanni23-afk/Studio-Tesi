@@ -3,6 +3,7 @@ import { ETICHETTE_SLOT } from '../agents/agenti'
 import { MODELLI_DISPONIBILI } from '../agents/api'
 import { eseguiDiagnosi, type EsitoDiagnosi } from '../agents/diagnostica'
 import { creaCopia, elencoCopie, ripristinaCopia, type CopiaSicurezza } from '../io/copie'
+import { cosaSiCancella, ripristinaTenendoIlCorso } from '../io/ripristino'
 import { AvvisoChiave } from '../components/AvvisoChiave'
 import { Conferma } from '../components/Conferma'
 import { Costi } from '../components/Costi'
@@ -25,34 +26,34 @@ function Chiave() {
       <h2>Come lavorano gli agenti</h2>
       {apiKey ? (
         <p className="nota">
-          <strong>Con la chiave API</strong>: gli agenti lavorano da soli e paghi a consumo. Togliendo la chiave si torna alla
-          modalità gratuita.
+          <strong>Con la chiave API</strong>: gli agenti lavorano da soli e paghi solo quello che usi. Se togli la chiave torni
+          alla versione gratis.
         </p>
       ) : (
         <div className="banda banda-info">
           <p>
-            <strong>Modalità gratuita attiva.</strong> Ogni comando prepara una richiesta completa: la copi su{' '}
+            <strong>Stai usando la versione gratis.</strong> Ogni comando ti prepara un messaggio già pronto: lo copi su{' '}
             <a href="https://claude.ai/new" target="_blank" rel="noreferrer">
               claude.ai
             </a>{' '}
-            (basta un account gratuito), incolli qui la risposta e l'app la controlla come sempre: citazioni, estratti, lessico.
+            (basta un account gratis), incolli qui la risposta e l'app la controlla come sempre (citazioni, pezzi di fonte, parole del corso).
           </p>
           <p className="nota">
-            Funziona tutto tranne la ricerca sul web e sui siti istituzionali (restano i cataloghi accademici e i PDF che
-            carichi tu). Claude.ai gratuito ha un limite di messaggi al giorno: se lo raggiungi, riprendi il giorno dopo.
+            Funziona tutto tranne la ricerca su internet e sui siti ufficiali (puoi sempre cercare negli archivi universitari e
+            caricare i tuoi PDF). Claude.ai gratis ha un limite di messaggi al giorno: se lo finisci, riprendi il giorno dopo.
           </p>
         </div>
       )}
-      <h3>Chiave API Anthropic (facoltativa)</h3>
+      <h3>Chiave API (non obbligatoria)</h3>
       <AvvisoChiave />
       {apiKey ? (
         <div className="riga-editor">
-          <span className="nota nota-ok">Chiave salvata in questo browser (termina con …{apiKey.slice(-4)}).</span>
+          <span className="nota nota-ok">Chiave salvata su questo browser (finisce con …{apiKey.slice(-4)}).</span>
           <Conferma
             classe="bottone bottone-vuoto"
-            etichetta="Rimuovi la chiave"
-            domanda="Rimuovere la chiave da questo browser?"
-            conferma="Rimuovi"
+            etichetta="Togli la chiave"
+            domanda="Tolgo la chiave da questo browser?"
+            conferma="Togli"
             pericolosa
             onConferma={() => setApiKey('')}
           />
@@ -99,9 +100,9 @@ function FileProgetto() {
     <section className="pannello">
       <h2>Salva e apri il progetto</h2>
       <p className="nota">
-        Il progetto vive in questo browser. Con la sincronizzazione qui sopra si allinea da solo; in alternativa salvalo in
-        un file, mettilo in iCloud o Drive e aprilo da qui sull'altro dispositivo. Il file contiene indice, testi con versioni, biblioteca, glossario,
-        osservazioni, costi e il testo estratto dei PDF. Non contiene la chiave API.
+        Il tuo lavoro è salvato in questo browser. Con la sincronizzazione qui sopra si aggiorna da solo sugli altri dispositivi.
+        Se no, salvalo in un file, mettilo su iCloud o Drive e aprilo da qui sull'altro dispositivo. Nel file c'è tutto (indice,
+        testi e versioni, fonti, glossario, note del relatore, costi, testo dei PDF) tranne la chiave API.
       </p>
       <div className="riga-editor">
         <button
@@ -110,9 +111,9 @@ function FileProgetto() {
           onClick={() => {
             try {
               const nome = salvaProgetto()
-              setMessaggio({ tono: 'ok', testo: `Salvato come "${nome}" nella cartella dei download.` })
+              setMessaggio({ tono: 'ok', testo: `Salvato come "${nome}" nei Download.` })
             } catch (err) {
-              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Salvataggio non riuscito.' })
+              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Non sono riuscito a salvare.' })
             }
           }}
         >
@@ -134,12 +135,12 @@ function FileProgetto() {
             try {
               setAnteprima(await leggiFileProgetto(file))
             } catch (err) {
-              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'File non leggibile.' })
+              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Non riesco a leggere questo file.' })
             }
           }}
         />
       </div>
-      {salvatoIl && <p className="nota">Ultima copia su file: {new Date(salvatoIl).toLocaleString('it-IT')}.</p>}
+      {salvatoIl && <p className="nota">Ultimo salvataggio su file: {new Date(salvatoIl).toLocaleString('it-IT')}.</p>}
 
       {anteprima && (
         <div className="banda banda-attesa">
@@ -149,7 +150,7 @@ function FileProgetto() {
             salvato il {new Date(anteprima.salvatoIl).toLocaleString('it-IT')} · {anteprima.capitoli} capitoli ·{' '}
             {anteprima.parole} parole · {anteprima.fonti} fonti · {anteprima.fileCorso} file del corso
           </p>
-          <p>Aprendolo, il progetto attuale in questo browser verrà sostituito. Se ti serve, salvalo prima.</p>
+          <p>Se lo apri, prende il posto del lavoro che hai ora in questo browser. Se ti serve, salvalo prima.</p>
           <div className="riga-editor">
             <button
               type="button"
@@ -159,12 +160,12 @@ function FileProgetto() {
                   await apriProgetto(anteprima)
                   setMessaggio({ tono: 'ok', testo: 'Progetto aperto.' })
                 } catch (err) {
-                  setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Apertura non riuscita.' })
+                  setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Non sono riuscito ad aprirlo.' })
                 }
                 setAnteprima(null)
               }}
             >
-              Sostituisci il progetto attuale
+              Apri e sostituisci
             </button>
             <button type="button" className="bottone bottone-vuoto" onClick={() => setAnteprima(null)}>
               Annulla
@@ -183,7 +184,7 @@ function FileProgetto() {
 
 const ESEMPIO_STILE: Record<StileCitazione, string> = {
   'autore-anno': 'Nel testo: (Rossi, 2021). Bibliografia in ordine alfabetico.',
-  note: 'Nel testo: un numero in apice. Riferimento completo in nota a piè di pagina.',
+  note: 'Nel testo: un numerino in alto. Il riferimento completo va in nota a piè di pagina.',
 }
 
 function Tesi() {
@@ -212,10 +213,10 @@ function Tesi() {
           <span className="etichetta">Parole per pagina</span>
           <input className="campo" type="number" inputMode="numeric" min={150} max={600} value={obiettivo.parolePerPagina} onChange={(e) => setObiettivo({ parolePerPagina: numero(e.target.value, 150, 600) })} />
         </label>
-        <span className="nota">300 parole è una pagina Word in Times 12 con interlinea 1,5. Se il relatore chiede un altro formato, cambia il numero.</span>
+        <span className="nota">300 parole sono circa una pagina Word (Times 12, interlinea 1,5). Se il relatore vuole un altro formato, cambia il numero.</span>
       </fieldset>
       <label className="campo-blocco">
-        <span className="etichetta">Stile di citazione</span>
+        <span className="etichetta">Come citare le fonti</span>
         <select className="campo" value={stile} onChange={(e) => setStile(e.target.value as StileCitazione)}>
           <option value="autore-anno">Autore-anno</option>
           <option value="note">Note a piè di pagina</option>
@@ -228,7 +229,7 @@ function Tesi() {
       </label>
       {caso.attivo && (
         <label className="campo-blocco">
-          <span className="etichetta">Descrizione del caso, anonimizzata</span>
+          <span className="etichetta">Descrivi l'azienda (senza il nome vero)</span>
           <textarea
             className="campo"
             rows={3}
@@ -236,7 +237,7 @@ function Tesi() {
             placeholder="Per esempio: frantoio della Piana di Gioia Tauro, molitura conto terzi, dati di cinque campagne."
             onChange={(e) => setCaso({ descrizione: e.target.value })}
           />
-          <span className="nota">Non usare il nome reale dell'azienda: gli agenti lo riceveranno nei loro prompt.</span>
+          <span className="nota">Non scrivere il nome vero dell'azienda: questo testo viene mandato agli agenti.</span>
         </label>
       )}
     </section>
@@ -260,15 +261,15 @@ function Dispositivo() {
         </select>
       </label>
       <label className="campo-blocco">
-        <span className="etichetta">Modo d'uso</span>
+        <span className="etichetta">Come lo usi</span>
         <select className="campo" value={preferenze.modoUso} onChange={(e) => setPreferenze({ modoUso: e.target.value as ModoUso })}>
           <option value="auto">Automatico (ora: {modo === 'ipad' ? 'iPad' : 'computer'})</option>
-          <option value="computer">Computer — postazione completa</option>
-          <option value="ipad">iPad — lettura e decisioni</option>
+          <option value="computer">Computer — tutto</option>
+          <option value="ipad">iPad — leggere e decidere</option>
         </select>
         <span className="nota">
-          Computer: editor a tre colonne, ricerca, revisione, gestione dei file. iPad: rilettura in modalità carta,
-          approvazioni, schede, osservazioni, chat e scrittura leggera, con tocchi più grandi e scena ridotta.
+          Computer: scrittura completa, ricerca, revisione e file. iPad: rileggere su carta, approvare, schede, note del
+          relatore, chat e piccole modifiche, con bottoni più grandi e scena più leggera.
         </span>
       </label>
       <label className="campo-blocco">
@@ -278,7 +279,7 @@ function Dispositivo() {
           value={preferenze.modalitaScena}
           onChange={(e) => setPreferenze({ modalitaScena: e.target.value as ModalitaScena })}
         >
-          <option value="auto">Automatica (ridotta su iPad e sui dispositivi meno potenti)</option>
+          <option value="auto">Automatica (più leggera su iPad e dispositivi lenti)</option>
           <option value="completa">Completa — ombre e uliveto fitto</option>
           <option value="ridotta">Ridotta — più leggera</option>
           <option value="spenta">Spenta — solo pannelli</option>
@@ -293,7 +294,7 @@ function Modelli() {
   const setModello = useStudio((s) => s.setModello)
   return (
     <section className="pannello">
-      <h2>Modelli degli agenti</h2>
+      <h2>Modelli IA degli agenti</h2>
       {(Object.keys(ETICHETTE_SLOT) as ModelSlot[]).map((slot) => (
         <label key={slot} className="campo-blocco">
           <span className="etichetta">{ETICHETTE_SLOT[slot]}</span>
@@ -318,14 +319,14 @@ function Diagnostica() {
   const [lavoro, setLavoro] = useState(false)
   return (
     <section className="pannello">
-      <h2>Diagnostica con la tua chiave</h2>
+      <h2>Prova la tua chiave</h2>
       <p className="nota">
-        Prova reale, con l'API vera, di ciò che usa l'app: ogni modello configurato risponde con un output strutturato minimo (lo Scrittore anche
-        in streaming), la ricerca web fa una sola ricerca e i cataloghi una query dal browser. Costa pochi centesimi.
+        Fa una prova vera di tutto quello che usa l'app: ogni modello scelto risponde a una domanda piccolissima, la ricerca su
+        internet fa una sola ricerca e gli archivi online una sola richiesta. Costa pochi centesimi.
       </p>
       <label className="interruttore">
         <input type="checkbox" checked={conWeb} onChange={(e) => setConWeb(e.target.checked)} />
-        <span>Prova anche la ricerca web (1 ricerca, 1 centesimo)</span>
+        <span>Prova anche la ricerca su internet (1 centesimo)</span>
       </label>
       <button
         type="button"
@@ -338,7 +339,7 @@ function Diagnostica() {
           setLavoro(false)
         }}
       >
-        {lavoro ? 'Prova in corso…' : 'Avvia la diagnostica'}
+        {lavoro ? 'Prova in corso…' : 'Fai la prova'}
       </button>
       {!haChiave && <p className="nota">Prima salva la chiave API.</p>}
       {esiti.length > 0 && (
@@ -372,21 +373,21 @@ function CopieSicurezza() {
 
   return (
     <section className="pannello">
-      <h2>Copie di sicurezza automatiche</h2>
+      <h2>Copie di sicurezza</h2>
       <p className="nota">
-        Il browser conserva le ultime 10 istantanee del progetto: una all'avvio e una ogni 15 minuti se qualcosa è cambiato. Servono a tornare
-        indietro dopo un errore; per proteggerlo davvero usa la sincronizzazione o il file su iCloud o Drive.
+        Il browser tiene le ultime 10 copie del tuo lavoro: una quando apri l'app e una ogni 15 minuti se hai cambiato qualcosa.
+        Servono per tornare indietro se sbagli. Per non perdere niente, usa la sincronizzazione o il file su iCloud o Drive.
       </p>
       <button
         type="button"
         className="bottone"
         onClick={async () => {
           const fatta = await creaCopia('Creata da te', true)
-          setMessaggio(fatta ? 'Copia creata.' : 'Nessuna modifica dall\'ultima copia.')
+          setMessaggio(fatta ? 'Copia creata.' : 'Non hai cambiato niente dall\'ultima copia.')
           await aggiorna()
         }}
       >
-        Crea una copia adesso
+        Fai una copia adesso
       </button>
       {messaggio && <p className="nota nota-ok">{messaggio}</p>}
       {copie && copie.length === 0 && <p className="nota">Ancora nessuna copia.</p>}
@@ -400,11 +401,11 @@ function CopieSicurezza() {
               <Conferma
                 classe="bottone bottone-piccolo bottone-vuoto"
                 etichetta="Ripristina"
-                domanda="Tornare a questa copia? Lo stato attuale viene salvato prima come copia."
+                domanda="Torni a questa copia? Prima salvo quello che hai adesso come copia."
                 conferma="Ripristina"
                 onConferma={async () => {
                   await ripristinaCopia(c.id)
-                  setMessaggio('Copia ripristinata. Lo stato precedente è fra le copie.')
+                  setMessaggio('Fatto, sei tornato a quella copia. Quello che avevi prima è fra le copie.')
                   await aggiorna()
                 }}
               />
@@ -416,12 +417,68 @@ function CopieSicurezza() {
   )
 }
 
+function Ripristino() {
+  const [aperto, setAperto] = useState(false)
+  const [fatto, setFatto] = useState(false)
+  const [lavoro, setLavoro] = useState(false)
+  const conta = aperto ? cosaSiCancella() : null
+  return (
+    <section className="pannello pannello-ripristino">
+      <h2>Ricomincia da capo</h2>
+      <p className="nota">
+        Cancella tutto quello che hai fatto (fonti, testo scritto, ricerche, note del relatore, chat) e riparti pulito. Le lezioni del corso
+        che hai caricato restano dove sono.
+      </p>
+      {!aperto ? (
+        <button type="button" className="bottone bottone-pericolo" onClick={() => (setAperto(true), setFatto(false))}>
+          Ripristina
+        </button>
+      ) : (
+        conta && (
+          <div className="banda banda-attesa" role="group" aria-label="Conferma ripristino">
+            <p>
+              Sicuro? Se ne vanno <strong>{conta.fonti} fonti</strong>, <strong>{conta.parole} parole</strong> scritte e{' '}
+              <strong>{conta.osservazioni} note del relatore</strong>. Restano le tue <strong>{conta.lezioni} lezioni</strong>. Prima
+              faccio comunque una copia di sicurezza, così se cambi idea la recuperi qui sotto.
+            </p>
+            <div className="riga-editor">
+              <button
+                type="button"
+                className="bottone bottone-pericolo"
+                disabled={lavoro}
+                onClick={async () => {
+                  setLavoro(true)
+                  await creaCopia('Prima del ripristino', true)
+                  await ripristinaTenendoIlCorso()
+                  setLavoro(false)
+                  setAperto(false)
+                  setFatto(true)
+                }}
+              >
+                Sì, cancella tutto tranne le lezioni
+              </button>
+              <button type="button" className="bottone bottone-vuoto" onClick={() => setAperto(false)}>
+                No, lascia stare
+              </button>
+            </div>
+          </div>
+        )
+      )}
+      {fatto && (
+        <p className="nota nota-ok" role="status">
+          Fatto, si riparte da zero. Le lezioni sono ancora lì.
+        </p>
+      )}
+    </section>
+  )
+}
+
 function Registro() {
   const log = useStudio((s) => s.log)
   return (
     <section className="pannello">
       <details>
-        <summary>Registro degli eventi ({log.length})</summary>
+        <summary>Cronologia ({log.length})</summary>
         <ul className="registro">
           {[...log].reverse().map((l) => (
             <li key={l.id} className={`log-${l.kind}`}>
@@ -442,6 +499,7 @@ export function Impostazioni() {
         <PannelloSincronizzazione />
         <FileProgetto />
         <Tesi />
+        <Ripristino />
       </div>
       <div>
         <Dispositivo />

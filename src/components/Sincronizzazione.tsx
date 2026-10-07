@@ -7,9 +7,9 @@ const ETICHETTA: Record<StatoSync, string> = {
   ok: 'sincronizzato',
   in_corso: 'sincronizzo…',
   attesa: 'in attesa',
-  offline: 'non in linea',
-  errore: 'errore di sincronizzazione',
-  conflitto: 'da scegliere',
+  offline: 'offline',
+  errore: 'non si sincronizza',
+  conflitto: 'scegli la versione',
 }
 
 const quando = (iso: string) =>
@@ -40,9 +40,9 @@ export function AvvisoSincronizzazione() {
     return (
       <div className="banda banda-attesa avviso-sync" role="alert">
         <p>
-          <strong>Ci sono modifiche diverse su due dispositivi.</strong> Su GitHub c'è un progetto salvato {preposizione('da', conflitto.da)}{' '}
-          {conflitto.il ? `(${quando(conflitto.il)})` : ''}, e questo {nomeDispositivo()} ha modifiche non ancora inviate. Quale
-          versione tieni?
+          <strong>Hai fatto modifiche diverse su due dispositivi.</strong> Su GitHub c'è una versione salvata{' '}
+          {preposizione('da', conflitto.da)} {conflitto.il ? `(${quando(conflitto.il)})` : ''}, ma su questo {nomeDispositivo()}{' '}
+          hai modifiche non ancora inviate. Quale tieni?
         </p>
         <div className="riga-editor">
           <button type="button" className="bottone bottone-primario" disabled={lavoro} onClick={() => void scegli('ricevi')}>
@@ -53,8 +53,8 @@ export function AvvisoSincronizzazione() {
           </button>
         </div>
         <p className="nota">
-          Non si perde niente: la versione di questo dispositivo resta fra le copie di sicurezza, quella dell'altro nella
-          storia del repository su GitHub.
+          Non perdi niente: la versione di questo dispositivo resta tra le copie di sicurezza, quella dell'altro resta
+          salvata su GitHub.
         </p>
       </div>
     )
@@ -62,7 +62,7 @@ export function AvvisoSincronizzazione() {
   if (stato === 'errore') {
     return (
       <div className="allerta allerta-errore avviso-sync" role="alert">
-        Sincronizzazione ferma: {messaggio}{' '}
+        La sincronizzazione si è fermata: {messaggio}{' '}
         <button type="button" className="bottone bottone-vuoto" onClick={() => void sincronizza()}>
           Riprova
         </button>
@@ -86,9 +86,9 @@ export function PannelloSincronizzazione() {
       {repo ? (
         <>
           <p className="nota">
-            Questo {nomeDispositivo()} è collegato al repository privato <strong>{repo}</strong>. Le modifiche partono da sole
-            pochi secondi dopo che smetti di scrivere e quando esci dall'app; quelle dell'altro dispositivo arrivano quando
-            riapri l'app e ogni due minuti mentre è aperta.
+            Questo {nomeDispositivo()} è collegato al tuo repository privato <strong>{repo}</strong>. Le modifiche partono da
+            sole pochi secondi dopo che smetti di scrivere e quando chiudi l'app. Quelle fatte sull'altro dispositivo arrivano
+            quando riapri l'app, e ogni due minuti mentre è aperta.
           </p>
           <p className={stato === 'errore' ? 'allerta allerta-errore' : 'nota nota-ok'} role="status">
             {stato === 'in_corso'
@@ -96,8 +96,8 @@ export function PannelloSincronizzazione() {
               : stato === 'errore' || stato === 'offline' || stato === 'attesa'
                 ? messaggio
                 : stato === 'conflitto'
-                  ? 'Scegli quale versione tenere nell\'avviso in alto.'
-                  : messaggio || (ultima ? `Sincronizzato: ${quando(ultima)}.` : 'Collegato.')}
+                  ? 'Scegli quale versione tenere nel messaggio in alto.'
+                  : messaggio || (ultima ? `Ultima sincronizzazione: ${quando(ultima)}.` : 'Collegato.')}
           </p>
           <div className="riga-editor">
             <button
@@ -111,7 +111,7 @@ export function PannelloSincronizzazione() {
             <Conferma
               classe="bottone bottone-vuoto"
               etichetta="Scollega questo dispositivo"
-              domanda="Scollegare? I dati restano in questo browser e su GitHub, ma smettono di allinearsi."
+              domanda="Vuoi scollegarlo? I dati restano qui e su GitHub, ma non si aggiornano più tra i dispositivi."
               conferma="Scollega"
               pericolosa
               onConferma={scollega}
@@ -121,11 +121,11 @@ export function PannelloSincronizzazione() {
       ) : (
         <>
           <p className="nota">
-            Senza sincronizzazione ogni dispositivo ha il suo progetto. Collegando iPhone, iPad e computer allo stesso
-            repository GitHub <strong>privato</strong>, testi, fonti e file del corso si allineano da soli.
+            Senza sincronizzazione ogni dispositivo ha la sua copia della tesi. Se colleghi iPhone, iPad e computer allo
+            stesso repository GitHub <strong>privato</strong>, testi, fonti e lezioni si aggiornano da soli su tutti.
           </p>
           <details className="istruzioni-sync">
-            <summary>Come si prepara (una volta sola, 3 minuti)</summary>
+            <summary>Come si fa (una volta sola, 3 minuti)</summary>
             <ol>
               <li>
                 Su GitHub crea un repository <strong>privato</strong> vuoto, per esempio <code>studio-tesi-dati</code>:{' '}
@@ -135,11 +135,11 @@ export function PannelloSincronizzazione() {
                 .
               </li>
               <li>
-                Crea un token "fine-grained":{' '}
+                Crea un token "fine-grained" (è una specie di password):{' '}
                 <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
                   nuovo token
                 </a>
-                . In <em>Repository access</em> scegli <em>Only select repositories</em> e quel repository; in{' '}
+                . In <em>Repository access</em> scegli <em>Only select repositories</em> e poi quel repository; in{' '}
                 <em>Permissions → Repository permissions</em> metti <em>Contents</em> su <em>Read and write</em>. Come scadenza
                 va bene un anno.
               </li>
@@ -156,7 +156,7 @@ export function PannelloSincronizzazione() {
                 await collega(bozzaRepo, token)
                 setToken('')
               } catch (err) {
-                setErrore(err instanceof Error ? err.message : 'Collegamento non riuscito.')
+                setErrore(err instanceof Error ? err.message : 'Collegamento non riuscito, riprova.')
               }
               setLavoro(false)
             }}
@@ -197,8 +197,8 @@ export function PannelloSincronizzazione() {
         </>
       )}
       <p className="avviso-chiave">
-        Il token resta solo in questo browser e viene inviato solo a GitHub; non entra nel progetto né nei file salvati. Dà
-        accesso soltanto al repository che hai scelto. Il repository deve restare privato: l'app rifiuta quelli pubblici.
+        Il token resta solo in questo browser e lo mando solo a GitHub: non finisce nella tesi né nei file salvati. Funziona
+        solo per il repository che hai scelto. Il repository deve essere privato: quelli pubblici l'app non li accetta.
       </p>
     </section>
   )

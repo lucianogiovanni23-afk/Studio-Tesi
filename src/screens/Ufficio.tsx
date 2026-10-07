@@ -41,7 +41,7 @@ function Colleghi() {
             <Ritratto k={a.key} dimensione={40} />
             {(occupato[a.key] || agenti[a.key].status === 'lavoro') && <span className="collega-lavora" aria-label="sta lavorando" />}
           </span>
-          <span className="collega-nome">{a.persona.nome.split(' ')[0]}</span>
+          <span className="collega-nome">{a.persona.breve}</span>
           <span className="collega-ruolo">{a.persona.titolo}</span>
         </button>
       ))}
@@ -71,7 +71,7 @@ function BottoneAzione({ k, a }: { k: AgentKey; a: Azione }) {
           onChange={(e) => {
             const files = Array.from(e.target.files ?? [])
             e.target.value = ''
-            if (files.length) void eseguiAzione(k, `${a.etichetta}: ${files.map((x) => x.name).join(', ')}`, a.lavoro ?? 'lavoro…', () => f.carica(files))
+            if (files.length) void eseguiAzione(k, `${a.etichetta}: ${files.map((x) => x.name).join(', ')}`, a.lavoro ?? 'ci lavoro…', () => f.carica(files))
           }}
         />
       </>
@@ -84,7 +84,7 @@ function BottoneAzione({ k, a }: { k: AgentKey; a: Azione }) {
       disabled={occupato && !a.vai}
       onClick={() => {
         if (a.vai) vai(a.vai)
-        else if (a.esegui) void eseguiAzione(k, a.etichetta, a.lavoro ?? 'lavoro…', a.esegui)
+        else if (a.esegui) void eseguiAzione(k, a.etichetta, a.lavoro ?? 'ci lavoro…', a.esegui)
       }}
     >
       {a.etichetta}
@@ -148,7 +148,7 @@ function Conversazione({ k }: { k: AgentKey }) {
           </p>
         </div>
         {battute.length > 0 && (
-          <button type="button" className="bottone bottone-vuoto bottone-piccolo" onClick={() => svuota(k)} title="Cancella lo storico di questa conversazione">
+          <button type="button" className="bottone bottone-vuoto bottone-piccolo" onClick={() => svuota(k)} title="Cancella questa chat e riparti da zero">
             Ricomincia
           </button>
         )}
@@ -156,7 +156,7 @@ function Conversazione({ k }: { k: AgentKey }) {
 
       <div className="conversazione-storico" aria-live="polite">
         <div className="battuta battuta-agente">
-          <p>Buongiorno! {def.persona.saluto}</p>
+          <p>Ciao! {def.persona.saluto}</p>
         </div>
         {battute.map((b) => (
           <div key={b.id} className={`battuta battuta-${b.da} ${b.tono ? `battuta-${b.tono}` : ''}`}>
@@ -231,7 +231,7 @@ function Conversazione({ k }: { k: AgentKey }) {
             className="campo"
             rows={2}
             value={testo}
-            placeholder={modoSpeciale && turno.speciale ? turno.speciale.placeholder : `Scrivi a ${def.persona.nome.split(' ')[0]}…`}
+            placeholder={modoSpeciale && turno.speciale ? turno.speciale.placeholder : 'Scrivi qui quello che vuoi chiedere…'}
             onChange={(e) => setTesto(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {

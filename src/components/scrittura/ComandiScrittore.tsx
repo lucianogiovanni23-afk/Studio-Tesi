@@ -21,7 +21,7 @@ import { TestoCitato } from '../TestoCitato'
 
 const NOME: Record<Comando, string> = {
   scaletta: 'Proponi una scaletta',
-  bozza: 'Proponi una bozza della sezione',
+  bozza: 'Proponi una bozza',
   riscrivi: 'Riscrivi questo paragrafo',
   alternative: 'Dammi due alternative',
   corso: 'Collega al corso',
@@ -42,7 +42,7 @@ function Bollini({ citazioni }: { citazioni: Citazione[] }) {
     <span className="bollini">
       <span className="esito esito-verde">{n.verdi} verificate</span>
       {n.ambra > 0 && <span className="esito esito-ambra">{n.ambra} da controllare</span>}
-      {n.rosse > 0 && <span className="esito esito-rosso">{n.rosse} non ritrovate</span>}
+      {n.rosse > 0 && <span className="esito esito-rosso">{n.rosse} non trovate</span>}
     </span>
   )
 }
@@ -53,11 +53,11 @@ function StileProposta({ testo }: { testo: string }) {
   const segnalazioni = analizzaStile(testo, glossario)
   const lessico = segnalazioni.filter((s) => s.tipo === 'lessico')
   const ia = segnalazioni.filter((s) => s.tipo !== 'lessico')
-  if (segnalazioni.length === 0) return <span className="esito esito-verde">nessuna formula da IA</span>
+  if (segnalazioni.length === 0) return <span className="esito esito-verde">niente frasi da IA</span>
   return (
     <span className="bollini" title={segnalazioni.map((s) => `«${s.testo}»: ${s.spiegazione}`).join('\n')}>
-      {ia.length > 0 && <span className="esito esito-ambra">{ia.length} formule da IA: {[...new Set(ia.map((s) => s.testo))].slice(0, 3).join(', ')}</span>}
-      {lessico.length > 0 && <span className="esito esito-ambra">lessico: {lessico.map((s) => s.spiegazione).join('; ')}</span>}
+      {ia.length > 0 && <span className="esito esito-ambra">{ia.length} frasi da IA: {[...new Set(ia.map((s) => s.testo))].slice(0, 3).join(', ')}</span>}
+      {lessico.length > 0 && <span className="esito esito-ambra">parole del corso: {lessico.map((s) => s.spiegazione).join('; ')}</span>}
     </span>
   )
 }
@@ -90,7 +90,7 @@ export function PannelloProposta({ sez }: { sez: Sezione }) {
           <Conferma
             classe="bottone bottone-primario"
             etichetta={proposta.opzioni.length > 1 ? 'Usa questa' : 'Usa la proposta'}
-            domanda={sostituisce ? 'Il testo attuale resterà fra le versioni. Procedo?' : 'Inserisco la proposta nel testo?'}
+            domanda={sostituisce ? 'Il testo di adesso resta fra le versioni. Procedo?' : 'Metto la proposta nel testo?'}
             conferma="Sì, usala"
             onConferma={() => accettaProposta(sez.id, i)}
           />
@@ -118,7 +118,7 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
     try {
       await fn()
     } catch (err) {
-      setErrore(err instanceof Error ? err.message : 'Errore.')
+      setErrore(err instanceof Error ? err.message : 'Qualcosa è andato storto.')
     }
   }
 
@@ -132,7 +132,7 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
         disabilitato={!abilitato || inCorso !== null}
         domanda={
           stima
-            ? `${NOME[c]}: ${costoStimato(stima).replace('Costo', 'costo')}${stima.cache && !modalitaGratuita() ? ', materiale già in cache' : ''}. Procedo?`
+            ? `${NOME[c]}: ${costoStimato(stima).replace('Costo', 'costo')}${stima.cache && !modalitaGratuita() ? ', in parte già in memoria (costa meno)' : ''}. Procedo?`
             : motivo
         }
         conferma="Procedi"
@@ -158,19 +158,19 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
           disabled={sez.citazioni.length === 0 && !/\[[FC]\d+\]/.test(sez.testo)}
           onClick={() => setControllo(controllaInCodice(cap.id, sez.id))}
         >
-          Verifica le citazioni
+          Controlla le citazioni
         </button>
       </div>
-      {!sez.fontiConfermate && <p className="nota">I comandi si attivano dopo l'approvazione delle fonti della sezione; la bozza anche dopo la scaletta.</p>}
+      {!sez.fontiConfermate && <p className="nota">Questi comandi funzionano dopo che approvi le fonti. Per la bozza serve anche la scaletta.</p>}
       {sez.fontiConfermate && (
         <p className="nota paragrafo-scelto">
           {scelto !== null ? (
             <>
-              Paragrafo selezionato: <strong>{scelto + 1}</strong> — «{pars[scelto].slice(0, 90)}
+              Paragrafo scelto: <strong>{scelto + 1}</strong> — «{pars[scelto].slice(0, 90)}
               {pars[scelto].length > 90 ? '…' : ''}»
             </>
           ) : (
-            'Tocca un paragrafo del testo per riscriverlo, avere due alternative o collegarlo al corso.'
+            'Tocca un paragrafo per riscriverlo, avere due alternative o collegarlo al corso.'
           )}
         </p>
       )}
@@ -178,35 +178,35 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
         <input
           disabled={scelto === null}
           className="campo"
-          placeholder="Indicazione per la riscrittura (facoltativa): per esempio «più sintetico», «separa raccolta e frantoio»"
+          placeholder="Come lo vuoi? Per esempio «più corto» o «separa raccolta e frantoio» (puoi lasciarlo vuoto)"
           value={richiesta}
           onChange={(e) => setRichiesta(e.target.value)}
           aria-label="Indicazione per la riscrittura"
         />
       )}
       {inCorso && inCorso.sezioneId === sez.id && inCorso.comando !== 'scaletta' && (
-        <p className="in-corso">Lo Scrittore sta lavorando: {NOME[inCorso.comando].toLowerCase()}…</p>
+        <p className="in-corso">Lo Scrittore ci sta lavorando: {NOME[inCorso.comando].toLowerCase()}…</p>
       )}
       {errore && <p className="allerta allerta-errore">{errore}</p>}
 
       {controllo && (
         <div className="esito-controllo" role="status">
           <p>
-            <strong>Controllo in codice:</strong> {controllo.citazioni} citazioni — {controllo.verdi} verdi, {controllo.ambra} ambra,{' '}
+            <strong>Controllo veloce:</strong> {controllo.citazioni} citazioni — {controllo.verdi} verdi, {controllo.ambra} ambra,{' '}
             {controllo.rosse} rosse.
             {controllo.senzaCitazione.length > 0 && (
-              <span className="testo-errore"> Marcatori senza citazione: {controllo.senzaCitazione.join(', ')}.</span>
+              <span className="testo-errore"> Rimandi senza citazione: {controllo.senzaCitazione.join(', ')}.</span>
             )}
           </p>
           {sez.citazioni.length > 0 && (
             <div className="riga-editor">
               {giudizioInCorso ? (
-                <span className="in-corso">Il Revisore sta giudicando le citazioni…</span>
+                <span className="in-corso">La revisora sta controllando le citazioni…</span>
               ) : (
                 <Conferma
                   classe="bottone bottone-piccolo"
-                  etichetta="Chiedi il giudizio del Revisore"
-                  domanda={stimaG ? `Il Revisore giudica se ogni estratto sostiene davvero l'affermazione. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?'}
+                  etichetta="Chiedi alla revisora"
+                  domanda={stimaG ? `La revisora controlla se ogni pezzo citato dice davvero quello che scrivi. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?'}
                   conferma="Procedi"
                   onConferma={async () => {
                     setGiudizioInCorso(true)

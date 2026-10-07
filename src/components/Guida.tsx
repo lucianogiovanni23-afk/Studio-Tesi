@@ -11,23 +11,23 @@ import { segnaGuidaVista, useGuida } from './guidaStato'
 const PASSI: { numero: string; titolo: string; testo: string; vai?: Schermata }[] = [
   {
     numero: '1',
-    titolo: 'Corso · Giulia Romano',
-    testo: "Le dai i PDF delle lezioni: ne ricava il quadro teorico e il lessico che la tesi dovrà usare.",
+    titolo: 'Corso · Lettrice del corso',
+    testo: 'Le passi i PDF delle lezioni: lei trova le idee principali del corso e si segna le parole del corso da usare nella tesi.',
   },
   {
     numero: '2',
-    titolo: 'Fonti · Marco Ferrara',
-    testo: 'Gli dici su cosa cercare: consulta i cataloghi, tu approvi i risultati, lui prepara le schede di lettura.',
+    titolo: 'Fonti · Bibliotecario',
+    testo: 'Gli dici cosa cercare e lui trova gli articoli. Tu scegli quali tenere, lui te li riassume.',
   },
   {
     numero: '3',
-    titolo: 'Scrittura · Luca Esposito',
-    testo: 'Una sezione alla volta: scegliete le fonti, approvi la scaletta, lui scrive la bozza con citazioni verificate.',
+    titolo: 'Scrittura · Scrittore',
+    testo: 'Un paragrafo alla volta: scegliete le fonti, dai l’ok alla scaletta e lui scrive la bozza con citazioni controllate.',
   },
   {
     numero: '4',
-    titolo: 'Revisione · Elena Conti',
-    testo: 'Le incolli le osservazioni del relatore, controlla tutta la tesi e prepara il file Word.',
+    titolo: 'Revisione · Revisora',
+    testo: 'Le incolli le note del relatore. Lei controlla tutta la tesi e ti prepara il file Word.',
   },
 ]
 
@@ -37,9 +37,9 @@ function Contenuto({ chiudi }: { chiudi: () => void }) {
   return (
     <>
       <p className="guida-idea">
-        Nell'<strong>Ufficio</strong> lavori con quattro persone: tocca una di loro e parlale. Ognuna ti dice che cosa
-        fare, e tu rispondi con un tocco o scrivendo. <strong>Decidi sempre tu</strong>: niente entra nella tesi senza la
-        tua approvazione, e ogni citazione viene controllata sul testo della fonte.
+        Nell'<strong>Ufficio</strong> hai quattro colleghi: tocca uno di loro e parlaci. Ognuno ti dice cosa fare, e tu
+        rispondi con un tocco o scrivendo. <strong>Decidi sempre tu</strong>: nella tesi non entra niente senza il tuo
+        ok, e ogni citazione viene controllata sulla fonte.
       </p>
       <ol className="guida-passi">
         {PASSI.map((p) => (
@@ -57,20 +57,20 @@ function Contenuto({ chiudi }: { chiudi: () => void }) {
       <div className="guida-colori">
         <strong>I colori delle citazioni</strong>
         <span>
-          <i className="pallino-verde" /> trovata alla lettera nella fonte
+          <i className="pallino-verde" /> c'è uguale nella fonte
         </span>
         <span>
-          <i className="pallino-ambra" /> quasi uguale o sostenuta solo in parte
+          <i className="pallino-ambra" /> quasi uguale, o vera solo in parte
         </span>
         <span>
-          <i className="pallino-rosso" /> non trovata: da correggere
+          <i className="pallino-rosso" /> non c'è: da sistemare
         </span>
       </div>
       <p className="nota">
         {gratuita
-          ? 'Stai usando la modalità gratuita: ogni comando degli agenti apre una finestra con il copia e incolla verso Claude.ai.'
-          : 'Con la chiave API gli agenti lavorano da soli; prima di ogni comando vedi il costo stimato.'}{' '}
-        Per avere la tesi su iPhone, iPad e computer: Impostazioni → Sincronizzazione.
+          ? 'Stai usando la versione gratis: quando chiedi qualcosa ai colleghi si apre una finestra, copi la richiesta su Claude.ai e incolli qui la risposta.'
+          : 'Con la chiave API i colleghi lavorano da soli, e prima di ogni richiesta vedi quanto costa più o meno.'}{' '}
+        Per avere la tesi su iPhone, iPad e computer: vai in Impostazioni → Sincronizzazione.
       </p>
       <div className="riga-editor">
         <button type="button" className="bottone bottone-primario" onClick={chiudi}>
@@ -84,7 +84,7 @@ function Contenuto({ chiudi }: { chiudi: () => void }) {
             scegliAgente('lettore')
           }}
         >
-          Comincia da Giulia
+          Comincia dalla lettrice
         </button>
       </div>
     </>
@@ -97,7 +97,7 @@ export function GuidaIniziale() {
   if (vista) return null
   return (
     <section className="pannello guida" aria-labelledby="guida-titolo">
-      <h2 id="guida-titolo">Come funziona Studio tesi</h2>
+      <h2 id="guida-titolo">Come funziona</h2>
       <Contenuto chiudi={segnaGuidaVista} />
     </section>
   )
@@ -115,7 +115,7 @@ export function GuidaFinestra() {
     <div className="ponte-sfondo" role="dialog" aria-modal="true" aria-labelledby="guida-finestra-titolo" onClick={(e) => e.target === e.currentTarget && segnaGuidaVista()}>
       <div className="ponte guida">
         <h2 id="guida-finestra-titolo" ref={titolo} tabIndex={-1}>
-          Come funziona Studio tesi
+          Come funziona
         </h2>
         <Contenuto chiudi={segnaGuidaVista} />
       </div>

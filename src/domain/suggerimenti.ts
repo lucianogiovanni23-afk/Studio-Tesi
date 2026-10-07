@@ -23,18 +23,18 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
         id: 'budget',
         testo:
           speso >= p.budgetMensile
-            ? 'Budget del mese esaurito: gli agenti sono fermi finché non lo alzi.'
-            : `Hai usato l'${Math.round((speso / p.budgetMensile) * 100)}% del budget di questo mese.`,
+            ? 'Hai finito i soldi che avevi messo per questo mese: gli agenti sono fermi finché non alzi il limite.'
+            : `Hai già speso il ${Math.round((speso / p.budgetMensile) * 100)}% di quello che avevi messo per questo mese.`,
         tono: speso >= p.budgetMensile ? 'urgente' : 'normale',
         vai: 'impostazioni',
-        etichetta: 'Budget',
+        etichetta: 'Spesa del mese',
       })
     }
   }
   if (!haChiave) {
     fuori.push({
       id: 'chiave',
-      testo: 'Modalità gratuita: ogni comando degli agenti passa da Claude.ai, con un copia e incolla. Con una chiave API lavorerebbero da soli.',
+      testo: 'Stai usando l\'app gratis: ogni cosa che chiedi agli agenti passa da Claude.ai, con un copia e incolla. Con una chiave API farebbero tutto da soli.',
       tono: 'info',
       vai: 'impostazioni',
       etichetta: 'Come funziona',
@@ -43,7 +43,7 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (!p.indiceApprovato) {
     fuori.push({
       id: 'indice',
-      testo: "Rivedi e approva l'indice: è la base su cui lavorano tutti gli agenti.",
+      testo: "Dai un'occhiata all'indice e approvalo: tutti gli agenti partono da lì.",
       tono: 'urgente',
       vai: 'cruscotto',
       etichetta: "Vai all'indice",
@@ -54,7 +54,7 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (aperte > 0) {
     fuori.push({
       id: 'osservazioni',
-      testo: `${aperte} osservazion${aperte === 1 ? 'e' : 'i'} del relatore ancora apert${aperte === 1 ? 'a' : 'e'}.`,
+      testo: `Hai ancora ${aperte} not${aperte === 1 ? 'a' : 'e'} del relatore da sistemare.`,
       tono: 'urgente',
       vai: 'revisione',
       etichetta: 'Revisione',
@@ -68,7 +68,7 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (deboli > 0) {
     fuori.push({
       id: 'citazioni',
-      testo: `${deboli} citazion${deboli === 1 ? 'e debole' : 'i deboli'} da sistemare (ambra o rosse).`,
+      testo: `${deboli} citazion${deboli === 1 ? 'e' : 'i'} da sistemare (quelle gialle o rosse).`,
       tono: 'normale',
       vai: 'scrittura',
       etichetta: 'Scrittura',
@@ -78,7 +78,7 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (p.inAttesa.length > 0) {
     fuori.push({
       id: 'in-attesa',
-      testo: `${p.inAttesa.length} risultat${p.inAttesa.length === 1 ? 'o' : 'i'} di ricerca da approvare prima che entrino in biblioteca.`,
+      testo: `${p.inAttesa.length} risultat${p.inAttesa.length === 1 ? 'o' : 'i'} della ricerca da guardare: decidi tu cosa entra in biblioteca.`,
       tono: 'urgente',
       vai: 'ricerca',
       etichetta: 'Ricerca',
@@ -89,7 +89,7 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (daLeggere > 0) {
     fuori.push({
       id: 'fonti',
-      testo: `${daLeggere} font${daLeggere === 1 ? 'e' : 'i'} in biblioteca da leggere.`,
+      testo: `Hai ${daLeggere} font${daLeggere === 1 ? 'e' : 'i'} in biblioteca ancora da leggere.`,
       tono: 'normale',
       vai: 'biblioteca',
       etichetta: 'Biblioteca',
@@ -100,26 +100,26 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (pronti === 0) {
     fuori.push({
       id: 'corso',
-      testo: 'Carica il materiale del corso: definisce che cosa si può trattare nella tesi.',
+      testo: 'Carica le lezioni del corso: servono a capire di cosa puoi parlare nella tesi.',
       tono: 'normale',
       vai: 'corso',
-      etichetta: 'Materiale del corso',
+      etichetta: 'Lezioni del corso',
     })
   } else if (!p.quadro) {
     fuori.push({
       id: 'quadro',
-      testo: 'Genera il quadro teorico del corso: lo useranno tutti i capitoli.',
+      testo: 'Fai trovare alla lettrice le idee principali del corso: servono a tutti i capitoli.',
       tono: 'normale',
       vai: 'corso',
-      etichetta: 'Materiale del corso',
+      etichetta: 'Lezioni del corso',
     })
   } else if (quadroObsoleto(p)) {
     fuori.push({
       id: 'quadro-vecchio',
-      testo: 'Hai cambiato i file del corso: aggiorna il quadro teorico.',
+      testo: 'Hai cambiato i file del corso: fai riguardare le idee principali.',
       tono: 'normale',
       vai: 'corso',
-      etichetta: 'Materiale del corso',
+      etichetta: 'Lezioni del corso',
     })
   }
 
@@ -127,10 +127,10 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (daRicaricare > 0) {
     fuori.push({
       id: 'ricarica',
-      testo: `${daRicaricare} file del corso da ricaricare.`,
+      testo: `${daRicaricare} file del corso da caricare di nuovo.`,
       tono: 'normale',
       vai: 'corso',
-      etichetta: 'Materiale del corso',
+      etichetta: 'Lezioni del corso',
     })
   }
 
@@ -140,8 +140,8 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
     fuori.push({
       id: 'copia',
       testo: ultimaCopia
-        ? `L'ultima copia su file risale a più di ${GIORNI_SENZA_COPIA} giorni fa: salva il progetto.`
-        : 'Non hai ancora salvato una copia del progetto su file.',
+        ? `Non salvi una copia del progetto da più di ${GIORNI_SENZA_COPIA} giorni: fallo adesso.`
+        : 'Non hai ancora salvato una copia del progetto sul tuo dispositivo.',
       tono: 'info',
       vai: 'impostazioni',
       etichetta: 'Salva progetto',
@@ -151,7 +151,7 @@ export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   if (fuori.length === 0) {
     fuori.push({
       id: 'tutto-bene',
-      testo: 'Nessuna urgenza: continua a scrivere la prossima sezione.',
+      testo: 'Tutto a posto: vai avanti con la prossima sezione.',
       tono: 'info',
       vai: 'scrittura',
       etichetta: 'Scrittura',

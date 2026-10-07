@@ -41,15 +41,15 @@ async function sincronizzaCorpus() {
   for (const f of files) {
     if (f.status === 'pronto' && !presenti.has(f.id)) {
       mancanti += 1
-      s.aggiornaCourseFile(f.id, { status: 'errore', errore: 'Il testo estratto non è più sul dispositivo: togli il file e ricaricalo.' })
+      s.aggiornaCourseFile(f.id, { status: 'errore', errore: "Il testo di questo file non c'è più su questo dispositivo: toglilo e ricaricalo." })
     }
     if (f.status === 'lettura' || f.status === 'estrazione') {
-      s.aggiornaCourseFile(f.id, { status: 'errore', errore: 'Lettura interrotta: togli il file e ricaricalo.' })
+      s.aggiornaCourseFile(f.id, { status: 'errore', errore: 'La lettura si è fermata a metà: togli il file e ricaricalo.' })
     }
   }
   const inElenco = new Set(files.map((f) => f.id))
   for (const id of presenti) if (!inElenco.has(id)) await rimuoviDalCorpus(id)
-  if (mancanti > 0) logAvviso(null, `${mancanti} file del corso vanno ricaricati.`)
+  if (mancanti > 0) logAvviso(null, `Ci sono ${mancanti} file del corso da ricaricare.`)
   useStudio.getState().setCorpusSincronizzato(true)
 }
 

@@ -49,14 +49,14 @@ export async function ricavaLessico(): Promise<EsitoLessico> {
     [...DOMANDE_CORSO, ...p.glossario.map((v) => v.termine), p.titolo, p.domanda],
     BUDGET_LETTORE,
   )
-  if (passaggi.length === 0) throw new ApiError('sconosciuto', 'Carica prima il materiale del corso.')
+  if (passaggi.length === 0) throw new ApiError('sconosciuto', 'Prima carica le lezioni del corso.')
 
   const client = creaClient(s.apiKey)
-  s.patchAgente('lettore', { status: 'lavoro', etichetta: 'ricavo il lessico del corso…', errore: null })
+  s.patchAgente('lettore', { status: 'lavoro', etichetta: 'raccolgo il lessico del corso…', errore: null })
   try {
     const consegna = await sorveglia<Consegna<{ termini: TermineGrezzo[] }>>({
       agente: 'lettore',
-      passo: 'Lessico del corso',
+      passo: 'Parole del corso',
       esegui: (_t, suggerimento) =>
         chiamataStrutturata({
           client,
@@ -106,7 +106,7 @@ export async function ricavaLessico(): Promise<EsitoLessico> {
         termine: t.termine.trim(),
         definizione: t.definizione,
         varianti,
-        nota: verificato ? '' : 'Definizione non ritrovata alla lettera nel passaggio indicato: controllala.',
+        nota: verificato ? '' : 'Non ho trovato questa definizione parola per parola nella lezione: dacci un\'occhiata tu.',
         origine: 'corso',
         occorrenze,
         collocazione: passaggio && verificato ? collocazione(passaggio) : '',
@@ -120,10 +120,10 @@ export async function ricavaLessico(): Promise<EsitoLessico> {
       passaggi: consegna.passaggi,
       errore: null,
     })
-    logOk('lettore', `Lessico del corso: ${esito.nuove} termini nuovi, ${esito.aggiornate} aggiornati, ${scartati.length} scartati perché assenti dal corso.`)
+    logOk('lettore', `Parole del corso: ${esito.nuove} nuove, ${esito.aggiornate} aggiornate, ${scartati.length} tolte perché nel corso non ci sono.`)
     return { ...esito, scartati, variantiTolte }
   } catch (err) {
-    useStudio.getState().patchAgente('lettore', { status: 'errore', etichetta: 'errore', errore: err instanceof Error ? err.message : 'Errore.' })
+    useStudio.getState().patchAgente('lettore', { status: 'errore', etichetta: "c'è stato un problema", errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     throw err
   }
 }

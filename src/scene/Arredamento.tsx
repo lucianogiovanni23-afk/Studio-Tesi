@@ -1,9 +1,9 @@
-import { useMemo } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 import { Html, RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { avanzamento } from '../domain/avanzamento'
 import { useStudio } from '../store'
-import { COLORI, COLORE_STATO } from './layout'
+import { ALTEZZA_SALA as H, COLORI, COLORE_STATO } from './layout'
 import { useQualita } from './qualita'
 
 /**
@@ -69,22 +69,22 @@ function Vetrata() {
   const montanti = [-5.5, -3.67, -1.83, 0, 1.83, 3.67, 5.5]
   return (
     <group>
-      <mesh position={[0, 2.3, -6.6]}>
-        <planeGeometry args={[16, 5.2]} />
+      <mesh position={[0, H / 2, -6.6]}>
+        <planeGeometry args={[16 * ((H + 0.8) / 5.2), H + 0.8]} />
         <meshBasicMaterial map={panorama ?? undefined} color={panorama ? '#ffffff' : '#cfe2ec'} toneMapped={false} />
       </mesh>
       {/* vetro leggermente riflettente */}
-      <mesh position={[0, 2.2, -6.02]}>
-        <planeGeometry args={[11, 4.4]} />
+      <mesh position={[0, H / 2, -6.02]}>
+        <planeGeometry args={[11, H]} />
         <meshStandardMaterial color="#dfeaf0" transparent opacity={0.08} roughness={0.05} metalness={0.2} />
       </mesh>
       {montanti.map((x) => (
-        <mesh key={x} position={[x, 2.2, -6]}>
-          <boxGeometry args={[0.06, 4.4, 0.08]} />
+        <mesh key={x} position={[x, H / 2, -6]}>
+          <boxGeometry args={[0.06, H, 0.08]} />
           <meshStandardMaterial color={COLORI.nero} roughness={0.4} metalness={0.5} />
         </mesh>
       ))}
-      {[0.02, 4.38].map((y) => (
+      {[0.02, 4.4, H - 0.03].map((y) => (
         <mesh key={y} position={[0, y, -6]}>
           <boxGeometry args={[11.06, 0.06, 0.1]} />
           <meshStandardMaterial color={COLORI.nero} roughness={0.4} metalness={0.5} />
@@ -92,8 +92,8 @@ function Vetrata() {
       ))}
       {/* pareti piene ai lati della vetrata */}
       {[-9, 9].map((x) => (
-        <mesh key={x} position={[x, 2.2, -6.05]} receiveShadow>
-          <boxGeometry args={[7, 4.4, 0.12]} />
+        <mesh key={x} position={[x, H / 2, -6.05]} receiveShadow>
+          <boxGeometry args={[7, H, 0.12]} />
           <meshStandardMaterial color={COLORI.parete} roughness={0.9} />
         </mesh>
       ))}
@@ -106,13 +106,13 @@ function Listelli() {
   const listelli = useMemo(() => Array.from({ length: 32 }, (_, i) => -12.3 + i * 0.2), [])
   return (
     <group position={[0, 0, -5.96]}>
-      <mesh position={[-8.9, 2.2, -0.02]}>
-        <boxGeometry args={[6.6, 4.4, 0.02]} />
+      <mesh position={[-8.9, H / 2, -0.02]}>
+        <boxGeometry args={[6.6, H, 0.02]} />
         <meshStandardMaterial color={COLORI.olivaScuro} roughness={0.9} />
       </mesh>
       {listelli.map((x) => (
-        <mesh key={x} position={[x + 0.6, 2.2, 0.03]}>
-          <boxGeometry args={[0.1, 4.4, 0.06]} />
+        <mesh key={x} position={[x + 0.6, H / 2, 0.03]}>
+          <boxGeometry args={[0.1, H, 0.06]} />
           <meshStandardMaterial color={COLORI.oliva} roughness={0.75} />
         </mesh>
       ))}
@@ -158,7 +158,7 @@ function Pianta({ posizione, scala = 1, alta = false }: { posizione: [number, nu
 }
 
 /** Libreria divisoria: un libro per ogni fonte in biblioteca, colorato per stato. */
-function Libreria() {
+function Libreria({ etichetta }: { etichetta: boolean }) {
   const fonti = useStudio((s) => s.progetto.fonti)
   const vai = useStudio((s) => s.vai)
   const ombre = useQualita() === 'completa'
@@ -192,18 +192,20 @@ function Libreria() {
           <meshStandardMaterial color={l.colore} roughness={0.7} />
         </mesh>
       ))}
+      {etichetta && (
       <Html position={[0, 2.85, 0]} center distanceFactor={11} zIndexRange={[20, 10]}>
         <button type="button" className="etichetta-scena etichetta-arredo" onClick={() => vai('biblioteca')}>
           <strong>Biblioteca</strong>
           <span>{fonti.length} fonti</span>
         </button>
       </Html>
+      )}
     </group>
   )
 }
 
 /** Grande schermo a parete con l'avanzamento in pagine di ogni capitolo. */
-function Schermo() {
+function Schermo({ etichetta }: { etichetta: boolean }) {
   const progetto = useStudio((s) => s.progetto)
   const vai = useStudio((s) => s.vai)
   const a = useMemo(() => avanzamento(progetto), [progetto])
@@ -235,6 +237,7 @@ function Schermo() {
           </group>
         )
       })}
+      {etichetta && (
       <Html position={[0, 1.3, 0.1]} center distanceFactor={11} zIndexRange={[20, 10]}>
         <button type="button" className="etichetta-scena etichetta-arredo" onClick={() => vai('cruscotto')}>
           <strong>La tesi</strong>
@@ -243,6 +246,7 @@ function Schermo() {
           </span>
         </button>
       </Html>
+      )}
     </group>
   )
 }
@@ -326,6 +330,50 @@ function Riunioni() {
   )
 }
 
+/**
+ * Soffitto a doppia altezza: lamelle acustiche in rovere sospese, con tagli
+ * di luce fra una fila e l'altra. È alto abbastanza da non vederci sopra
+ * girando la visuale.
+ */
+function Soffitto() {
+  const lamelle = useRef<THREE.InstancedMesh>(null)
+  const posizioni = useMemo(() => Array.from({ length: 64 }, (_, i) => -12.2 + i * 0.385), [])
+  useLayoutEffect(() => {
+    const m = lamelle.current
+    if (!m) return
+    const o = new THREE.Object3D()
+    posizioni.forEach((x, i) => {
+      o.position.set(x, H - 0.32, 1.75)
+      o.updateMatrix()
+      m.setMatrixAt(i, o.matrix)
+    })
+    m.instanceMatrix.needsUpdate = true
+  }, [posizioni])
+  return (
+    <group>
+      <mesh position={[0, H, 1]} rotation={[Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[25, 22]} />
+        <meshStandardMaterial color="#e7e4de" roughness={0.95} side={THREE.DoubleSide} />
+      </mesh>
+      <instancedMesh ref={lamelle} args={[undefined, undefined, posizioni.length]}>
+        <boxGeometry args={[0.07, 0.42, 15.5]} />
+        <meshStandardMaterial color={COLORI.rovere} roughness={0.7} />
+      </instancedMesh>
+      {[-7.5, -2.5, 2.5, 7.5].map((x) => (
+        <mesh key={x} position={[x, H - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[0.16, 16]} />
+          <meshStandardMaterial color="#fffaf0" emissive="#fff6e4" emissiveIntensity={2} side={THREE.DoubleSide} />
+        </mesh>
+      ))}
+      {/* fascia scura sopra la vetrata */}
+      <mesh position={[0, H - 0.2, -5.95]}>
+        <boxGeometry args={[25, 0.4, 0.1]} />
+        <meshStandardMaterial color="#d9d5ce" roughness={0.85} />
+      </mesh>
+    </group>
+  )
+}
+
 /** Luci lineari sospese sopra le scrivanie. */
 function LuciLineari() {
   const completa = useQualita() === 'completa'
@@ -345,8 +393,8 @@ function LuciLineari() {
             <meshStandardMaterial color="#fff6e3" emissive="#fff1d2" emissiveIntensity={2} side={THREE.DoubleSide} />
           </mesh>
           {[-1.6, 1.6].map((dx) => (
-            <mesh key={dx} position={[dx, 0.46, 0]}>
-              <cylinderGeometry args={[0.004, 0.004, 0.9, 4]} />
+            <mesh key={dx} position={[dx, (H - 3.5) / 2, 0]}>
+              <cylinderGeometry args={[0.004, 0.004, H - 3.5, 4]} />
               <meshStandardMaterial color="#444" />
             </mesh>
           ))}
@@ -357,7 +405,8 @@ function LuciLineari() {
   )
 }
 
-export function Sala() {
+/** Le etichette dell'arredo si nascondono in primo piano, per non finire sopra la conversazione. */
+export function Sala({ etichette = true }: { etichette?: boolean }) {
   const ombre = useQualita() === 'completa'
   return (
     <group>
@@ -373,26 +422,16 @@ export function Sala() {
       </mesh>
       {/* pareti laterali */}
       {[-12.5, 12.5].map((x) => (
-        <mesh key={x} position={[x, 2.2, 3]} receiveShadow>
-          <boxGeometry args={[0.2, 4.4, 18]} />
+        <mesh key={x} position={[x, H / 2, 3]} receiveShadow>
+          <boxGeometry args={[0.2, H, 18]} />
           <meshStandardMaterial color={COLORI.parete} roughness={0.92} />
         </mesh>
       ))}
-      {/* soffitto con strisce di luce incassate */}
-      <mesh position={[0, 4.42, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[25, 22]} />
-        <meshStandardMaterial color="#f4f3ef" emissive="#e9e6df" emissiveIntensity={0.55} roughness={0.95} side={THREE.DoubleSide} />
-      </mesh>
-      {[-7.5, -2.5, 2.5, 7.5].map((x) => (
-        <mesh key={x} position={[x, 4.4, -0.5]} rotation={[Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[0.12, 12]} />
-          <meshStandardMaterial color="#fffaf0" emissive="#fff6e4" emissiveIntensity={1.6} side={THREE.DoubleSide} />
-        </mesh>
-      ))}
+      <Soffitto />
       <Vetrata />
       <Listelli />
-      <Libreria />
-      <Schermo />
+      <Libreria etichetta={etichette} />
+      <Schermo etichetta={etichette} />
       <Relax />
       <Riunioni />
       <LuciLineari />
@@ -407,72 +446,6 @@ export function Sala() {
       </mesh>
       <Pianta posizione={[-1.8, 0.6, -5.6]} scala={0.55} />
       <Pianta posizione={[1.6, 0.6, -5.6]} scala={0.5} />
-    </group>
-  )
-}
-
-/** Postazione moderna: piano bianco, gambe nere, monitor sottile di lato, tastiera e accessori. */
-export function Scrivania({ colore, schermoAcceso }: { colore: string; schermoAcceso: boolean }) {
-  const ombre = useQualita() === 'completa'
-  return (
-    <group>
-      <RoundedBox args={[1.7, 0.04, 0.82]} radius={0.015} smoothness={2} position={[0, 0.74, 0]} castShadow={ombre} receiveShadow>
-        <meshStandardMaterial color={COLORI.piano} roughness={0.3} />
-      </RoundedBox>
-      {/* bordo in rovere */}
-      <mesh position={[0, 0.715, 0]}>
-        <boxGeometry args={[1.66, 0.025, 0.78]} />
-        <meshStandardMaterial color={COLORI.rovere} roughness={0.6} />
-      </mesh>
-      {[-0.78, 0.78].map((x) => (
-        <group key={x} position={[x, 0, 0]}>
-          {[-0.33, 0.33].map((z) => (
-            <mesh key={z} position={[0, 0.36, z]} castShadow={ombre}>
-              <boxGeometry args={[0.04, 0.72, 0.04]} />
-              <meshStandardMaterial color={COLORI.nero} roughness={0.4} metalness={0.4} />
-            </mesh>
-          ))}
-          <mesh position={[0, 0.02, 0]}>
-            <boxGeometry args={[0.04, 0.04, 0.7]} />
-            <meshStandardMaterial color={COLORI.nero} roughness={0.4} metalness={0.4} />
-          </mesh>
-        </group>
-      ))}
-      {/* monitor di lato, girato verso la persona: il viso resta libero */}
-      <group position={[0.5, 0.76, -0.1]} rotation={[0, Math.PI + 0.55, 0]}>
-        <mesh position={[0, 0.02, 0]}>
-          <boxGeometry args={[0.22, 0.015, 0.16]} />
-          <meshStandardMaterial color={COLORI.nero} metalness={0.5} roughness={0.35} />
-        </mesh>
-        <mesh position={[0, 0.17, -0.03]}>
-          <boxGeometry args={[0.035, 0.3, 0.025]} />
-          <meshStandardMaterial color={COLORI.nero} metalness={0.5} roughness={0.35} />
-        </mesh>
-        <RoundedBox args={[0.68, 0.4, 0.025]} radius={0.01} position={[0, 0.42, 0]} castShadow={ombre}>
-          <meshStandardMaterial color={COLORI.nero} roughness={0.3} metalness={0.3} />
-        </RoundedBox>
-        <mesh position={[0, 0.42, 0.014]}>
-          <planeGeometry args={[0.64, 0.36]} />
-          <meshStandardMaterial color="#19212b" emissive={schermoAcceso ? colore : '#1e2e3c'} emissiveIntensity={schermoAcceso ? 0.7 : 0.35} />
-        </mesh>
-      </group>
-      {/* tastiera, mouse, tazza, quaderno */}
-      <mesh position={[-0.05, 0.77, -0.22]}>
-        <boxGeometry args={[0.42, 0.015, 0.13]} />
-        <meshStandardMaterial color="#e8e8e6" roughness={0.5} />
-      </mesh>
-      <mesh position={[0.25, 0.77, -0.22]} scale={[1, 0.5, 1.5]}>
-        <sphereGeometry args={[0.03, 12, 8]} />
-        <meshStandardMaterial color="#e8e8e6" roughness={0.5} />
-      </mesh>
-      <mesh position={[-0.6, 0.81, 0.05]}>
-        <cylinderGeometry args={[0.04, 0.037, 0.1, 18]} />
-        <meshStandardMaterial color={colore} roughness={0.35} />
-      </mesh>
-      <mesh position={[-0.42, 0.765, -0.05]} rotation={[0, 0.3, 0]}>
-        <boxGeometry args={[0.2, 0.012, 0.28]} />
-        <meshStandardMaterial color="#2b2d30" roughness={0.6} />
-      </mesh>
     </group>
   )
 }

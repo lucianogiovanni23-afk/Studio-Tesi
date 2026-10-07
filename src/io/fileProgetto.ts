@@ -30,7 +30,7 @@ function contieneChiave(json: string): boolean {
 export function controllaSegreti(json: string) {
   if (contieneChiave(json)) {
     throw new Error(
-      'Nel progetto compare un testo che somiglia a una chiave API Anthropic o a un token di GitHub: il salvataggio è bloccato. Cerca e togli la chiave dai testi prima di salvare.',
+      'Nel progetto c\'è un testo che sembra una chiave API di Anthropic o un token di GitHub, quindi non salvo. Trovalo, toglilo dai testi e poi salva di nuovo.',
     )
   }
 }
@@ -98,16 +98,16 @@ export async function leggiFileProgetto(file: File): Promise<AnteprimaFile> {
   try {
     dati = JSON.parse(testo)
   } catch {
-    throw new Error('Il file non è un progetto valido: non è JSON leggibile.')
+    throw new Error('Questo file non riesco ad aprirlo: non sembra un progetto.')
   }
   if (!èOggetto(dati) || dati.formato !== FORMATO) {
-    throw new Error('Il file non è un progetto di Studio tesi.')
+    throw new Error('Questo file non è un progetto di Studio tesi.')
   }
   if (typeof dati.versione !== 'number' || dati.versione > VERSIONE) {
-    throw new Error("Il file è stato creato da una versione più recente dell'app: aggiorna la pagina e riprova.")
+    throw new Error("Questo file viene da una versione più nuova dell'app: ricarica la pagina e riprova.")
   }
   if (!èOggetto(dati.progetto) || !Array.isArray(dati.progetto.capitoli) || !èOggetto(dati.corpus)) {
-    throw new Error('Il file di progetto è incompleto o danneggiato.')
+    throw new Error('Il file del progetto è rovinato o manca qualche pezzo.')
   }
   // I campi mancanti (file di versioni precedenti) prendono il valore iniziale.
   const progetto = normalizzaProgetto({ ...progettoIniziale(), ...(dati.progetto as Partial<Progetto>) } as Progetto)
@@ -130,9 +130,9 @@ export async function leggiFileProgetto(file: File): Promise<AnteprimaFile> {
 export function fileCorsoControllati(progetto: Progetto, corpus: Record<string, Passaggio[]>): Progetto['courseFiles'] {
   return progetto.courseFiles.map((f) =>
     f.status === 'pronto' && !corpus[f.id]
-      ? { ...f, status: 'errore' as const, errore: 'Il testo di questo file non era nel progetto: ricaricalo.' }
+      ? { ...f, status: 'errore' as const, errore: 'Il testo di questo file non era nel progetto: caricalo di nuovo.' }
       : f.status === 'lettura' || f.status === 'estrazione'
-        ? { ...f, status: 'errore' as const, errore: 'Lettura interrotta: ricarica il file.' }
+        ? { ...f, status: 'errore' as const, errore: 'La lettura si è fermata a metà: carica di nuovo il file.' }
         : f,
   )
 }

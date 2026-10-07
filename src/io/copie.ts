@@ -53,7 +53,7 @@ export async function creaCopia(motivo: string, forza = false): Promise<boolean>
 
 export async function ripristinaCopia(id: string): Promise<void> {
   const copia = (await elencoCopie()).find((c) => c.id === id)
-  if (!copia) throw new Error('Copia non trovata.')
+  if (!copia) throw new Error('Non trovo più questa copia.')
   // Prima di tornare indietro si salva lo stato attuale: anche il ripristino è reversibile.
   await creaCopia('Prima del ripristino', true)
   useStudio.getState().sostituisciProgetto(normalizzaProgetto(JSON.parse(copia.progetto) as Progetto))

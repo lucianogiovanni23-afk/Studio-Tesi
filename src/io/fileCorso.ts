@@ -44,26 +44,26 @@ export async function caricaFileCorso(lista: FileList | File[], suScartati: (nom
         const esito = await estraiPdf(buffer, (corrente, totale) => aggiorna({ paginaCorrente: corrente, pagine: totale }))
         if (esito.scansionato) {
           throw new Error(
-            'Il PDF non ha testo selezionabile (è una scansione). Esportalo con il riconoscimento del testo (OCR) e ricaricalo.',
+            'Questo PDF è una scansione, quindi non riesco a leggere il testo. Passalo in un\'app che riconosce il testo (OCR) e caricalo di nuovo.',
           )
         }
         pagine = esito.pagine
       } else {
         const testo = await voce.file.text()
-        if (!testo.trim()) throw new Error('File di testo vuoto.')
+        if (!testo.trim()) throw new Error('Il file è vuoto.')
         pagine = pagineDaTesto(testo)
       }
       const passaggi = suddividi(voce.id, voce.file.name, pagine)
-      if (passaggi.length === 0) throw new Error('Nessun testo leggibile nel file.')
+      if (passaggi.length === 0) throw new Error('Nel file non c\'è testo che riesco a leggere.')
       await aggiungiAlCorpus(voce.id, passaggi)
       aggiorna({ status: 'pronto', progress: 100, pagine: pagine.length, paginaCorrente: pagine.length, passaggi: passaggi.length })
       letti += 1
-      logOk(null, `Materiale del corso: "${voce.file.name}" letto — ${pagine.length} pagine, ${passaggi.length} passaggi.`)
+      logOk(null, `Lezioni del corso: ho letto "${voce.file.name}" (${pagine.length} pagine).`)
     } catch (err) {
-      const messaggio = err instanceof Error ? err.message : 'Lettura non riuscita.'
+      const messaggio = err instanceof Error ? err.message : 'Non sono riuscito a leggerlo.'
       errori += 1
       aggiorna({ status: 'errore', progress: 100, errore: messaggio })
-      logAvviso(null, `Materiale del corso: "${voce.file.name}" — ${messaggio}`)
+      logAvviso(null, `Lezioni del corso: "${voce.file.name}" — ${messaggio}`)
     }
   }
   return { letti, errori }

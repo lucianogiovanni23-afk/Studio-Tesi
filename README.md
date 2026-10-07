@@ -209,17 +209,26 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 ## L'Ufficio: si lavora parlando con gli agenti
 
 All'apertura l'app mostra l'**Ufficio**: un open space moderno in 3D con quattro persone in
-giacca e cravatta che interpretano gli agenti:
-- **Giulia Romano**, lettrice del corso;
-- **Marco Ferrara**, bibliotecario;
-- **Luca Esposito**, scrittore;
-- **Elena Conti**, revisora.
+giacca e cravatta che interpretano gli agenti. Il nome di ognuno è la funzione che svolge, e
+l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
+- **Lettrice del corso**: studia le tue lezioni;
+- **Bibliotecario**: ti trova gli articoli;
+- **Scrittore**: scrive la tesi con te;
+- **Revisora**: controlla che sia tutto giusto.
 
-- **Sala unica**: vetrata a tutta parete sulla campagna calabrese, soffitto con luci lineari,
+- **Sala unica**: vetrata a tutta parete sulla campagna calabrese, soffitto a doppia altezza
+  (6,6 m) con lamelle acustiche in rovere e tagli di luce, così girando la visuale non si finisce
+  mai sopra il tetto (la rotazione verticale è anche limitata),
   parete a listelli verde oliva, libreria con un libro per ogni fonte, schermo con l'avanzamento
   dei capitoli, zona relax e tavolo riunioni. All'avvio la telecamera mostra tutta la sala; quando
   scegli una persona si avvicina a lei con un movimento fluido, e "Tutta la sala" la riporta
   indietro. Illuminazione morbida con luce d'ambiente generata in locale e ombre a contatto.
+- **Postazioni da setup di ultima generazione**: scrivania grafite regolabile con striscia LED,
+  PC con vetro temperato, ventole RGB che girano e luci che scorrono fra i colori, monitor curvo
+  ultrawide su braccio in alluminio, tastiera meccanica retroilluminata, tappetino XXL, supporto
+  per le cuffie. Sedie ergonomiche con schienale alto avvolgente, poggiatesta, cuscino lombare,
+  braccioli regolabili e base a cinque razze, con inserti nel colore di ogni persona. Con
+  "movimento ridotto" del sistema luci e ventole restano ferme.
 - **Conversazione**: sul computer è un pannello semitrasparente sopra la scena (il centro ottico
   si sposta perché il pannello non copra le persone). Ogni persona si presenta, dice che cosa fare
   in base allo stato della tesi e offre le risposte possibili come pulsanti: al massimo tre
@@ -228,18 +237,37 @@ giacca e cravatta che interpretano gli agenti:
   chiamano le stesse funzioni delle pagine di dettaglio, quindi controlli e verifiche restano
   identici.
 - **Che cosa fa ogni persona**:
-  - **Giulia**: lezioni (anche 25 file), quadro teorico, lessico.
-  - **Marco**: ricerca dal campo di testo o per la prima sezione scoperta, approvazione dei
+  - **Lettrice**: lezioni (anche 25 file), idee principali del corso, parole del corso.
+  - **Bibliotecario**: ricerca dal campo di testo o per la prima sezione scoperta, approvazione dei
     risultati, schede in blocco, testi completi, PDF.
-  - **Luca**: approvazione dell'indice, scelta della sezione, fonti, scaletta, bozza, foglio,
+  - **Scrittore**: approvazione dell'indice, scelta della sezione, fonti, scaletta, bozza, foglio,
     controllo delle citazioni.
-  - **Elena**: osservazioni del relatore, controllo della tesi, controllo approfondito, file Word.
+  - **Revisora**: note del relatore, controllo della tesi, controllo approfondito, file Word.
 - **Domande libere**: scrivendo a una persona le si fa una domanda; risponde dal suo ruolo e
   conosce tutta la tesi, con lo stesso contesto in cache della vecchia chat (in modalità gratuita
   passa da Claude.ai). Lo storico di ogni persona si salva nel progetto e si sincronizza.
 - **Telefono e iPad in verticale**: niente 3D, i ritratti delle quattro persone e la conversazione
   a tutta larghezza.
 - Le pagine di dettaglio restano nel menu: Panoramica, Corso, Fonti, Scrittura, Revisione.
+
+## Linguaggio semplice e ripristino
+
+- Tutti i testi dell'app (pagine, dialoghi dei colleghi, messaggi di errore, stati di lavoro)
+  sono scritti in modo semplice e alla mano, dando del tu: niente parole tecniche come "quadro
+  teorico", "corpus" o "metadati". Restano invariati i testi che l'app manda al modello.
+- **Ricomincia da capo** (Impostazioni): il pulsante "Ripristina" cancella fonti, testo scritto,
+  ricerche, note del relatore, glossario e conversazioni, e tiene solo le lezioni del corso (con
+  le idee principali che la lettrice ne ha ricavato). Prima di confermare mostra cosa sparisce;
+  prima di cancellare fa una copia di sicurezza ("Prima del ripristino"), recuperabile dallo
+  stesso pannello delle copie. Chiave API, collegamento fra dispositivi e preferenze restano.
+
+## Grafica
+
+- Sfondo con bagliori morbidi, card più ariose, pulsanti con profondità, testata in vetro.
+- Ogni pagina ha un'intestazione colorata con il collega che se ne occupa ("Chiedi a lui/lei"
+  porta nell'ufficio da quella persona), il passo del percorso e le sue schede.
+- Panoramica: la tesi come copertina scura, anello di avanzamento verso il minimo di pagine,
+  numeri in riquadri. Entrata morbida delle pagine (disattivata con movimento ridotto).
 
 ## Interfaccia: un percorso in quattro passi
 
@@ -380,17 +408,17 @@ npm run lint
 ```
 
 Il collaudo dell'Ufficio aggiunge 28 controlli, tutti in modalità gratuita:
-- avvio sull'Ufficio con la sala 3D, le quattro persone e la presentazione di Giulia;
-- Giulia: lezioni caricate dalla conversazione, quadro teorico tramite Claude.ai con le verifiche
+- avvio sull'Ufficio con la sala 3D, le quattro persone e la presentazione della lettrice;
+- Lettrice: lezioni caricate dalla conversazione, quadro teorico tramite Claude.ai con le verifiche
   raccontate, proposta del lessico;
-- Marco: ricerca scritta nel campo di testo con piano e selezione, risultati approvati dentro la
+- Bibliotecario: ricerca scritta nel campo di testo con piano e selezione, risultati approvati dentro la
   conversazione, passo successivo proposto;
-- Luca: indice approvato e passaggio alla scelta delle fonti, cambio di sezione;
-- Elena: osservazione del relatore e domanda libera con il suo ruolo e il contesto;
+- Scrittore: indice approvato e passaggio alla scelta delle fonti, cambio di sezione;
+- Revisora: osservazione del relatore e domanda libera con il suo ruolo e il contesto;
 - storico per persona e dopo la ricarica, scelta della persona toccando il cartellino nella
   scena, nessuna chiamata a pagamento, telefono senza 3D e senza scorrimento orizzontale.
 
-I collaudi precedenti sono stati adeguati: la chat è diventata la domanda libera a Elena, con gli
+I collaudi precedenti sono stati adeguati: la chat è diventata la domanda libera alla revisora, con gli
 stessi controlli su streaming, cache e storia; la scena ora sta nell'Ufficio. Passano tutti: 356
 controlli in totale.
 

@@ -93,7 +93,7 @@ function Editor({ cap, sez, onCursore }: { cap: Capitolo; sez: Sezione; onCursor
     <textarea
       className="editor-testo"
       value={testo}
-      placeholder="Scrivi qui il testo della sezione, oppure chiedi una bozza allo Scrittore dopo aver approvato fonti e scaletta. Il testo resta sempre modificabile da te. I marcatori come [F12] o [C3] collegano un'affermazione alla sua citazione."
+      placeholder="Scrivi qui il testo. Oppure, dopo aver scelto fonti e scaletta, chiedi una bozza allo Scrittore: puoi sempre cambiarla tu. I segni tipo [F12] o [C3] dicono da quale fonte viene una frase."
       onSelect={(e) => onCursore(paragrafoAlCursore(e.currentTarget.value, e.currentTarget.selectionStart))}
       onChange={(e) => {
         setTestoLocale(e.target.value)
@@ -128,19 +128,19 @@ function Versioni({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
           ;(document.activeElement as HTMLElement | null)?.blur()
           setTimeout(() => {
             const ok = salva(cap.id, sez.id, nota.trim() || 'Versione salvata da te')
-            setEsito(ok ? 'Versione salvata.' : 'Nessuna modifica dall\'ultima versione: niente da salvare.')
+            setEsito(ok ? 'Versione salvata.' : 'Non hai cambiato niente dall\'ultima versione.')
             if (ok) setNota('')
           }, 0)
         }}
       >
-        <input className="campo" placeholder="Nota (facoltativa)" value={nota} onChange={(e) => setNota(e.target.value)} aria-label="Nota della versione" />
+        <input className="campo" placeholder="Nota (se vuoi)" value={nota} onChange={(e) => setNota(e.target.value)} aria-label="Nota della versione" />
         <button type="submit" className="bottone">
           Salva versione
         </button>
       </form>
       {esito && <p className="nota" role="status">{esito}</p>}
       {versioni.length === 0 ? (
-        <p className="nota">Nessuna versione salvata per questa sezione.</p>
+        <p className="nota">Ancora nessuna versione salvata.</p>
       ) : (
         <ul className="elenco-versioni">
           {versioni.map((v) => (
@@ -152,11 +152,11 @@ function Versioni({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
                 <Conferma
                   classe="bottone bottone-piccolo bottone-vuoto"
                   etichetta="Ripristina"
-                  domanda="Tornare a questa versione? Il testo attuale resta fra le versioni."
+                  domanda="Vuoi tornare a questa versione? Il testo di adesso resta salvato."
                   conferma="Ripristina"
                   onConferma={() => {
                     ripristina(cap.id, sez.id, v.id)
-                    setEsito('Versione ripristinata. Il testo precedente è stato conservato fra le versioni.')
+                    setEsito('Fatto, sei tornato a questa versione. Il testo di prima è salvato fra le versioni.')
                   }}
                 />
               </div>
@@ -203,7 +203,7 @@ function Utili({ sez }: { sez: Sezione }) {
     <aside className="colonna-utili" aria-label="Fonti utili per la sezione">
       <h3>Fonti della sezione</h3>
       {approvate.length === 0 ? (
-        <p className="nota">{sez.fontiConfermate ? 'Solo materiale del corso.' : 'Non ancora approvate.'}</p>
+        <p className="nota">{sez.fontiConfermate ? 'Solo il materiale del corso.' : 'Non le hai ancora scelte.'}</p>
       ) : (
         <ul className="elenco-concetti">
           {approvate.map((f) => (
@@ -227,7 +227,7 @@ function Utili({ sez }: { sez: Sezione }) {
           </button>
         </p>
       ) : utili.length === 0 ? (
-        <p className="nota">Nessun'altra fonte della biblioteca sembra legata a questa sezione.</p>
+        <p className="nota">Nessun'altra fonte sembra c'entrare con questa parte.</p>
       ) : (
         <ul className="elenco-concetti">
           {utili.map((f) => (
@@ -236,7 +236,7 @@ function Utili({ sez }: { sez: Sezione }) {
                 <code>[F{f.numero}]</code> {autoreAnno(f)}
               </strong>
               <span>{f.titolo}</span>
-              <small>{f.scheda ? (f.scheda.corretta ? 'scheda rivista' : 'scheda da rivedere') : 'senza scheda'}</small>
+              <small>{f.scheda ? (f.scheda.corretta ? 'scheda controllata' : 'scheda da controllare') : 'senza scheda'}</small>
             </li>
           ))}
         </ul>
@@ -245,9 +245,9 @@ function Utili({ sez }: { sez: Sezione }) {
       <h3>Dal corso</h3>
       {concetti.length === 0 ? (
         <p className="nota">
-          {quadro ? 'Nessun concetto del quadro teorico collegato al titolo.' : 'Quadro teorico non ancora generato.'}{' '}
+          {quadro ? 'Nessun concetto del corso c\'entra con questo titolo.' : 'I concetti del corso non sono ancora pronti.'}{' '}
           <button type="button" className="link" onClick={() => vai('corso')}>
-            Materiale del corso
+            Vai al corso
           </button>
         </p>
       ) : (
@@ -290,7 +290,7 @@ function ConCitazioni({ sez }: { sez: Sezione }) {
     <section className="con-citazioni">
       <div className="riga-editor">
         <button type="button" className="bottone bottone-piccolo" onClick={() => setAperto((a) => !a)} aria-expanded={aperto} disabled={vuoto}>
-          {aperto ? 'Nascondi il testo con le citazioni' : `Testo con le citazioni (${esame.totali})`}
+          {aperto ? 'Nascondi le citazioni' : `Mostra le citazioni (${esame.totali})`}
         </button>
         <button
           type="button"
@@ -300,7 +300,7 @@ function ConCitazioni({ sez }: { sez: Sezione }) {
             const testo = esportaTesto(sez.testo, sez.citazioni, fonti, stile)
             try {
               await navigator.clipboard.writeText(testo)
-              setCopiato(`Testo copiato in stile ${stile === 'note' ? 'note a piè di pagina' : 'autore-anno'}.`)
+              setCopiato(`Testo copiato, con le citazioni ${stile === 'note' ? 'in nota a piè di pagina' : 'autore-anno'}.`)
             } catch {
               setCopiato(testo)
             }
@@ -316,7 +316,7 @@ function ConCitazioni({ sez }: { sez: Sezione }) {
           </p>
         ) : (
           <label className="campo-blocco">
-            <span className="etichetta">Copia da qui (il browser non ha permesso la copia automatica)</span>
+            <span className="etichetta">Copia da qui (il browser non mi ha fatto copiare da solo)</span>
             <textarea className="campo" rows={6} readOnly value={copiato} />
           </label>
         ))}
@@ -372,7 +372,7 @@ export function Scrittura() {
   if (!cap) {
     return (
       <section className="pannello">
-        <p>L'indice è vuoto: aggiungi un capitolo dal cruscotto.</p>
+        <p>L'indice è vuoto: aggiungi un capitolo dalla Panoramica.</p>
       </section>
     )
   }
@@ -433,7 +433,7 @@ export function Scrittura() {
             <PassoScaletta cap={cap} sez={sez} />
             <section className="passo-scrittura passo-testo">
               <h3>
-                <span className="passo-numero">3</span> Testo della sezione
+                <span className="passo-numero">3</span> Scrivi il testo
               </h3>
               <ComandiScrittore cap={cap} sez={sez} paragrafo={selezione?.sezioneId === sez.id ? selezione.n : null} />
               <Editor cap={cap} sez={sez} onCursore={(n) => selezionaParagrafo(sez.id, n)} />
@@ -444,7 +444,7 @@ export function Scrittura() {
             <Versioni cap={cap} sez={sez} />
           </>
         ) : (
-          <p className="nota">Questo capitolo non ha sezioni: aggiungile dall'indice nel cruscotto.</p>
+          <p className="nota">Questo capitolo non ha sezioni: aggiungile dall'indice nella Panoramica.</p>
         )}
       </main>
 

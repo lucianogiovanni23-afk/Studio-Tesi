@@ -4,8 +4,11 @@ import type { AgentKey } from '../types'
  * Un'unica sala open space, in metri. All'avvio la telecamera la mostra
  * tutta, da lontano; quando lavori con una persona si avvicina a lei.
  */
-export const CAMERA_CASA: [number, number, number] = [0, 3.2, 10.3]
-export const CAMERA_BERSAGLIO: [number, number, number] = [0, 1.6, -2.6]
+/** Altezza del soffitto: doppia altezza, così girando la visuale non si esce dalla sala. */
+export const ALTEZZA_SALA = 6.6
+
+export const CAMERA_CASA: [number, number, number] = [0, 2.8, 10.6]
+export const CAMERA_BERSAGLIO: [number, number, number] = [0, 1.75, -2.4]
 
 export interface Postazione {
   /** Centro della scrivania. */

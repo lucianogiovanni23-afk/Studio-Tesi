@@ -32,7 +32,7 @@ export async function esportaWord(opzioni: OpzioniWord): Promise<string> {
   const p = useStudio.getState().progetto
   const stile = p.stileCitazione
   const capitoli = opzioni.capitoloId ? p.capitoli.filter((c) => c.id === opzioni.capitoloId) : p.capitoli
-  if (capitoli.length === 0) throw new Error('Capitolo non trovato.')
+  if (capitoli.length === 0) throw new Error('Non trovo più questo capitolo.')
 
   const note: Record<number, { children: InstanceType<typeof Paragraph>[] }> = {}
   let prossimaNota = 1

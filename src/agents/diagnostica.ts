@@ -63,15 +63,15 @@ export async function eseguiDiagnosi(conRicercaWeb: boolean, suEsito: (e: EsitoD
         const r = streaming
           ? await chiamataStrutturataStream<{ ok: boolean }>(base)
           : await chiamataStrutturata<{ ok: boolean }>(base)
-        if (r.ok !== true) throw new Error('risposta inattesa')
-        return streaming ? 'output strutturato e streaming funzionano' : 'output strutturato funziona'
+        if (r.ok !== true) throw new Error('ha risposto in modo strano')
+        return streaming ? 'funziona, anche con il testo che arriva un po\' alla volta' : 'funziona'
       }),
     )
   }
 
   if (conRicercaWeb) {
     suEsito(
-      await cronometra(`Ricerca web (${modelli.bibliotecario})`, async () => {
+      await cronometra(`Ricerca sul web (${modelli.bibliotecario})`, async () => {
         const r = await chiamataConStrumenti({
           client,
           model: modelli.bibliotecario,
@@ -86,13 +86,13 @@ export async function eseguiDiagnosi(conRicercaWeb: boolean, suEsito: (e: EsitoD
         })
         const raccolta = raccogliRicerca(r.blocchi)
         if (raccolta.errori.length) throw new Error(raccolta.errori.join(' '))
-        if (!raccolta.usato) throw new Error('il modello non ha usato la ricerca web')
-        return `ricerca web attiva: ${raccolta.risultati.length} risultati verificabili`
+        if (!raccolta.usato) throw new Error('Claude non ha fatto la ricerca sul web')
+        return `la ricerca sul web funziona: ${raccolta.risultati.length} risultati con link controllabile`
       }),
     )
   }
 
   for (const c of await provaCataloghi()) {
-    suEsito({ voce: `Catalogo ${c.catalogo}`, ok: c.ok, messaggio: c.messaggio, millisecondi: 0 })
+    suEsito({ voce: `Archivio ${c.catalogo}`, ok: c.ok, messaggio: c.messaggio, millisecondi: 0 })
   }
 }

@@ -134,7 +134,7 @@ export async function inviaMessaggio(testo: string): Promise<void> {
     useStudio.getState().aggiornaMessaggio(idRisposta, finale || accumulato)
   } catch (err) {
     const fermata = controller?.signal.aborted
-    useStudio.getState().aggiornaMessaggio(idRisposta, accumulato + (fermata ? '\n\n(risposta interrotta)' : ''))
+    useStudio.getState().aggiornaMessaggio(idRisposta, accumulato + (fermata ? '\n\n(risposta fermata a metà)' : ''))
     if (!fermata) useChat.setState({ errore: toApiError(err).message })
   } finally {
     useChat.setState({ inCorso: false })

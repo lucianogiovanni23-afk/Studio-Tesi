@@ -5,12 +5,12 @@ import { useStudio } from '../../store'
 import type { Sezione } from '../../types'
 
 const NOME: Record<TipoSegnalazione, string> = {
-  formula: 'formula da IA',
+  formula: 'frase da IA',
   parola_jolly: 'parola ripetuta',
-  connettivo: 'connettivo ripetuto',
-  chiusura: 'chiusura riassuntiva',
+  connettivo: 'collegamento ripetuto',
+  chiusura: 'chiusura che riassume',
   ritmo: 'ritmo',
-  lessico: 'lessico del corso',
+  lessico: 'parole del corso',
 }
 
 /** Rilevatore di frasi tipiche dell'IA e di termini diversi dal lessico del corso, calcolato in codice. */
@@ -27,7 +27,7 @@ export function PannelloStile({ sez }: { sez: Sezione }) {
     return (
       <section className="pannello-stile">
         <button type="button" className="bottone bottone-piccolo" disabled>
-          Frasi tipiche dell'IA: —
+          Frasi da IA: —
         </button>
       </section>
     )
@@ -47,17 +47,17 @@ export function PannelloStile({ sez }: { sez: Sezione }) {
   return (
     <section className={`pannello-stile ${segnalazioni.length ? 'con-segnalazioni' : 'pulito'}`}>
       <button type="button" className="bottone bottone-piccolo" onClick={() => setAperto((a) => !a)} aria-expanded={aperto}>
-        Frasi tipiche dell'IA: {ia} · lessico del corso: {lessico === 0 ? 'ok' : `${lessico} da sistemare`}
+        Frasi da IA: {ia} · parole del corso: {lessico === 0 ? 'ok' : `${lessico} da sistemare`}
       </button>
       {aperto && (
         <div className="stile-dettaglio">
           {segnalazioni.length === 0 ? (
-            <p className="nota nota-ok">Nessuna formula tipica dell'IA e nessuna variante al posto dei termini del corso in {parole} parole.</p>
+            <p className="nota nota-ok">Tutto a posto: in {parole} parole niente frasi da IA e i termini del corso sono giusti.</p>
           ) : (
             <>
               <p className="nota">
-                Controllo in codice, gratuito. Non sono errori uno per uno, ma sommati danno il "sapore" di un testo generato. Con "Sistema questo
-                paragrafo" prepari la riscrittura: poi premi "Riscrivi questo paragrafo" nei comandi dello Scrittore, oppure correggi tu.
+                Controllo veloce e gratis. Da sole non sono errori, ma tutte insieme fanno sembrare il testo scritto da un'IA. Premi
+                "Sistema questo paragrafo", poi "Riscrivi questo paragrafo" fra i comandi dello Scrittore. Oppure correggi tu.
               </p>
               <ul className="elenco-stile">
                 {segnalazioni.map((s, i) => (

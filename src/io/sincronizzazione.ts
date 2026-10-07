@@ -157,34 +157,34 @@ async function gh(token: string, percorso: string, init: { method?: string; body
       body: init.body ? JSON.stringify(init.body) : undefined,
     })
   } catch {
-    throw new ErroreSync('offline', 'Non raggiungo GitHub: riprovo appena torna la connessione.')
+    throw new ErroreSync('offline', 'Non riesco a collegarmi a GitHub: riprovo appena torna internet.')
   }
 }
 
 async function errore(r: Response, cosa: string): Promise<ErroreSync> {
-  if (r.status === 401) return new ErroreSync('errore', 'GitHub non accetta il token: forse è scaduto. Creane uno nuovo e ricollega questo dispositivo.')
+  if (r.status === 401) return new ErroreSync('errore', 'GitHub non accetta il token, forse è scaduto. Creane uno nuovo e collega di nuovo questo dispositivo.')
   if (r.status === 403 || r.status === 429) {
     const testo = await r.text().catch(() => '')
-    if (/rate limit/i.test(testo)) return new ErroreSync('offline', 'GitHub ha limitato le richieste per qualche minuto: riprovo più tardi.')
-    return new ErroreSync('errore', 'Il token non ha il permesso di scrivere nel repository: serve "Contents" in lettura e scrittura.')
+    if (/rate limit/i.test(testo)) return new ErroreSync('offline', 'GitHub mi ha bloccato per qualche minuto perché ho fatto troppe richieste: riprovo più tardi.')
+    return new ErroreSync('errore', 'Il token non può scrivere nel repository: quando lo crei, dai a "Contents" il permesso di lettura e scrittura.')
   }
-  if (r.status === 404) return new ErroreSync('errore', 'Repository non trovato: controlla il nome e che il token abbia accesso proprio a quel repository.')
-  if (r.status === 413) return new ErroreSync('errore', 'Il progetto è troppo grande per GitHub.')
-  return new ErroreSync('errore', `GitHub ha risposto con un errore (${r.status}) ${cosa}.`)
+  if (r.status === 404) return new ErroreSync('errore', 'Non trovo il repository: controlla il nome e che il token possa entrare proprio in quel repository.')
+  if (r.status === 413) return new ErroreSync('errore', 'Il progetto è troppo grande, GitHub non lo accetta.')
+  return new ErroreSync('errore', `Qualcosa non va con GitHub (errore ${r.status}) ${cosa}.`)
 }
 
 /** Lo sha del file nel repository, o null se non c'è ancora. */
 async function shaRemoto(token: string, repo: string, file: string): Promise<string | null> {
   const r = await gh(token, `/repos/${repo}/contents/${file}`)
   if (r.status === 404) return null
-  if (!r.ok) throw await errore(r, 'leggendo i dati')
+  if (!r.ok) throw await errore(r, 'mentre leggevo i dati')
   return ((await r.json()) as { sha: string }).sha
 }
 
 /** Il contenuto esatto di quella versione (fino a 100 MB). */
 async function leggiVersione(token: string, repo: string, sha: string): Promise<string> {
   const r = await gh(token, `/repos/${repo}/git/blobs/${sha}`, { accept: 'application/vnd.github.raw+json' })
-  if (!r.ok) throw await errore(r, 'leggendo i dati')
+  if (!r.ok) throw await errore(r, 'mentre leggevo i dati')
   return r.text()
 }
 
@@ -201,8 +201,8 @@ async function scriviFile(token: string, repo: string, file: string, contenuto: 
     method: 'PUT',
     body: { message: `Aggiornamento da ${nomeDispositivo()}`, content: base64Utf8(contenuto), ...(sha ? { sha } : {}) },
   })
-  if (r.status === 409 || (r.status === 422 && !sha)) throw new ErroreSync('conflitto', 'Il file è cambiato su GitHub nel frattempo.')
-  if (!r.ok) throw await errore(r, 'salvando i dati')
+  if (r.status === 409 || (r.status === 422 && !sha)) throw new ErroreSync('conflitto', 'Nel frattempo il file su GitHub è cambiato.')
+  if (!r.ok) throw await errore(r, 'mentre salvavo i dati')
   return ((await r.json()) as { content: { sha: string } }).content.sha
 }
 
@@ -221,16 +221,16 @@ export function nomeRepository(testo: string): string | null {
 export async function collega(repoScritto: string, tokenScritto: string): Promise<void> {
   const repo = nomeRepository(repoScritto)
   const token = tokenScritto.trim()
-  if (!repo) throw new Error('Scrivi il repository come nome-utente/nome-repository.')
+  if (!repo) throw new Error('Scrivi il repository così: nome-utente/nome-repository.')
   if (!token) throw new Error('Incolla il token di GitHub.')
   const r = await gh(token, `/repos/${repo}`)
-  if (!r.ok) throw await errore(r, 'controllando il repository')
+  if (!r.ok) throw await errore(r, 'mentre controllavo il repository')
   const info = (await r.json()) as { private?: boolean; permissions?: { push?: boolean } }
   if (info.private !== true) {
-    throw new Error('Il repository è pubblico: chiunque potrebbe leggere la tesi. Rendilo privato su GitHub oppure creane uno privato.')
+    throw new Error('Il repository è pubblico, quindi chiunque potrebbe leggere la tesi. Rendilo privato su GitHub oppure creane uno nuovo privato.')
   }
   if (info.permissions && info.permissions.push === false) {
-    throw new Error('Il token può leggere ma non scrivere nel repository: serve "Contents" in lettura e scrittura.')
+    throw new Error('Il token può leggere ma non scrivere nel repository: quando lo crei, dai a "Contents" il permesso di lettura e scrittura.')
   }
   scrivi(CHIAVE_TOKEN, token)
   salvaCollegamento({ repo })
@@ -271,7 +271,7 @@ async function giro(scelta?: Scelta): Promise<void> {
   // Il conflitto si risolve solo con una scelta dello studente.
   if (!scelta && useSync.getState().stato === 'conflitto') return
   if (estrazioneInCorso(s.progetto)) {
-    aggiorna({ stato: 'attesa', messaggio: 'Aspetto che finisca la lettura dei file del corso.' })
+    aggiorna({ stato: 'attesa', messaggio: 'Aspetto di finire di leggere i file del corso.' })
     return
   }
   aggiorna({ stato: 'in_corso', messaggio: '' })
@@ -297,12 +297,12 @@ async function giro(scelta?: Scelta): Promise<void> {
   }
 
   if (azione === 'conflitto' || azione === 'ricevi') {
-    if (!shaP) throw new ErroreSync('errore', 'Su GitHub non c\'è ancora nessun progetto da ricevere.')
+    if (!shaP) throw new ErroreSync('errore', 'Su GitHub non c\'è ancora nessun progetto da scaricare.')
     const remoto = JSON.parse(await leggiVersione(token, col.repo, shaP)) as ProgettoRemoto
     if (remoto.formato !== FORMATO || !remoto.progetto || !Array.isArray(remoto.progetto.capitoli)) {
       throw new ErroreSync('errore', 'Il file su GitHub non è un progetto di Studio tesi.')
     }
-    if (remoto.versione > VERSIONE) throw new ErroreSync('errore', "I dati su GitHub vengono da una versione più recente dell'app: aggiorna la pagina.")
+    if (remoto.versione > VERSIONE) throw new ErroreSync('errore', "I dati su GitHub vengono da una versione più nuova dell'app: ricarica la pagina.")
 
     if (azione === 'conflitto') {
       aggiorna({ stato: 'conflitto', messaggio: '', conflitto: { da: remoto.salvatoDa || 'altro dispositivo', il: remoto.salvatoIl } })
@@ -335,7 +335,7 @@ async function giro(scelta?: Scelta): Promise<void> {
       improntaCorpus: improntaCorpus(corpus),
       ultima,
     })
-    aggiorna({ stato: 'ok', messaggio: `Ricevute le modifiche ${preposizione('da', remoto.salvatoDa || 'altro dispositivo')}.`, ultima, conflitto: null })
+    aggiorna({ stato: 'ok', messaggio: `Ho preso le modifiche fatte ${preposizione('da', remoto.salvatoDa || 'altro dispositivo')}.`, ultima, conflitto: null })
     return
   }
 
@@ -375,7 +375,7 @@ export function sincronizza(scelta?: Scelta): Promise<void> {
       } else if (err instanceof ErroreSync && err.tipo === 'offline') {
         aggiorna({ stato: 'offline', messaggio: err.message })
       } else {
-        aggiorna({ stato: 'errore', messaggio: err instanceof Error ? err.message : 'Sincronizzazione non riuscita.' })
+        aggiorna({ stato: 'errore', messaggio: err instanceof Error ? err.message : 'Non sono riuscito a sincronizzare.' })
       }
     } finally {
       inCorso = null

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { useStudio } from '../store'
-import type { Schermata } from '../types'
+import { AGENTE } from '../agents/agenti'
+import type { AgentKey, Schermata } from '../types'
+import { Ritratto } from './Ritratto'
 
 /**
  * Navigazione a percorso: Inizio, i quattro passi del lavoro, Chiedi.
@@ -77,11 +79,11 @@ export function NavigazionePrincipale() {
 
 const SCHEDE: Partial<Record<Schermata, { id: Schermata; nome: string }[]>> = {
   corso: [
-    { id: 'corso', nome: 'Lezioni e quadro teorico' },
+    { id: 'corso', nome: 'Lezioni' },
     { id: 'glossario', nome: 'Glossario' },
   ],
   glossario: [
-    { id: 'corso', nome: 'Lezioni e quadro teorico' },
+    { id: 'corso', nome: 'Lezioni' },
     { id: 'glossario', nome: 'Glossario' },
   ],
   biblioteca: [
@@ -101,18 +103,26 @@ const SCHEDE: Partial<Record<Schermata, { id: Schermata; nome: string }[]>> = {
   ],
 }
 
-const INTRO: Record<Schermata, { titolo: string; frase: string } | null> = {
+interface Intro {
+  passo?: number
+  titolo: string
+  frase: string
+  /** Il collega dell'ufficio che si occupa di questa pagina. */
+  agente?: AgentKey
+}
+
+const INTRO: Record<Schermata, Intro | null> = {
   cruscotto: null,
   ufficio: null,
-  corso: { titolo: '1 · Corso', frase: "Carica le lezioni: l'app ne ricava i concetti e il lessico da usare in tutta la tesi." },
-  glossario: { titolo: '1 · Corso', frase: 'I termini tecnici come li usa il corso: lo Scrittore è obbligato a usarli.' },
-  biblioteca: { titolo: '2 · Fonti', frase: 'Le fonti raccolte: leggile con le schede e scegli quali usare in ogni sezione.' },
-  ricerca: { titolo: '2 · Fonti', frase: 'Cerca articoli nei cataloghi accademici: niente entra in biblioteca senza la tua approvazione.' },
-  copertura: { titolo: '2 · Fonti', frase: 'Quali sezioni hanno abbastanza fonti e quali vanno rinforzate.' },
-  scrittura: { titolo: '3 · Scrittura', frase: 'Sezione per sezione: scegli le fonti, approva la scaletta, poi bozza. Ogni citazione è verificata sulla fonte.' },
-  revisione: { titolo: '4 · Revisione', frase: 'Osservazioni del relatore, controllo di tutta la tesi, bibliografia ed esportazione in Word.' },
-  chat: { titolo: 'Chiedi', frase: "Domande libere sulla tesi: l'assistente conosce capitoli, fonti e osservazioni." },
-  impostazioni: { titolo: 'Impostazioni', frase: 'Chiave API (facoltativa), sincronizzazione fra dispositivi, file del progetto e obiettivo di pagine.' },
+  corso: { passo: 1, titolo: 'Corso', agente: 'lettore', frase: "Carica le lezioni: la lettrice trova i concetti e le parole del corso da usare in tutta la tesi." },
+  glossario: { passo: 1, titolo: 'Corso', agente: 'lettore', frase: 'Le parole tecniche come le usa il corso: lo scrittore deve usare proprio queste.' },
+  biblioteca: { passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Le fonti che hai raccolto: leggi i riassunti e scegli quali usare in ogni paragrafo.' },
+  ricerca: { passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Cerca articoli negli archivi delle università: in biblioteca entra solo quello che scegli tu.' },
+  copertura: { passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Quali paragrafi hanno abbastanza fonti e a quali ne servono altre.' },
+  scrittura: { passo: 3, titolo: 'Scrittura', agente: 'scrittore', frase: "Un paragrafo alla volta: scegli le fonti, dai l'ok alla scaletta, poi la bozza. Ogni citazione viene controllata sulla fonte." },
+  revisione: { passo: 4, titolo: 'Revisione', agente: 'revisore', frase: 'Note del relatore, controllo di tutta la tesi, bibliografia e file Word.' },
+  chat: { titolo: 'Chiedi', frase: "Chiedi quello che vuoi sulla tesi: l'assistente conosce capitoli, fonti e note del relatore." },
+  impostazioni: { titolo: 'Impostazioni', frase: 'Chiave API (se vuoi), sincronizzazione tra dispositivi, file del progetto, quante pagine vuoi scrivere e il ripristino.' },
 }
 
 /** Titolo del passo, una frase su a cosa serve la pagina e, se ci sono, le sue schede. */
@@ -121,13 +131,25 @@ export function TestaSchermata() {
   const vai = useStudio((s) => s.vai)
   const intro = INTRO[schermata]
   const schede = SCHEDE[schermata]
+  const scegliAgente = useStudio((s) => s.scegliAgente)
   if (!intro) return null
+  const def = intro.agente ? AGENTE[intro.agente] : null
   return (
-    <div className="testa-schermata">
-      <div>
+    <div className="testa-schermata" style={def ? { ['--colore-agente' as string]: def.colore } : undefined}>
+      <div className="testa-testo">
+        {intro.passo && <span className="testa-passo">Passo {intro.passo} di 4</span>}
         <h1>{intro.titolo}</h1>
         <p>{intro.frase}</p>
       </div>
+      {def && (
+        <button type="button" className="testa-agente" onClick={() => scegliAgente(def.key)} title={`Vai nell'ufficio a parlare con ${def.persona.femminile ? 'la' : 'il'} ${def.persona.nome.toLowerCase()}`}>
+          <Ritratto k={def.key} dimensione={44} />
+          <span>
+            <strong>{def.persona.nome}</strong>
+            <small>Chiedi {def.persona.femminile ? 'a lei' : 'a lui'} →</small>
+          </span>
+        </button>
+      )}
       {schede && (
         <div className="sotto-schede" role="tablist">
           {schede.map((s) => (

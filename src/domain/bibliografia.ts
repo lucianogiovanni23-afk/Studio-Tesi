@@ -31,7 +31,7 @@ export const ETICHETTA_ORIGINE: Record<Fonte['origine'], string> = {
   openalex: 'OpenAlex',
   crossref: 'Crossref',
   semanticscholar: 'Semantic Scholar',
-  istituzionale: 'sito istituzionale',
+  istituzionale: 'sito ufficiale',
   web: 'web',
   pdf: 'PDF caricato',
 }

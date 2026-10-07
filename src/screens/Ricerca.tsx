@@ -38,26 +38,26 @@ function Modulo() {
 
   return (
     <section className="pannello">
-      <h2>Nuova ricerca</h2>
+      <h2>Cerca fonti nuove</h2>
       <label className="campo-blocco">
-        <span className="etichetta">Domanda di ricerca</span>
+        <span className="etichetta">Cosa vuoi cercare?</span>
         <textarea
           className="campo"
           rows={3}
           value={domanda}
-          placeholder="Per esempio: come varia la marginalità dei frantoi calabresi nelle annate di scarica?"
+          placeholder="Per esempio: quanto guadagnano i frantoi calabresi negli anni di raccolta scarsa?"
           onChange={(e) => setDomanda(e.target.value)}
           disabled={inCorso}
         />
       </label>
-      {casella('cataloghi', 'Cataloghi accademici', 'OpenAlex, Crossref, Semantic Scholar; gratuiti, dal tuo browser')}
-      {casella('istituzionali', 'Siti istituzionali', 'ISMEA, ISTAT, CREA-RICA, ARPACAL, Copernicus e altri')}
-      {casella('web', 'Web generico', 'studi e rapporti anche in spagnolo e inglese')}
+      {casella('cataloghi', 'Archivi di articoli', 'OpenAlex, Crossref, Semantic Scholar. Gratis')}
+      {casella('istituzionali', 'Siti ufficiali', 'ISMEA, ISTAT, CREA-RICA, ARPACAL, Copernicus e altri')}
+      {casella('web', 'Resto del web', 'studi e report anche in inglese e spagnolo')}
 
       {gratuita && (
         <p className="nota">
-          Modalità gratuita: la ricerca usa i cataloghi accademici, gratuiti. I siti istituzionali e il web richiedono la
-          ricerca web dell'API; i rapporti di ISMEA, ISTAT e simili puoi scaricarli tu e aggiungerli in Biblioteca come PDF.
+          Sei in modalità gratis: cerco solo negli archivi di articoli. Per i siti ufficiali e il resto del web serve la
+          chiave API. I report di ISMEA, ISTAT e simili puoi scaricarli tu e metterli in Biblioteca come PDF.
         </p>
       )}
       {inCorso ? (
@@ -72,13 +72,13 @@ function Modulo() {
           classe="bottone bottone-primario"
           etichetta="Cerca"
           disabilitato={domanda.trim().length < 8 || !(opzioni.cataloghi || opzioni.istituzionali || opzioni.web)}
-          domanda={`${costoStimato(stima)} (i cataloghi sono gratuiti). Procedo?`}
-          conferma="Avvia la ricerca"
+          domanda={`${costoStimato(stima)} (gli archivi di articoli sono gratis). Procedo?`}
+          conferma="Cerca"
           onConferma={() => void avviaRicerca(domanda.trim(), opzioni)}
         />
       )}
       <details className="dettagli-piccoli">
-        <summary>Siti istituzionali consultati</summary>
+        <summary>Quali siti ufficiali guardo</summary>
         <p className="nota">{DOMINI_ISTITUZIONALI.join(' · ')}</p>
       </details>
     </section>
@@ -91,7 +91,7 @@ function Avanzamento() {
   if (passi.length === 0) return null
   return (
     <section className="pannello">
-      <h2>Avanzamento</h2>
+      <h2>A che punto sono</h2>
       <ol className="passi-ricerca">
         {passi.map((p) => (
           <li key={p.id} className={`passo-${p.stato}`}>
@@ -115,10 +115,10 @@ function ProvaCataloghi() {
   const [prova, setProva] = useState(false)
   return (
     <section className="pannello">
-      <h2>Cataloghi dal tuo browser</h2>
+      <h2>Prova gli archivi</h2>
       <p className="nota">
-        I cataloghi accademici si interrogano direttamente da questo browser, senza costi. Una prova veloce dice se
-        rispondono (una rete scolastica, un proxy o un'estensione potrebbero bloccarli).
+        Gli archivi di articoli li consulto direttamente da questo browser, gratis. Con una prova veloce vedi se
+        rispondono (la rete della scuola, un proxy o un'estensione potrebbero bloccarli).
       </p>
       <button
         type="button"
@@ -130,7 +130,7 @@ function ProvaCataloghi() {
           setProva(false)
         }}
       >
-        {prova ? 'Provo…' : 'Prova i cataloghi'}
+        {prova ? 'Provo…' : 'Fai una prova'}
       </button>
       {esiti && (
         <ul className="elenco-semplice prova-cataloghi">
@@ -156,12 +156,12 @@ function CartaCandidato({ c }: { c: Candidato }) {
       <div className="candidato-testa">
         <span className="pastiglia-origine">{ETICHETTA_ORIGINE[f.origine]}</span>
         <span className={`verifica verifica-${c.verifica}`}>
-          {c.verifica === 'catalogo' ? 'metadati dal catalogo' : 'URL verificato fra i risultati'}
+          {c.verifica === 'catalogo' ? "dati presi dall'archivio" : 'link controllato'}
         </span>
-        {f.oaUrl && <span className="verifica">open access</span>}
+        {f.oaUrl && <span className="verifica">gratis online</span>}
         {c.consiglio && (
           <span className={`consiglio consiglio-${c.consiglio.decisione}`}>
-            {c.consiglio.decisione === 'tenere' ? `consigliata · pertinenza ${c.consiglio.pertinenza}` : 'sconsigliata'}
+            {c.consiglio.decisione === 'tenere' ? `consigliata · quanto c'entra: ${c.consiglio.pertinenza}` : 'sconsigliata'}
           </span>
         )}
       </div>
@@ -192,7 +192,7 @@ function CartaCandidato({ c }: { c: Candidato }) {
       {f.abstract && (
         <>
           <button type="button" className="link" onClick={() => setAperto((a) => !a)} aria-expanded={aperto}>
-            {aperto ? 'Nascondi abstract' : 'Mostra abstract'}
+            {aperto ? 'Nascondi il riassunto' : 'Leggi il riassunto'}
           </button>
           {aperto && <p className="abstract">{f.abstract}</p>}
         </>
@@ -204,7 +204,7 @@ function CartaCandidato({ c }: { c: Candidato }) {
             Scarta
           </button>
           <button type="button" className="bottone bottone-primario" onClick={() => decidi(c.id, true)}>
-            Approva
+            Tienila
           </button>
         </span>
       </div>
@@ -226,7 +226,7 @@ export function InAttesa() {
   return (
     <section className="pannello">
       <div className="pannello-testa">
-        <h2>Da approvare ({inAttesa.length})</h2>
+        <h2>Da controllare ({inAttesa.length})</h2>
         <label>
           <span className="sr">Mostra</span>
           <select className="campo campo-stretto" value={filtro} onChange={(e) => setFiltro(e.target.value as 'tutti' | 'consigliati')}>
@@ -236,16 +236,16 @@ export function InAttesa() {
         </label>
       </div>
       {inAttesa.length === 0 ? (
-        <p className="nota">Nessun risultato in attesa. Ogni fonte entra in biblioteca solo dopo la tua approvazione.</p>
+        <p className="nota">Non c'è niente da controllare. Una fonte entra in biblioteca solo se decidi di tenerla.</p>
       ) : (
         <>
           <div className="riga-editor">
             {consigliati.length > 0 && (
               <Conferma
                 classe="bottone"
-                etichetta={`Approva i ${consigliati.length} consigliati`}
-                domanda={`Mettere in biblioteca ${consigliati.length} fonti?`}
-                conferma="Approva"
+                etichetta={`Tieni i ${consigliati.length} consigliati`}
+                domanda={`Metto in biblioteca ${consigliati.length} fonti?`}
+                conferma="Sì, tienile"
                 onConferma={() => consigliati.forEach((c) => decidi(c.id, true))}
               />
             )}
@@ -253,7 +253,7 @@ export function InAttesa() {
               <Conferma
                 classe="bottone bottone-vuoto"
                 etichetta={`Scarta i ${sconsigliati.length} sconsigliati`}
-                domanda={`Scartare ${sconsigliati.length} risultati?`}
+                domanda={`Scarto ${sconsigliati.length} risultati?`}
                 conferma="Scarta"
                 pericolosa
                 onConferma={() => sconsigliati.forEach((c) => decidi(c.id, false))}
@@ -284,16 +284,16 @@ function Storico() {
               <summary>
                 {new Date(r.data).toLocaleDateString('it-IT')} — {r.domanda} <small>({r.trovati} risultati)</small>
               </summary>
-              {r.query.length > 0 && <p className="nota">Query: {r.query.join(' · ')}</p>}
+              {r.query.length > 0 && <p className="nota">Cosa ho cercato: {r.query.join(' · ')}</p>}
               {Object.keys(r.perCatalogo).length > 0 && (
                 <p className="nota">
-                  Cataloghi: {Object.entries(r.perCatalogo).map(([k, v]) => `${k} ${typeof v === 'number' ? v : `(${v})`}`).join(' · ')}
+                  Archivi: {Object.entries(r.perCatalogo).map(([k, v]) => `${k} ${typeof v === 'number' ? v : `(${v})`}`).join(' · ')}
                 </p>
               )}
               {r.esclusi.length > 0 && (
                 <>
                   <p>
-                    <strong>Esclusi e segnalazioni</strong>
+                    <strong>Cosa ho scartato e perché</strong>
                   </p>
                   <ul className="elenco-semplice">
                     {r.esclusi.map((e, i) => (

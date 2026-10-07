@@ -45,12 +45,12 @@ export function Chat() {
       <div className="pannello-testa">
         <h2>Chat sulla tesi</h2>
         {messaggi.length > 0 && (
-          <Conferma classe="bottone bottone-piccolo bottone-vuoto" etichetta="Svuota la chat" domanda="Cancellare la conversazione?" conferma="Svuota" pericolosa onConferma={svuota} />
+          <Conferma classe="bottone bottone-piccolo bottone-vuoto" etichetta="Svuota la chat" domanda="Cancello tutta la chat?" conferma="Svuota" pericolosa onConferma={svuota} />
         )}
       </div>
       <p className="nota">
-        Conosce capitoli e testi, biblioteca, quadro teorico, osservazioni del relatore, stato degli agenti e costi. Ha lo
-        stesso vincolo di materia degli agenti.
+        Sa tutto della tua tesi: capitoli, fonti, concetti del corso, note del relatore, cosa fanno gli agenti e quanto hai
+        speso. Come gli agenti, resta sugli argomenti del corso.
       </p>
 
       <div className="chat-messaggi" aria-live="polite">
@@ -84,7 +84,7 @@ export function Chat() {
             className="campo"
             rows={3}
             value={testo}
-            placeholder="Scrivi una domanda (Invio per mandare, Maiusc+Invio per andare a capo)"
+            placeholder="Scrivi qui (Invio per mandare, Maiusc+Invio per andare a capo)"
             onChange={(e) => setTesto(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -104,10 +104,10 @@ export function Chat() {
                 Invia
               </button>
             )}
-            {gratuita && <span className="nota">Gratis: ogni domanda passa da Claude.ai, con il contesto della tesi già pronto.</span>}
+            {gratuita && <span className="nota">Gratis: ogni domanda la mandi tu su Claude.ai, con le info sulla tesi già pronte.</span>}
             {stima && (
               <span className="nota">
-                circa {formattaDollari(stima.minimo)} – {formattaDollari(stima.massimo)} a messaggio con {modello} (il contesto della tesi resta in cache per 5 minuti; il primo messaggio costa di più)
+                circa {formattaDollari(stima.minimo)} – {formattaDollari(stima.massimo)} a messaggio con {modello} (il primo costa di più, poi per 5 minuti costa meno)
               </span>
             )}
           </div>

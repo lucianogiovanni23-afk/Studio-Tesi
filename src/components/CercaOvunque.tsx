@@ -95,7 +95,7 @@ function Riquadro() {
             ref={campo}
             type="search"
             className="campo"
-            placeholder="Cerca in testi, fonti, lezioni, glossario…"
+            placeholder="Cerca nella tesi, nelle fonti, nelle lezioni…"
             value={domanda}
             onChange={(e) => setDomanda(e.target.value)}
             aria-label="Cerca in tutta la tesi"
@@ -109,11 +109,11 @@ function Riquadro() {
         <div className="cerca-risultati" aria-live="polite">
           {!rinviata.trim() ? (
             <p className="nota">
-              Scrivi una o più parole: cerco nel testo della tesi, nelle fonti (anche nel testo completo e nelle schede), nelle
-              lezioni del corso, nel glossario, nelle osservazioni e nella chat. È gratis e non usa gli agenti.
+              Scrivi una o più parole: cerco nel testo della tesi, nelle fonti (anche nei testi interi e nei riassunti), nelle
+              lezioni, nel glossario, nele note del relatore e nella chat. È gratis e non disturba i colleghi.
             </p>
           ) : gruppi.length === 0 ? (
-            <p className="nota">Nessun risultato per «{rinviata.trim()}».</p>
+            <p className="nota">Non ho trovato niente per «{rinviata.trim()}».</p>
           ) : (
             gruppi.map(({ g, voci }) => (
               <section key={g} className="cerca-gruppo">
@@ -132,12 +132,12 @@ function Riquadro() {
                     </li>
                   ))}
                 </ul>
-                {voci.length > PER_GRUPPO && <p className="nota">e altri {voci.length - PER_GRUPPO}: aggiungi una parola per restringere.</p>}
+                {voci.length > PER_GRUPPO && <p className="nota">e altri {voci.length - PER_GRUPPO}: aggiungi una parola per trovare meglio.</p>}
               </section>
             ))
           )}
         </div>
-        <p className="nota cerca-piede">Invio apre il primo risultato · Esc chiude · Ctrl+K la riapre da qualunque pagina</p>
+        <p className="nota cerca-piede">Invio: apri il primo · Esc: chiudi · Ctrl+K: cerca da ogni pagina</p>
       </div>
     </div>
   )

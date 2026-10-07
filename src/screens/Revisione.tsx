@@ -69,7 +69,7 @@ function CartaProposta({ o, p }: { o: Osservazione; p: PropostaRevisione }) {
             Rifiuta
           </button>
           <button type="button" className="bottone bottone-primario" onClick={() => accettaPropostaRevisione(o.id, p.id)}>
-            {p.tipo === 'modifica' ? 'Accetta e applica' : 'Ne terrò conto'}
+            {p.tipo === 'modifica' ? 'Usa la modifica' : 'Ne terrò conto'}
           </button>
         </div>
       )}
@@ -91,38 +91,38 @@ export function CartaOsservazione({ o }: { o: Osservazione }) {
       <div className="pannello-testa">
         <span className="nota">
           {new Date(o.data).toLocaleDateString('it-IT')} · {etichetta(o.capitoloId, null)} · <strong>{o.stato}</strong>
-          {daDecidere > 0 && ` · ${daDecidere} proposte da decidere`}
+          {daDecidere > 0 && ` · ${daDecidere} proposte da guardare`}
         </span>
         <span className="riga-editor">
           <button type="button" className="bottone bottone-piccolo bottone-vuoto" onClick={() => aggiorna(o.id, { stato: o.stato === 'aperta' ? 'risolta' : 'aperta' })}>
             {o.stato === 'aperta' ? 'Segna come risolta' : 'Riapri'}
           </button>
-          <Conferma classe="icona" etichetta="✕" domanda="Eliminare l'osservazione?" conferma="Elimina" pericolosa onConferma={() => rimuovi(o.id)} />
+          <Conferma classe="icona" etichetta="✕" domanda="Cancello questa nota?" conferma="Elimina" pericolosa onConferma={() => rimuovi(o.id)} />
         </span>
       </div>
       <blockquote className="testo-osservazione">{o.testo}</blockquote>
       {o.lettura && (
         <p className="nota">
-          <strong>Lettura del Revisore:</strong> {o.lettura}
+          <strong>Come la capisce la revisora:</strong> {o.lettura}
         </p>
       )}
       {lavoro ? (
-        <p className="in-corso">Il Revisore sta preparando le proposte…</p>
+        <p className="in-corso">La revisora sta preparando le proposte…</p>
       ) : (
         o.stato === 'aperta' && (
           <Conferma
             classe={o.proposte.length ? 'bottone bottone-piccolo' : 'bottone bottone-primario'}
-            etichetta={o.proposte.length ? 'Chiedi nuove proposte' : 'Chiedi le proposte al Revisore'}
-            domanda={`${costoStimato(stima)}${o.proposte.length ? '; le proposte attuali saranno sostituite' : ''}. Procedo?`}
+            etichetta={o.proposte.length ? 'Chiedi nuove proposte' : 'Chiedi alla revisora'}
+            domanda={`${costoStimato(stima)}${o.proposte.length ? '; le proposte di adesso verranno sostituite' : ''}. Procedo?`}
             conferma="Procedi"
             onConferma={async () => {
               setLavoro(true)
               setMessaggio(null)
               try {
                 const { scartate } = await proponiPerOsservazione(o.id)
-                if (scartate) setMessaggio({ tono: 'ok', testo: `${scartate} ${scartate === 1 ? 'proposta scartata' : 'proposte scartate'} perché il paragrafo citato non c'è nel testo.` })
+                if (scartate) setMessaggio({ tono: 'ok', testo: `${scartate} ${scartate === 1 ? 'proposta scartata' : 'proposte scartate'} perché parlavano di un paragrafo che nel testo non c'è.` })
               } catch (err) {
-                setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Errore.' })
+                setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
               } finally {
                 setLavoro(false)
               }
@@ -153,7 +153,7 @@ function Osservazioni() {
   return (
     <div className="colonna-unica">
       <section className="pannello">
-        <h2>Nuova osservazione del relatore</h2>
+        <h2>Nuova nota del relatore</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -163,11 +163,11 @@ function Osservazioni() {
           }}
         >
           <label className="campo-blocco">
-            <span className="etichetta">Osservazione</span>
-            <textarea className="campo" rows={4} value={testo} placeholder="Incolla qui il commento del relatore" onChange={(e) => setTesto(e.target.value)} />
+            <span className="etichetta">Nota</span>
+            <textarea className="campo" rows={4} value={testo} placeholder="Incolla qui la nota del relatore" onChange={(e) => setTesto(e.target.value)} />
           </label>
           <label className="campo-blocco">
-            <span className="etichetta">Si riferisce a</span>
+            <span className="etichetta">Di cosa parla</span>
             <select className="campo" value={capitolo} onChange={(e) => setCapitolo(e.target.value)}>
               <option value="">tutta la tesi</option>
               {capitoli.map((c, i) => (
@@ -178,14 +178,14 @@ function Osservazioni() {
             </select>
           </label>
           <button type="submit" className="bottone bottone-primario" disabled={!testo.trim()}>
-            Aggiungi l'osservazione
+            Aggiungi la nota
           </button>
         </form>
       </section>
       <section className="pannello">
-        <h2>Osservazioni ({osservazioni.filter((o) => o.stato === 'aperta').length} aperte)</h2>
+        <h2>Note del relatore ({osservazioni.filter((o) => o.stato === 'aperta').length} da sistemare)</h2>
         {ordinate.length === 0 ? (
-          <p className="nota">Nessuna osservazione. Quando il relatore ti manda commenti, incollali qui: il Revisore propone modifiche puntuali e decidi tu, una per una.</p>
+          <p className="nota">Ancora nessuna nota. Quando il relatore ti manda dei commenti, incollali qui: la revisora ti propone cosa cambiare e tu decidi, una cosa alla volta.</p>
         ) : (
           <ul className="elenco-osservazioni">
             {ordinate.map((o) => (
@@ -205,8 +205,8 @@ function Osservazioni() {
 const NOME_TIPO: Record<TipoRilievo, string> = {
   terminologia: 'Termini',
   ripetizione: 'Ripetizioni',
-  materia: 'Vincolo di materia',
-  coerenza: 'Coerenza',
+  materia: 'Fuori tema',
+  coerenza: 'Contraddizioni',
   citazioni: 'Citazioni',
   stile_ia: 'Frasi da IA',
 }
@@ -228,22 +228,22 @@ function Controllo() {
 
   return (
     <section className="pannello">
-      <h2>Controllo di tutta la tesi</h2>
+      <h2>Controlla tutta la tesi</h2>
       <p className="nota">
-        Il controllo in codice è gratuito: varianti del glossario, frasi ripetute, parole spia di sconfinamenti, citazioni rosse.
-        Il Revisore aggiunge un giudizio di merito su coerenza fra capitoli, punti di vista e materia; ogni suo rilievo deve citare
-        un passo che esiste davvero nella tesi, altrimenti viene scartato.
+        Il controllo veloce è gratis: trova termini scritti diversi dal glossario, frasi ripetute, parole che portano fuori tema
+        e citazioni rosse. La revisora invece legge tutto e guarda se i capitoli si contraddicono o escono dal tema. Ogni cosa che
+        segnala deve citare una frase vera della tesi, se no la scarto.
       </p>
       <div className="riga-editor">
         <button type="button" className="bottone" onClick={controlloSoloCodice}>
-          Controllo in codice (gratis)
+          Controllo veloce (gratis)
         </button>
         {lavoro ? (
-          <span className="in-corso">Il Revisore sta leggendo tutta la tesi…</span>
+          <span className="in-corso">La revisora sta leggendo tutta la tesi…</span>
         ) : (
           <Conferma
             classe="bottone bottone-primario"
-            etichetta="Controllo completo con il Revisore"
+            etichetta="Fallo leggere alla revisora"
             domanda={`${costoStimato(stima)}. Procedo?`}
             conferma="Procedi"
             onConferma={async () => {
@@ -252,7 +252,7 @@ function Controllo() {
               try {
                 await controlloConRevisore()
               } catch (err) {
-                setErrore(err instanceof Error ? err.message : 'Errore.')
+                setErrore(err instanceof Error ? err.message : 'Qualcosa è andato storto.')
               } finally {
                 setLavoro(false)
               }
@@ -265,9 +265,9 @@ function Controllo() {
       {controllo && (
         <>
           <p className="nota">
-            Ultimo controllo: {new Date(controllo.data).toLocaleString('it-IT')} · {controllo.conRevisore ? 'codice e Revisore' : 'solo codice'} ·{' '}
-            {controllo.rilievi.length} rilievi
-            {controllo.scartati > 0 && ` · ${controllo.scartati} rilievi del Revisore scartati perché il passo citato non c'è`}
+            Ultimo controllo: {new Date(controllo.data).toLocaleString('it-IT')} · {controllo.conRevisore ? 'veloce + revisora' : 'solo veloce'} ·{' '}
+            {controllo.rilievi.length} cose da guardare
+            {controllo.scartati > 0 && ` · ${controllo.scartati} segnalazioni della revisora tolte perché citavano frasi che non ci sono`}
           </p>
           <div className="filtri-tipo" role="group" aria-label="Filtra per tipo">
             <button type="button" className={`tema ${filtro === '' ? 'tema-attivo' : 'tema-spento'}`} onClick={() => setFiltro('')}>
@@ -280,14 +280,14 @@ function Controllo() {
             ))}
           </div>
           {rilievi.length === 0 ? (
-            <p className="nota nota-ok">Nessun rilievo{filtro ? ' di questo tipo' : ''}.</p>
+            <p className="nota nota-ok">Niente da segnalare{filtro ? ' per questo tipo' : ''}.</p>
           ) : (
             <ul className="elenco-rilievi">
               {rilievi.map((r) => (
                 <li key={r.id} className={`rilievo rilievo-${r.tipo}`}>
                   <div className="candidato-testa">
                     <span className="pastiglia-origine">{NOME_TIPO[r.tipo]}</span>
-                    <span className="verifica">{r.origine === 'codice' ? 'controllo in codice' : 'Revisore'}</span>
+                    <span className="verifica">{r.origine === 'codice' ? 'controllo veloce' : 'revisora'}</span>
                     {r.capitoloId && (
                       <button type="button" className="link" onClick={() => apri(r.capitoloId!, r.sezioneId)}>
                         {etichetta(r.capitoloId, r.sezioneId)}
@@ -297,7 +297,7 @@ function Controllo() {
                   <blockquote className="estratto">«{r.passo}»</blockquote>
                   <p>{r.problema}</p>
                   <p className="nota">
-                    <strong>Suggerimento:</strong> {r.suggerimento}
+                    <strong>Cosa fare:</strong> {r.suggerimento}
                   </p>
                 </li>
               ))}
@@ -339,10 +339,10 @@ function Bibliografia() {
           </button>
         </span>
       </div>
-      <p className="nota">Generata dai metadati veri delle fonti citate nel testo (autori, anno, rivista, DOI), in ordine alfabetico.</p>
-      {biblio.mancanti.length > 0 && <p className="allerta">Marcatori senza fonte in biblioteca: {biblio.mancanti.join(', ')}.</p>}
+      <p className="nota">La faccio con i dati veri delle fonti che citi nel testo (autori, anno, rivista, DOI), in ordine alfabetico.</p>
+      {biblio.mancanti.length > 0 && <p className="allerta">Rimandi a fonti che non sono in biblioteca: {biblio.mancanti.join(', ')}.</p>}
       {biblio.voci.length === 0 ? (
-        <p className="nota">Nessuna fonte è ancora citata nel testo.</p>
+        <p className="nota">Nel testo non citi ancora nessuna fonte.</p>
       ) : (
         <ol className="bibliografia">
           {biblio.voci.map((v) => (
@@ -352,7 +352,7 @@ function Bibliografia() {
       )}
       {biblio.corso.length > 0 && (
         <>
-          <h3>Materiale del corso citato</h3>
+          <h3>Materiale del corso che citi</h3>
           <ul className="elenco-semplice">
             {biblio.corso.map((c) => (
               <li key={c}>{c}</li>
@@ -370,7 +370,7 @@ function Bibliografia() {
               await navigator.clipboard.writeText(testo)
               setMessaggio('Bibliografia copiata.')
             } catch {
-              setMessaggio('Il browser non ha permesso la copia: usa "Scarica".')
+              setMessaggio('Il browser non mi ha fatto copiare: usa "Scarica".')
             }
           }}
         >
@@ -397,7 +397,7 @@ function Bibliografia() {
           disabled={biblio.voci.length === 0}
           onClick={() => setMessaggio(`${segna()} fonti segnate come usate, con i capitoli in cui compaiono.`)}
         >
-          Segna come usate le fonti citate
+          Segna le fonti come usate
         </button>
       </div>
       {messaggio && (
@@ -407,7 +407,7 @@ function Bibliografia() {
       )}
       {biblio.nonCitate.length > 0 && (
         <details>
-          <summary>Fonti in biblioteca non citate ({biblio.nonCitate.length})</summary>
+          <summary>Fonti che non hai citato ({biblio.nonCitate.length})</summary>
           <ul className="elenco-semplice">
             {biblio.nonCitate.map((f) => (
               <li key={f.id}>
@@ -432,13 +432,13 @@ function EsportaWord() {
 
   return (
     <section className="pannello">
-      <h2>Esporta in Word</h2>
+      <h2>Scarica in Word</h2>
       <p className="nota">
-        Un file .docx da mandare al relatore: titoli con gli stili di Word (da cui Word genera l'indice), Times New Roman 12 con interlinea 1,5,
-        citazioni nello stile scelto ({stile === 'note' ? 'note a piè di pagina vere' : 'autore-anno nel testo'}) e bibliografia in fondo.
+        Un file Word da mandare al relatore: titoli già pronti per l'indice automatico, Times New Roman 12, interlinea 1,5,
+        citazioni nello stile che hai scelto ({stile === 'note' ? 'note a piè di pagina' : 'autore-anno nel testo'}) e bibliografia in fondo.
       </p>
       <label className="campo-blocco">
-        <span className="etichetta">Che cosa esportare</span>
+        <span className="etichetta">Cosa vuoi scaricare</span>
         <select className="campo" value={capitolo} onChange={(e) => setCapitolo(e.target.value)}>
           <option value="">tutta la tesi</option>
           {capitoli.map((c, i) => (
@@ -467,7 +467,7 @@ function EsportaWord() {
             const nome = await esportaWord({ capitoloId: capitolo || null, conBibliografia, conFrontespizio })
             setMessaggio({ tono: 'ok', testo: `Scaricato "${nome}".` })
           } catch (err) {
-            setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Esportazione non riuscita.' })
+            setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Non sono riuscito a creare il file.' })
           } finally {
             setLavoro(false)
           }
@@ -488,10 +488,10 @@ export function Revisione() {
   const [scheda, setScheda] = useState<Scheda>('osservazioni')
   const aperte = useStudio((s) => s.progetto.osservazioni.filter((o) => o.stato === 'aperta').length)
   const voci: { id: Scheda; nome: string }[] = [
-    { id: 'osservazioni', nome: `Osservazioni del relatore${aperte ? ` (${aperte})` : ''}` },
-    { id: 'controllo', nome: 'Controllo della tesi' },
+    { id: 'osservazioni', nome: `Note del relatore${aperte ? ` (${aperte})` : ''}` },
+    { id: 'controllo', nome: 'Controlla la tesi' },
     { id: 'bibliografia', nome: 'Bibliografia' },
-    { id: 'word', nome: 'Esporta in Word' },
+    { id: 'word', nome: 'Scarica in Word' },
   ]
   return (
     <div className="colonna-unica">

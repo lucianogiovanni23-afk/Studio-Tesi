@@ -58,12 +58,15 @@ function Avanzamento() {
   return (
     <section className="pannello avanzamento" aria-labelledby="titolo-avanzamento">
       <div className="pannello-testa">
-        <h2 id="titolo-avanzamento">Avanzamento</h2>
+        <h2 id="titolo-avanzamento">A che punto sei</h2>
         <span className="nota">obiettivo {a.pagineMin}–{a.pagineMax} pagine</span>
       </div>
-      <p className="avanzamento-grande">
-        <strong>{pagine(a.pagine)}</strong> {a.pagine === 1 ? 'pagina' : 'pagine'} scritte
-      </p>
+      <div className="avanzamento-testa">
+        <Anello quota={a.pagine / Math.max(1, a.pagineMin)} />
+        <p className="avanzamento-grande">
+          <strong>{pagine(a.pagine)}</strong> {a.pagine === 1 ? 'pagina' : 'pagine'} scritte
+        </p>
+      </div>
       <div
         className="barra-pagine"
         role="meter"
@@ -78,10 +81,10 @@ function Avanzamento() {
       <p className="nota">
         {a.parole.toLocaleString('it-IT')} parole ·{' '}
         {a.mancano > 0
-          ? `ne mancano circa ${a.mancano} pagine per arrivare a ${a.pagineMin}`
+          ? `mancano circa ${a.mancano} pagine per arrivare a ${a.pagineMin}`
           : a.pagine > a.pagineMax
-            ? `oltre le ${a.pagineMax} pagine: valuta dove sintetizzare`
-            : 'sei dentro l\'obiettivo'}
+            ? `hai superato le ${a.pagineMax} pagine: vedi dove puoi tagliare`
+            : 'sei nella lunghezza giusta'}
       </p>
       <ul className="avanzamento-capitoli">
         {a.capitoli.map((c) => (
@@ -98,8 +101,40 @@ function Avanzamento() {
           </li>
         ))}
       </ul>
-      <p className="nota">Una pagina è circa {progetto.obiettivo.parolePerPagina} parole (Word, Times 12, interlinea 1,5). L'obiettivo si cambia nelle Impostazioni.</p>
+      <p className="nota">Una pagina è circa {progetto.obiettivo.parolePerPagina} parole (Word, Times 12, interlinea 1,5). Puoi cambiare l'obiettivo nelle Impostazioni.</p>
     </section>
+  )
+}
+
+/** Anello di avanzamento verso il minimo di pagine. */
+function Anello({ quota }: { quota: number }) {
+  const q = Math.max(0, Math.min(1, quota))
+  const r = 34
+  const giro = 2 * Math.PI * r
+  return (
+    <svg className="anello" width="84" height="84" viewBox="0 0 84 84" aria-hidden>
+      <defs>
+        <linearGradient id="anello-sfumatura" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="var(--oliva)" />
+          <stop offset="100%" stopColor="var(--oro)" />
+        </linearGradient>
+      </defs>
+      <circle cx="42" cy="42" r={r} fill="none" stroke="var(--crema-2)" strokeWidth="9" />
+      <circle
+        cx="42"
+        cy="42"
+        r={r}
+        fill="none"
+        stroke="url(#anello-sfumatura)"
+        strokeWidth="9"
+        strokeLinecap="round"
+        strokeDasharray={`${Math.max(0.001, q) * giro} ${giro}`}
+        transform="rotate(-90 42 42)"
+      />
+      <text x="42" y="47" textAnchor="middle" className="anello-testo">
+        {Math.round(q * 100)}%
+      </text>
+    </svg>
   )
 }
 
@@ -149,7 +184,7 @@ function Indice() {
       <div className="pannello-testa">
         <h2>Indice</h2>
         <button type="button" className="bottone bottone-vuoto" onClick={() => setModifica((m) => !m)}>
-          {modifica ? 'Fine modifica' : 'Modifica indice'}
+          {modifica ? 'Fatto' : 'Modifica indice'}
         </button>
       </div>
 
@@ -160,12 +195,12 @@ function Indice() {
       ) : (
         <div className="banda banda-attesa">
           <p>
-            <strong>Indice da approvare.</strong> È una proposta di partenza: modificalo come vuoi, poi approvalo. Ogni
-            modifica successiva richiede una nuova approvazione.
+            <strong>Indice da approvare.</strong> È solo un punto di partenza: cambialo come vuoi e poi approvalo. Se lo
+            cambi dopo, dovrai riapprovarlo.
           </p>
           <Conferma
             etichetta="Approvo l'indice"
-            domanda="Confermi l'indice così com'è?"
+            domanda="Va bene l'indice così?"
             conferma="Sì, approvo"
             classe="bottone bottone-primario"
             onConferma={() => {
@@ -226,7 +261,7 @@ function ProssimoPasso() {
 
   return (
     <section className={`pannello prossimo tono-${prima.tono}`} aria-labelledby="titolo-prossimo">
-      <h2 id="titolo-prossimo">Prossimo passo</h2>
+      <h2 id="titolo-prossimo">Cosa fare adesso</h2>
       <p className="prossimo-testo">{prima.testo}</p>
       <button type="button" className="bottone bottone-primario" onClick={() => esegui(prima)}>
         {prima.etichetta}
@@ -269,7 +304,7 @@ function Numeri() {
       </div>
       <div>
         <strong>{haChiave || mese > 0 ? formattaDollari(mese) : 'gratis'}</strong>
-        <span>{haChiave || mese > 0 ? 'spesi questo mese' : 'modalità senza chiave'}</span>
+        <span>{haChiave || mese > 0 ? 'spesi questo mese' : 'versione gratis'}</span>
       </div>
     </div>
   )

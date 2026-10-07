@@ -19,13 +19,13 @@ export function Glossario() {
     <section className="pannello glossario">
       <div className="pannello-testa">
         <h2>Glossario</h2>
-        <span className="nota">{voci.length} termini · condiviso da tutti gli agenti</span>
+        <span className="nota">{voci.length} parole · lo usano tutti gli assistenti</span>
       </div>
       <p className="nota">
-        Gli agenti usano questi termini e non le varianti: il Revisore segnalerà i capitoli che usano un termine in modo
-        diverso. Le definizioni restano sul piano finanziario.
+        Gli assistenti usano queste parole e non i sinonimi. Se un capitolo usa una parola in modo diverso, la revisora te lo
+        segnala. Le spiegazioni restano sulla finanza.
       </p>
-      <input className="campo" placeholder="Cerca un termine" value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Cerca nel glossario" />
+      <input className="campo" placeholder="Cerca una parola" value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Cerca nel glossario" />
 
       <ul className="elenco-glossario">
         {visibili.map((v) => (
@@ -45,7 +45,7 @@ export function Glossario() {
               <Conferma
                 classe="icona"
                 etichetta="✕"
-                domanda={`Eliminare "${v.termine}"?`}
+                domanda={`Elimino "${v.termine}"?`}
                 conferma="Elimina"
                 pericolosa
                 onConferma={() => st().rimuoviVoce(v.id)}
@@ -59,7 +59,7 @@ export function Glossario() {
               aria-label={`Definizione di ${v.termine}`}
             />
             <label className="campo-blocco">
-              <span className="etichetta">Varianti da uniformare (separate da virgola)</span>
+              <span className="etichetta">Sinonimi da non usare (separati da una virgola)</span>
               <input
                 className="campo"
                 defaultValue={v.varianti.join(', ')}
@@ -79,12 +79,12 @@ export function Glossario() {
           setNuovo({ termine: '', definizione: '' })
         }}
       >
-        <h3>Nuovo termine</h3>
-        <input className="campo" placeholder="Termine" value={nuovo.termine} onChange={(e) => setNuovo({ ...nuovo, termine: e.target.value })} aria-label="Nuovo termine" />
+        <h3>Aggiungi una parola</h3>
+        <input className="campo" placeholder="Parola" value={nuovo.termine} onChange={(e) => setNuovo({ ...nuovo, termine: e.target.value })} aria-label="Nuovo termine" />
         <textarea
           className="campo"
           rows={2}
-          placeholder="Definizione"
+          placeholder="Cosa vuol dire"
           value={nuovo.definizione}
           onChange={(e) => setNuovo({ ...nuovo, definizione: e.target.value })}
           aria-label="Definizione del nuovo termine"

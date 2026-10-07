@@ -69,10 +69,10 @@ export function schedaInCorso(id: string): boolean {
 export async function preparaScheda(fonteId: string): Promise<{ scartate: number }> {
   const s = useStudio.getState()
   const fonte = s.progetto.fonti.find((f) => f.id === fonteId)
-  if (!fonte) throw new ApiError('sconosciuto', 'Fonte non trovata.')
+  if (!fonte) throw new ApiError('sconosciuto', 'Non trovo più questa fonte.')
   const { testo, base } = testoPerScheda(fonte)
   if (testo.trim().length < 80) {
-    throw new ApiError('sconosciuto', 'Questa fonte non ha testo da leggere: carica il PDF del paper e riprova.')
+    throw new ApiError('sconosciuto', 'Di questa fonte non ho niente da leggere: carica il PDF dell\'articolo e riprova.')
   }
 
   const client = creaClient(s.apiKey)
@@ -119,13 +119,13 @@ export async function preparaScheda(fonteId: string): Promise<{ scartate: number
       passaggi: consegna.passaggi,
       errore: null,
     })
-    logOk('bibliotecario', `Scheda di "${fonte.titolo}": ${tenute} frasi chiave verificate${scartate ? `, ${scartate} scartate perché non ritrovate` : ''}.`)
+    logOk('bibliotecario', `Scheda di "${fonte.titolo}" pronta: ${tenute} frasi chiave controllate${scartate ? `, ${scartate} tolte perché nel testo non c'erano` : ''}.`)
     return { scartate }
   } catch (err) {
     useStudio.getState().patchAgente('bibliotecario', {
       status: 'errore',
-      etichetta: 'errore',
-      errore: err instanceof Error ? err.message : 'Errore sconosciuto.',
+      etichetta: "c'è stato un problema",
+      errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.',
     })
     throw err
   } finally {
@@ -203,7 +203,7 @@ export async function preparaSchedeInBlocco(ids: string[], suAvanzamento: (grupp
         .join('\n\n')
       const consegna = await sorveglia<Consegna<SchedeGrezze>>({
         agente: 'bibliotecario',
-        passo: `Schede di lettura (gruppo ${g + 1} di ${gruppi.length})`,
+        passo: `Schede di lettura (blocco ${g + 1} di ${gruppi.length})`,
         esegui: (_t, suggerimento) =>
           chiamataStrutturata<Consegna<SchedeGrezze>>({
             client,
@@ -242,10 +242,10 @@ export async function preparaSchedeInBlocco(ids: string[], suAvanzamento: (grupp
       useStudio.getState().patchAgente('bibliotecario', { passaggi: consegna.passaggi })
     }
     useStudio.getState().patchAgente('bibliotecario', { status: 'fatto', etichetta: 'schede pronte', errore: null })
-    logOk('bibliotecario', `Schede in blocco: ${fatte} pronte${frasiScartate ? `, ${frasiScartate} frasi chiave scartate perché non ritrovate` : ''}.`)
+    logOk('bibliotecario', `Schede pronte: ${fatte}${frasiScartate ? `. Ho tolto ${frasiScartate} frasi chiave perché nel testo non c'erano` : ''}.`)
     return { fatte, frasiScartate }
   } catch (err) {
-    useStudio.getState().patchAgente('bibliotecario', { status: 'errore', etichetta: 'errore', errore: err instanceof Error ? err.message : 'Errore sconosciuto.' })
+    useStudio.getState().patchAgente('bibliotecario', { status: 'errore', etichetta: "c'è stato un problema", errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     throw err
   }
 }

@@ -19,7 +19,7 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
         <h3>
           <span className="passo-numero">2</span> Scaletta della sezione
         </h3>
-        <p className="nota">Prima approva le fonti della sezione.</p>
+        <p className="nota">Prima scegli le fonti.</p>
       </section>
     )
   }
@@ -59,8 +59,8 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
       <h3>
         <span className="passo-numero">2</span> Scaletta della sezione
       </h3>
-      <p className="nota">I punti in ordine, con i riferimenti da usare. Correggila come vuoi, poi approvala: la bozza la seguirà.</p>
-      {inCorso?.comando === 'scaletta' && inCorso.sezioneId === sez.id && <p className="in-corso">Lo Scrittore prepara la scaletta…</p>}
+      <p className="nota">I punti in ordine, con le fonti da usare. Cambiala come vuoi, poi approvala: la bozza seguirà questa.</p>
+      {inCorso?.comando === 'scaletta' && inCorso.sezioneId === sez.id && <p className="in-corso">Lo Scrittore sta facendo la scaletta…</p>}
       {punti.length > 0 && (
         <ol className="scaletta-editor">
           {punti.map((p, i) => (
@@ -81,7 +81,7 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
       )}
       {lacune && lacune.length > 0 && (
         <div className="allerta">
-          <strong>Che cosa manca nelle fonti, secondo lo Scrittore:</strong>
+          <strong>Secondo lo Scrittore, nelle fonti manca:</strong>
           <ul className="elenco-semplice">
             {lacune.map((l, i) => (
               <li key={i}>{l}</li>
@@ -93,10 +93,10 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
       <div className="riga-editor">
         <Conferma
           classe="bottone"
-          etichetta={punti.length ? 'Proponi un\'altra scaletta' : 'Proponi una scaletta'}
+          etichetta={punti.length ? 'Rifai la scaletta' : 'Proponi una scaletta'}
           domanda={
             stima
-              ? `${costoStimato(stima)}${stima.cache ? ' (materiale già in cache)' : ''}. Procedo?`
+              ? `${costoStimato(stima)}${stima.cache ? ' (in parte già in memoria, costa meno)' : ''}. Procedo?`
               : 'Procedo?'
           }
           conferma="Proponi"
@@ -106,7 +106,7 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
             try {
               await proponiScaletta(cap.id, sez.id)
             } catch (err) {
-              setErrore(err instanceof Error ? err.message : 'Errore.')
+              setErrore(err instanceof Error ? err.message : 'Qualcosa è andato storto.')
             }
           }}
         />
@@ -117,7 +117,7 @@ export function PassoScaletta({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
           <Conferma
             classe="bottone bottone-primario"
             etichetta="Approvo la scaletta"
-            domanda="Confermi la scaletta così com'è?"
+            domanda="Va bene la scaletta così?"
             conferma="Sì, approvo"
             onConferma={() => {
               setScaletta(cap.id, sez.id, punti.filter((p) => p.trim()))

@@ -16,8 +16,8 @@ import type { Fonte, SchedaLettura, StatoFonte, TemaFonte } from '../types'
 type Vista = 'schede' | 'tabella'
 
 function statoScheda(f: Fonte): string {
-  if (!f.scheda) return 'senza scheda'
-  return f.scheda.corretta ? 'scheda rivista da te' : 'scheda da rivedere'
+  if (!f.scheda) return 'niente riassunto'
+  return f.scheda.corretta ? 'riassunto controllato' : 'riassunto da controllare'
 }
 
 // ---------------------------------------------------------------------------
@@ -40,10 +40,10 @@ function Scheda({ f }: { f: Fonte }) {
       const { scartate } = await preparaScheda(f.id)
       setMessaggio({
         tono: 'ok',
-        testo: scartate ? `Scheda pronta. ${scartate} frasi chiave scartate perché non ritrovate alla lettera nel testo.` : 'Scheda pronta.',
+        testo: scartate ? `Riassunto pronto. Ho tolto ${scartate} frasi chiave perché non le trovo uguali nel testo.` : 'Riassunto pronto.',
       })
     } catch (err) {
-      setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Errore.' })
+      setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     } finally {
       setLavoro(false)
     }
@@ -52,9 +52,9 @@ function Scheda({ f }: { f: Fonte }) {
   const bottone = (
     <Conferma
       classe={f.scheda ? 'bottone bottone-vuoto bottone-piccolo' : 'bottone bottone-primario'}
-      etichetta={f.scheda ? 'Rifai la scheda' : 'Prepara la scheda di lettura'}
-      domanda={`${f.scheda ? 'La scheda attuale sarà sostituita. ' : ''}${costoStimato(stima)}. Procedo?`}
-      conferma="Prepara"
+      etichetta={f.scheda ? 'Rifai il riassunto' : 'Fai il riassunto'}
+      domanda={`${f.scheda ? 'Il riassunto di adesso verrà sostituito. ' : ''}${costoStimato(stima)}. Procedo?`}
+      conferma="Vai"
       disabilitato={lavoro}
       onConferma={() => void prepara()}
     />
@@ -64,14 +64,14 @@ function Scheda({ f }: { f: Fonte }) {
 
   return (
     <section className="scheda">
-      <h3>Scheda di lettura</h3>
+      <h3>Riassunto della fonte</h3>
       {base === 'abstract' && (
         <p className="nota">
-          Per questa fonte c'è solo {f.abstract ? "l'abstract" : 'qualche estratto'}: la scheda sarà parziale. Allega il PDF per
-          una scheda sul testo completo.
+          Di questa fonte ho solo {f.abstract ? 'il riassunto degli autori' : 'qualche pezzo'}, quindi il riassunto sarà incompleto.
+          Se aggiungi il PDF lo faccio su tutto il testo.
         </p>
       )}
-      {lavoro && <p className="in-corso">Il Bibliotecario sta leggendo la fonte…</p>}
+      {lavoro && <p className="in-corso">Il Bibliotecario sta leggendo…</p>}
       {messaggio && <p className={messaggio.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'}>{messaggio.testo}</p>}
 
       {!f.scheda ? (
@@ -79,8 +79,8 @@ function Scheda({ f }: { f: Fonte }) {
       ) : (
         <>
           <p className="nota">
-            Preparata il {new Date(f.scheda.preparataIl).toLocaleDateString('it-IT')} sul{' '}
-            {f.scheda.base === 'testo' ? 'testo completo' : "l'abstract"}. Puoi correggerla: i campi si salvano mentre scrivi.
+            Fatto il {new Date(f.scheda.preparataIl).toLocaleDateString('it-IT')} su{' '}
+            {f.scheda.base === 'testo' ? 'tutto il testo' : 'il riassunto degli autori'}. Puoi correggerlo: si salva da solo mentre scrivi.
           </p>
           {(['domanda', 'metodo', 'risultati', 'rilevanza'] as const).map((campo) => (
             <label key={campo} className="campo-blocco">
@@ -93,7 +93,7 @@ function Scheda({ f }: { f: Fonte }) {
               />
             </label>
           ))}
-          <span className="etichetta">Frasi chiave (verificate sul testo della fonte)</span>
+          <span className="etichetta">Frasi chiave (controllate sul testo)</span>
           <ul className="frasi-chiave">
             {f.scheda.frasiChiave.map((fr, i) => (
               <li key={i}>
@@ -121,19 +121,19 @@ function Scheda({ f }: { f: Fonte }) {
           >
             <input
               className="campo"
-              placeholder="Aggiungi una frase copiata dalla fonte"
+              placeholder="Incolla una frase della fonte"
               value={nuovaFrase}
               onChange={(e) => setNuovaFrase(e.target.value)}
               aria-label="Nuova frase chiave"
             />
             <button type="submit" className="bottone">
-              Aggiungi e verifica
+              Aggiungi e controlla
             </button>
           </form>
           <div className="riga-editor">
             <label className="interruttore">
               <input type="checkbox" checked={f.scheda.corretta} onChange={(e) => modifica({ corretta: e.target.checked })} />
-              <span>Ho rivisto la scheda</span>
+              <span>L'ho controllato io</span>
             </label>
             {bottone}
           </div>
@@ -156,7 +156,7 @@ function TestoCompleto({ f }: { f: Fonte }) {
   if (f.testoCompleto) {
     return (
       <p className="nota nota-ok">
-        Testo completo disponibile{f.pagine?.length ? `: ${f.pagine.length} pagine, le citazioni avranno il numero di pagina` : ''}.
+        Ho tutto il testo{f.pagine?.length ? `: ${f.pagine.length} pagine, quindi nelle citazioni metto anche la pagina` : ''}.
       </p>
     )
   }
@@ -169,23 +169,23 @@ function TestoCompleto({ f }: { f: Fonte }) {
     try {
       const e = await recuperaTestoCompleto(f.id, conApi)
       if (e.ok) {
-        setMessaggio({ tono: 'ok', testo: `Testo completo ${e.via === 'browser' ? 'scaricato gratis dal browser' : 'letto tramite l\'API'}${e.pagine ? `: ${e.pagine} pagine` : ''}. Ora puoi rifare la scheda sul testo completo.` })
+        setMessaggio({ tono: 'ok', testo: `Fatto, ${e.via === 'browser' ? 'scaricato gratis' : 'letto con la chiave API'}${e.pagine ? `: ${e.pagine} pagine` : ''}. Ora puoi rifare il riassunto su tutto il testo.` })
       } else if (e.motivo === 'nessun_indirizzo') {
-        setMessaggio({ tono: 'avviso', testo: 'Per questo articolo non risulta una versione gratuita. Se hai il PDF (per esempio dalla biblioteca dell\'università), allegalo.' })
+        setMessaggio({ tono: 'avviso', testo: 'Di questo articolo non trovo una versione gratis. Se hai il PDF (per esempio dalla biblioteca dell\'università), aggiungilo tu.' })
       } else if (e.motivo === 'non_corrisponde') {
-        setMessaggio({ tono: 'avviso', testo: 'Il documento trovato non sembra questo articolo (il titolo non compare nelle prime pagine): non l\'ho usato.' })
+        setMessaggio({ tono: 'avviso', testo: 'Il file che ho trovato non sembra questo articolo (il titolo non c\'è nelle prime pagine), quindi l\'ho lasciato stare.' })
       } else {
         setBloccato(true)
         setIndirizzo(e.indirizzi[0] ?? null)
         setMessaggio({
           tono: 'avviso',
           testo: conApi
-            ? 'Neanche tramite l\'API è stato possibile leggere il documento.'
-            : `Il sito che ospita la versione gratuita non permette al browser di scaricarla direttamente.${haChiave ? '' : ' Aprila dal link qui sotto, scarica il PDF e allegalo a questa fonte: è gratis.'}`,
+            ? 'Non riesco a leggerlo neanche con la chiave API.'
+            : `Il sito con la versione gratis non me la fa scaricare.${haChiave ? '' : ' Aprila dal link qui sotto, scarica il PDF e aggiungilo a questa fonte: è gratis.'}`,
         })
       }
     } catch (err) {
-      setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Errore.' })
+      setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     } finally {
       setStato('fermo')
     }
@@ -193,29 +193,29 @@ function TestoCompleto({ f }: { f: Fonte }) {
 
   return (
     <section className="testo-completo">
-      <h3>Testo completo</h3>
+      <h3>Tutto il testo</h3>
       <p className="nota">
-        {f.oaUrl ? 'Il catalogo indica una versione gratuita (open access) di questo articolo. ' : 'Cerco su OpenAlex, tramite il DOI, se esiste una versione gratuita. '}
-        Con il testo completo la scheda e le citazioni si basano sull'articolo intero e indicano il numero di pagina.
+        {f.oaUrl ? 'Questo articolo si può leggere gratis online. ' : 'Guardo su OpenAlex se c\'è una versione gratis di questo articolo. '}
+        Con tutto il testo il riassunto e le citazioni si basano sull'articolo intero e hanno il numero di pagina.
       </p>
       {stato !== 'fermo' ? (
-        <p className="in-corso">{stato === 'browser' ? 'Provo a scaricarlo dal browser…' : 'Lo leggo tramite l\'API…'}</p>
+        <p className="in-corso">{stato === 'browser' ? 'Provo a scaricarlo…' : 'Lo leggo con la chiave API…'}</p>
       ) : (
         <div className="riga-editor">
           <button type="button" className="bottone" onClick={() => void prova(false)}>
-            Cerca il testo completo (gratis)
+            Cerca tutto il testo
           </button>
           {bloccato && indirizzo && !haChiave && (
             <a className="bottone" href={indirizzo} target="_blank" rel="noreferrer">
-              Apri la versione gratuita
+              Apri la versione gratis
             </a>
           )}
           {bloccato && haChiave && (
             <Conferma
               classe="bottone bottone-primario"
-              etichetta="Leggilo tramite l'API"
-              domanda={`${costoStimato(stima)} (dipende dalla lunghezza del PDF). Procedo?`}
-              conferma="Procedi"
+              etichetta="Leggilo con la chiave"
+              domanda={`${costoStimato(stima)} (dipende da quanto è lungo il PDF). Procedo?`}
+              conferma="Vai"
               onConferma={() => void prova(true)}
             />
           )}
@@ -242,7 +242,7 @@ function SchedeInBlocco() {
   if (senza.length < 2 && !esito) return null
   const gruppi = gruppiSchede(senza).length
   const stima = stimaSchedeInBlocco(senza, modello)
-  const passaggi = `${gruppi} ${gruppi === 1 ? 'passaggio' : 'passaggi'}${modalitaGratuita() ? ' su Claude.ai' : ''}`
+  const passaggi = `${gruppi} ${gruppi === 1 ? 'giro' : 'giri'}${modalitaGratuita() ? ' su Claude.ai' : ''}`
 
   return (
     <div className="testo-completo-tutte">
@@ -252,21 +252,21 @@ function SchedeInBlocco() {
         senza.length >= 2 && (
           <Conferma
             classe="bottone bottone-piccolo"
-            etichetta={`Prepara le schede di ${senza.length} fonti insieme`}
+            etichetta={`Riassumi ${senza.length} fonti insieme`}
             domanda={`${senza.length} fonti in ${passaggi}. ${costoStimato(stima)}. Procedo?`}
-            conferma="Prepara"
+            conferma="Vai"
             disabilitato={lavoro}
             onConferma={async () => {
               setEsito(null)
               try {
                 const r = await preparaSchedeInBlocco(
                   senza.map((f) => f.id),
-                  (g, tot) => setAvanzamento(`Schede di lettura: gruppo ${g} di ${tot}…`),
+                  (g, tot) => setAvanzamento(`Riassunti: gruppo ${g} di ${tot}…`),
                 )
-                setEsito({ tono: 'ok', testo: `${r.fatte} schede pronte${r.frasiScartate ? `; ${r.frasiScartate} frasi chiave scartate perché non si ritrovano nel testo` : ''}.` })
+                setEsito({ tono: 'ok', testo: `${r.fatte} riassunti pronti${r.frasiScartate ? `; ho tolto ${r.frasiScartate} frasi chiave perché non le trovo nel testo` : ''}.` })
               } catch (err) {
                 const annullato = err instanceof DOMException && err.name === 'AbortError'
-                setEsito({ tono: 'errore', testo: annullato ? 'Interrotto: le schede già pronte restano salvate.' : err instanceof Error ? err.message : 'Errore.' })
+                setEsito({ tono: 'errore', testo: annullato ? 'Fermato. I riassunti già fatti restano salvati.' : err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
               }
               setAvanzamento(null)
             }}
@@ -299,13 +299,13 @@ function TestoCompletoPerTutte() {
             className="bottone bottone-piccolo"
             onClick={async () => {
               setEsito(null)
-              const r = await recuperaTuttiNelBrowser((fatte, totale) => setAvanzamento(`Cerco il testo completo: ${fatte} di ${totale}…`))
+              const r = await recuperaTuttiNelBrowser((fatte, totale) => setAvanzamento(`Cerco i testi: ${fatte} di ${totale}…`))
               setAvanzamento(null)
               setDaApi(r.daApi)
-              setEsito(`${r.riusciti} testi completi scaricati gratis.${r.daApi.length ? ` ${r.daApi.length} sono gratuiti ma il sito non li fa scaricare al browser.` : ''}`)
+              setEsito(`Ho scaricato gratis ${r.riusciti} testi.${r.daApi.length ? ` Altri ${r.daApi.length} sono gratis ma il sito non me li fa scaricare.` : ''}`)
             }}
           >
-            Cerca il testo completo per {candidate} {candidate === 1 ? 'fonte' : 'fonti'} (gratis)
+            Cerca il testo di {candidate} {candidate === 1 ? 'fonte' : 'fonti'}
           </button>
         )
       )}
@@ -313,13 +313,13 @@ function TestoCompletoPerTutte() {
       {daApi.length > 0 && !avanzamento && haChiave && (
         <Conferma
           classe="bottone bottone-piccolo bottone-primario"
-          etichetta={`Leggi le ${daApi.length} rimaste tramite l'API`}
+          etichetta={`Leggi le altre ${daApi.length} con la chiave`}
           domanda={`${costoStimato(stima, daApi.length)}. Procedo?`}
-          conferma="Procedi"
+          conferma="Vai"
           onConferma={async () => {
             let ok = 0
             for (const [i, id] of daApi.entries()) {
-              setAvanzamento(`Leggo tramite l'API: ${i + 1} di ${daApi.length}…`)
+              setAvanzamento(`Leggo con la chiave API: ${i + 1} di ${daApi.length}…`)
               try {
                 if ((await recuperaTestoCompleto(id, true)).ok) ok += 1
               } catch {
@@ -328,7 +328,7 @@ function TestoCompletoPerTutte() {
             }
             setAvanzamento(null)
             setDaApi([])
-            setEsito(`${ok} testi completi letti tramite l'API.`)
+            setEsito(`Ho letto ${ok} testi con la chiave API.`)
           }}
         />
       )}
@@ -365,7 +365,7 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
       </div>
       <p className="nota">
         {ETICHETTA_ORIGINE[f.origine]} · aggiunta il {new Date(f.aggiuntaIl).toLocaleDateString('it-IT')} ·{' '}
-        {f.testoCompleto ? `testo disponibile (${f.testo.length < 1000 ? `${f.testo.length} caratteri` : `${Math.round(f.testo.length / 1000)} mila caratteri`})` : 'solo abstract'}
+        {f.testoCompleto ? `c'è tutto il testo (${f.testo.length < 1000 ? `${f.testo.length} caratteri` : `${Math.round(f.testo.length / 1000)} mila caratteri`})` : 'solo il riassunto degli autori'}
         {f.url && (
           <>
             {' · '}
@@ -390,7 +390,7 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
       <TemiChips temi={f.temi} onCambia={(temi) => aggiorna(f.id, { temi })} />
 
       <details className="dettagli-capitoli">
-        <summary>Usata nei capitoli ({f.usataIn.length})</summary>
+        <summary>In quali capitoli la usi ({f.usataIn.length})</summary>
         {capitoli.map((c, i) => (
           <label key={c.id} className="interruttore">
             <input type="checkbox" checked={f.usataIn.includes(c.id)} onChange={(e) => usataIn(c.id, e.target.checked)} />
@@ -402,10 +402,10 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
       </details>
 
       <details>
-        <summary>Metadati</summary>
+        <summary>Dati della fonte</summary>
         {campo('titolo', 'Titolo')}
         <label className="campo-blocco">
-          <span className="etichetta">Autori o ente (separati da virgola)</span>
+          <span className="etichetta">Autori o ente (separati da una virgola)</span>
           <input
             className="campo"
             defaultValue={f.autori.join(', ')}
@@ -427,7 +427,7 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
         {campo('rivista', 'Rivista o editore')}
         {f.pagine?.length ? (
           <label className="campo-blocco">
-            <span className="etichetta">Numero stampato della prima pagina del PDF</span>
+            <span className="etichetta">Numero di pagina con cui inizia l'articolo</span>
             <input
               className="campo"
               inputMode="numeric"
@@ -438,8 +438,8 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
               }}
             />
             <span className="nota">
-              Serve a citare la pagina giusta della rivista: se l'articolo inizia a p. 245, le citazioni dalla prima pagina del PDF diventano "p. 245".
-              Dopo una modifica, "Verifica le citazioni" nella scrittura aggiorna le pagine.
+              Serve per citare la pagina giusta della rivista: se l'articolo inizia a p. 245, la prima pagina del PDF diventa "p. 245".
+              Se lo cambi, usa "Verifica le citazioni" nella scrittura per aggiornare le pagine.
             </span>
           </label>
         ) : null}
@@ -449,13 +449,13 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
 
       {f.abstract && (
         <details>
-          <summary>Abstract</summary>
+          <summary>Riassunto degli autori</summary>
           <p className="abstract">{f.abstract}</p>
         </details>
       )}
       {f.estratti.length > 0 && (
         <details open>
-          <summary>Estratti verificati sulla pagina letta</summary>
+          <summary>Frasi controllate sulla pagina</summary>
           <ul className="frasi-chiave">
             {f.estratti.map((e, i) => (
               <li key={i}>
@@ -468,7 +468,7 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
 
       <div className="riga-editor">
         <button type="button" className="bottone bottone-piccolo" onClick={() => input.current?.click()}>
-          {f.tipo === 'pdf' ? 'Sostituisci il PDF' : 'Allega il PDF del paper'}
+          {f.tipo === 'pdf' ? 'Cambia il PDF' : 'Aggiungi il PDF'}
         </button>
         <input
           ref={input}
@@ -479,20 +479,20 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
             const file = e.target.files?.[0]
             e.target.value = ''
             if (!file) return
-            setAllegato('Estraggo il testo…')
+            setAllegato('Leggo il PDF…')
             try {
               const { testo, pagine } = await testoDaPdf(file)
               aggiorna(f.id, { testo, pagine, testoCompleto: true })
-              setAllegato(`Testo allegato: ${pagine.length} pagine, ${Math.round(testo.length / 1000)} mila caratteri. Ora puoi rifare la scheda sul testo completo.`)
+              setAllegato(`Fatto: ${pagine.length} pagine, ${Math.round(testo.length / 1000)} mila caratteri. Ora puoi rifare il riassunto su tutto il testo.`)
             } catch (err) {
-              setAllegato(err instanceof Error ? err.message : 'Lettura non riuscita.')
+              setAllegato(err instanceof Error ? err.message : 'Non riesco a leggere il PDF.')
             }
           }}
         />
         <Conferma
           classe="bottone bottone-vuoto bottone-piccolo"
           etichetta="Togli dalla biblioteca"
-          domanda="Togliere questa fonte?"
+          domanda="Tolgo questa fonte?"
           conferma="Togli"
           pericolosa
           onConferma={() => {
@@ -539,7 +539,7 @@ function Tabella({ fonti, onApri }: { fonti: Fonte[]; onApri: (id: string) => vo
   return (
     <section className="pannello">
       <div className="pannello-testa">
-        <h2>Tabella della letteratura</h2>
+        <h2>Tabella delle fonti</h2>
         <button
           type="button"
           className="bottone bottone-piccolo"
@@ -552,7 +552,7 @@ function Tabella({ fonti, onApri }: { fonti: Fonte[]; onApri: (id: string) => vo
             setTimeout(() => URL.revokeObjectURL(url), 5000)
           }}
         >
-          Scarica per Excel (CSV)
+          Scarica per Excel
         </button>
       </div>
       <div className="tabella-scorrevole">
@@ -639,7 +639,7 @@ export function Biblioteca() {
 
       {inAttesa > 0 && (
         <p className="allerta">
-          {inAttesa} risultati di ricerca aspettano la tua approvazione.{' '}
+          Hai {inAttesa} risultati da controllare.{' '}
           <button type="button" className="link" onClick={() => vai('ricerca')}>
             Vai alla ricerca
           </button>
@@ -647,7 +647,7 @@ export function Biblioteca() {
       )}
 
       <div className="filtri">
-        <input className="campo" placeholder="Cerca per titolo, autore, parole" value={testo} onChange={(e) => setTesto(e.target.value)} aria-label="Cerca in biblioteca" />
+        <input className="campo" placeholder="Cerca titolo, autore o parola" value={testo} onChange={(e) => setTesto(e.target.value)} aria-label="Cerca in biblioteca" />
         <select className="campo" value={tema} onChange={(e) => setTema(e.target.value as TemaFonte | '')} aria-label="Filtra per tema">
           <option value="">tutti i temi</option>
           {(Object.keys(ETICHETTA_TEMA) as TemaFonte[]).map((t) => (
@@ -668,7 +668,7 @@ export function Biblioteca() {
 
       <div className="riga-editor">
         <button type="button" className="bottone" onClick={() => input.current?.click()}>
-          Aggiungi PDF di paper
+          Aggiungi PDF
         </button>
         <input ref={input} type="file" accept=".pdf,application/pdf" multiple hidden onChange={(e) => {
           void caricaPdf(e.target.files)
@@ -684,10 +684,10 @@ export function Biblioteca() {
 
       {fonti.length === 0 ? (
         <p className="nota">
-          La biblioteca si riempie nel tempo: con le ricerche approvate e con i PDF che carichi tu. Non si rifà a ogni ricerca.
+          La biblioteca si riempie un po' alla volta: con le fonti che tieni dalle ricerche e con i PDF che carichi tu. Non si svuota a ogni ricerca.
         </p>
       ) : visibili.length === 0 ? (
-        <p className="nota">Nessuna fonte con questi filtri.</p>
+        <p className="nota">Nessuna fonte con questi filtri. Prova a toglierne qualcuno.</p>
       ) : (
         <ul className="elenco-fonti">
           {visibili.map((f) => (
@@ -699,7 +699,7 @@ export function Biblioteca() {
                   <span className={`stato-fonte stato-fonte-${f.stato}`}>{ETICHETTA_STATO_FONTE[f.stato]}</span>
                   <span>{ETICHETTA_ORIGINE[f.origine]}</span>
                   <span>{statoScheda(f)}</span>
-                  {f.testoCompleto ? <span className="nota-ok">testo completo{f.pagine?.length ? ' con pagine' : ''}</span> : puòAvereTestoCompleto(f) && f.oaUrl ? <span className="oa">open access</span> : null}
+                  {f.testoCompleto ? <span className="nota-ok">tutto il testo{f.pagine?.length ? ' con pagine' : ''}</span> : puòAvereTestoCompleto(f) && f.oaUrl ? <span className="oa">gratis online</span> : null}
                 </span>
                 {f.temi.length > 0 && <TemiChips temi={f.temi} sola />}
               </button>
@@ -725,7 +725,7 @@ export function Biblioteca() {
   return largo ? (
     <div className="griglia-due">
       <div>{elenco}</div>
-      <div>{dettaglio ?? <section className="pannello nota">Scegli una fonte per vederne la scheda.</section>}</div>
+      <div>{dettaglio ?? <section className="pannello nota">Scegli una fonte per vederla qui.</section>}</div>
     </div>
   ) : (
     <div className="colonna-unica">

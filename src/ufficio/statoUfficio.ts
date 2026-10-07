@@ -33,7 +33,7 @@ export async function eseguiAzione(k: AgentKey, etichetta: string, lavoro: strin
     const annullato = err instanceof DOMException && err.name === 'AbortError'
     st().aggiungiBattuta(k, {
       da: 'agente',
-      testo: annullato ? 'Va bene, ci fermiamo qui. Riprendiamo quando vuoi.' : `Non ci sono riuscit${AGENTE[k].persona.titolo.endsWith('a') ? 'a' : 'o'}: ${toApiError(err).message}`,
+      testo: annullato ? 'Va bene, ci fermiamo qui. Riprendiamo quando vuoi.' : `Scusa, non ci sono riuscit${AGENTE[k].persona.femminile ? 'a' : 'o'}: ${toApiError(err).message}`,
       tono: annullato ? undefined : 'errore',
     })
   } finally {

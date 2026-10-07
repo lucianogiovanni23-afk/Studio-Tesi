@@ -5,7 +5,7 @@ import { useLargo } from '../hooks/useLayoutMode'
 import { useStudio } from '../store'
 import type { Fonte } from '../types'
 
-const ETICHETTA: Record<LivelloCopertura, string> = { scoperta: 'nessuna fonte', debole: 'una sola fonte', coperta: 'coperta' }
+const ETICHETTA: Record<LivelloCopertura, string> = { scoperta: 'nessuna fonte', debole: 'una sola fonte', coperta: 'a posto' }
 
 function Gettone({ f }: { f: Fonte }) {
   const apriFonte = useStudio((s) => s.apriFonte)
@@ -38,7 +38,7 @@ function Riga({ s }: { s: CoperturaSezione }) {
       )}
       {s.suggerite.length > 0 && (
         <p className="copertura-fonti">
-          <span className="nota">Già in biblioteca e forse utili:</span>
+          <span className="nota">Già in biblioteca, forse ti servono:</span>
           {s.suggerite.map((f) => (
             <Gettone key={f.id} f={f} />
           ))}
@@ -47,7 +47,7 @@ function Riga({ s }: { s: CoperturaSezione }) {
       <div className="riga-editor">
         {s.livello !== 'coperta' && (
           <button type="button" className="bottone bottone-piccolo bottone-primario" onClick={() => proponi(domandaPerSezione(s))}>
-            Cerca fonti per questa sezione
+            Cerca fonti
           </button>
         )}
         <button type="button" className="bottone bottone-piccolo" onClick={() => apriSezione(s.capitoloId, s.sezioneId)}>
@@ -66,10 +66,10 @@ function Griglia({ sezioni, fonti }: { sezioni: CoperturaSezione[]; fonti: Fonte
   return (
     <div className="tabella-scorrevole">
       <table className="tabella griglia-copertura">
-        <caption>Sezioni e fonti</caption>
+        <caption>Quali fonti usi in ogni parte</caption>
         <thead>
           <tr>
-            <th scope="col">Sezione</th>
+            <th scope="col">Parte</th>
             {ordinate.map((f) => (
               <th key={f.id} scope="col">
                 <button type="button" className="link" onClick={() => apriFonte(f.id)} title={`${autoreAnno(f, false)} · ${f.titolo}`}>
@@ -124,11 +124,11 @@ export function Copertura() {
     <div className="copertura">
       <section className="pannello">
         <div className="pannello-testa">
-          <h2>Mappa di copertura</h2>
+          <h2>Dove mancano fonti</h2>
           {largo && progetto.fonti.length > 0 && (
             <div className="sotto-schede" role="tablist">
               <button type="button" role="tab" aria-selected={vista === 'sezioni'} className={`sotto-voce ${vista === 'sezioni' ? 'sotto-attiva' : ''}`} onClick={() => setVista('sezioni')}>
-                Per sezione
+                Elenco
               </button>
               <button type="button" role="tab" aria-selected={vista === 'griglia'} className={`sotto-voce ${vista === 'griglia' ? 'sotto-attiva' : ''}`} onClick={() => setVista('griglia')}>
                 Griglia
@@ -138,29 +138,29 @@ export function Copertura() {
         </div>
         <p className="copertura-riassunto">
           <span className="copertura-scoperta">
-            <span className="copertura-segno" aria-hidden /> <strong>{c.conteggio.scoperta}</strong> sezioni senza fonti
+            <span className="copertura-segno" aria-hidden /> <strong>{c.conteggio.scoperta}</strong> parti senza fonti
           </span>
           <span className="copertura-debole">
             <span className="copertura-segno" aria-hidden /> <strong>{c.conteggio.debole}</strong> con una sola fonte
           </span>
           <span className="copertura-coperta">
-            <span className="copertura-segno" aria-hidden /> <strong>{c.conteggio.coperta}</strong> coperte (due o più)
+            <span className="copertura-segno" aria-hidden /> <strong>{c.conteggio.coperta}</strong> a posto (due o più)
           </span>
         </p>
         <p className="nota">
-          Conta le fonti scelte per ogni sezione e quelle citate nel testo. Per le sezioni scoperte o deboli puoi far partire una
-          ricerca già impostata, oppure guardare le fonti della biblioteca che sembrano pertinenti.
+          Qui vedi quante fonti hai scelto per ogni parte della tesi e quante ne hai già citato. Dove ne mancano puoi far partire
+          una ricerca già pronta, oppure guardare le fonti che hai già in biblioteca e che potrebbero servire.
         </p>
         <label className="interruttore">
           <input type="checkbox" checked={soloDaFare} onChange={(e) => setSoloDaFare(e.target.checked)} />
-          <span>Mostra solo le sezioni da rinforzare</span>
+          <span>Solo le parti con poche fonti</span>
         </label>
       </section>
 
       {vista === 'griglia' && largo && progetto.fonti.length > 0 ? (
         <section className="pannello">
           <Griglia sezioni={sezioni} fonti={progetto.fonti} />
-          <p className="nota legenda-griglia">● citata nel testo · ○ scelta ma non ancora citata · · forse utile</p>
+          <p className="nota legenda-griglia">● citata nel testo · ○ scelta ma non ancora citata · · forse ti serve</p>
         </section>
       ) : (
         <ol className="copertura-elenco">
@@ -172,8 +172,8 @@ export function Copertura() {
 
       {c.inutilizzate.length > 0 && (
         <section className="pannello">
-          <h2>Fonti non ancora usate ({c.inutilizzate.length})</h2>
-          <p className="nota">Sono in biblioteca ma nessuna sezione le ha scelte o citate.</p>
+          <h2>Fonti che non usi ancora ({c.inutilizzate.length})</h2>
+          <p className="nota">Sono in biblioteca ma non le hai ancora scelte né citate da nessuna parte.</p>
           <p className="copertura-fonti">
             {c.inutilizzate.map((f) => (
               <button key={f.id} type="button" className="gettone-fonte" onClick={() => apriFonte(f.id)} title={f.titolo}>

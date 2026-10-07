@@ -62,18 +62,18 @@ export function installaHookControllore(): () => void {
 
   console.error = (...args: unknown[]) => {
     erroreOriginale.apply(console, args as never[])
-    logFallimento(null, `console.error — ${descriviArgomenti(args)}`)
+    logFallimento(null, `Errore dell'app — ${descriviArgomenti(args)}`)
     ripristinaSeBloccata()
   }
   console.warn = (...args: unknown[]) => {
     avvisoOriginale.apply(console, args as never[])
-    logAvviso(null, `console.warn — ${descriviArgomenti(args)}`)
+    logAvviso(null, `Avviso dell'app — ${descriviArgomenti(args)}`)
   }
 
   const suErrore = (e: ErrorEvent) => {
     logFallimento(
       null,
-      `Errore di runtime — ${e.message} (${e.filename ?? '?'}:${e.lineno ?? 0}:${e.colno ?? 0})`,
+      `L'app si è inceppata — ${e.message} (${e.filename ?? '?'}:${e.lineno ?? 0}:${e.colno ?? 0})`,
     )
     ripristinaSeBloccata()
   }
@@ -81,7 +81,7 @@ export function installaHookControllore(): () => void {
     const r = e.reason
     logFallimento(
       null,
-      `Promise non gestita — ${r instanceof Error ? `${r.name}: ${r.message}` : String(r)}`,
+      `Errore non gestito — ${r instanceof Error ? `${r.name}: ${r.message}` : String(r)}`,
     )
     ripristinaSeBloccata()
   }
@@ -103,7 +103,7 @@ function ripristinaSeBloccata() {
   const s = useStudio.getState()
   const alLavoro = Object.values(s.agenti).some((a) => a.status === 'lavoro')
   if (!alLavoro || inVolo > 0) return
-  logRiparazione(null, 'Interfaccia bloccata dopo un errore: controlli riabilitati.')
+  logRiparazione(null, 'Dopo un errore l\'app era rimasta bloccata: ora i pulsanti funzionano di nuovo.')
   s.sbloccaInterfaccia()
 }
 
@@ -164,7 +164,7 @@ export async function sorveglia<T>(call: ChiamataSorvegliata<T>): Promise<T> {
 
     try {
       if (tentativo > 1) {
-        logRiparazione(call.agente, `${call.passo}: tentativo ${tentativo} di ${MAX_TENTATIVI}.`)
+        logRiparazione(call.agente, `${call.passo}: ci riprovo (${tentativo}ª volta su ${MAX_TENTATIVI}).`)
       }
 
       segnalaInizioChiamata()
@@ -177,12 +177,12 @@ export async function sorveglia<T>(call: ChiamataSorvegliata<T>): Promise<T> {
 
       const verdetto = call.valida(esito)
       if (verdetto.ok) {
-        logOk(call.agente, `${call.passo}: risposta valida${tentativo > 1 ? ` al tentativo ${tentativo}` : ''}.`)
+        logOk(call.agente, `${call.passo}: fatto${tentativo > 1 ? ` (alla ${tentativo}ª prova)` : ''}.`)
         return esito
       }
 
-      ultimoErrore = new Error(verdetto.suggerimento ?? 'Output non valido.')
-      logAvviso(call.agente, `${call.passo}: output non valido — ${ultimoErrore.message}`)
+      ultimoErrore = new Error(verdetto.suggerimento ?? 'La risposta non va bene.')
+      logAvviso(call.agente, `${call.passo}: la risposta non va bene — ${ultimoErrore.message}`)
       suggerimento = `ATTENZIONE: la tua risposta precedente non è utilizzabile. ${verdetto.suggerimento ?? ''} Rifalla da capo rispettando alla lettera lo schema richiesto e i vincoli di materia.`
     } catch (err) {
       if (isAbort(err)) throw err
@@ -203,13 +203,13 @@ export async function sorveglia<T>(call: ChiamataSorvegliata<T>): Promise<T> {
       const attesa = errore.attesaMs ?? BACKOFF_MS[Math.min(tentativo - 1, BACKOFF_MS.length - 1)]
       logRiparazione(
         call.agente,
-        `${call.passo}: ${errore.message} Nuovo tentativo fra ${Math.round(attesa / 1000)}s.`,
+        `${call.passo}: ${errore.message} Riprovo fra ${Math.round(attesa / 1000)} secondi.`,
       )
       await attendi(attesa, call.signal)
     }
   }
 
-  const messaggio = `${call.passo}: nessuna risposta valida dopo ${MAX_TENTATIVI} tentativi. ${ultimoErrore?.message ?? ''}`.trim()
+  const messaggio = `${call.passo}: ho provato ${MAX_TENTATIVI} volte ma non è venuta fuori una risposta buona. ${ultimoErrore?.message ?? ''}`.trim()
   logFallimento(call.agente, messaggio)
   throw new ApiError('sconosciuto', messaggio)
 }

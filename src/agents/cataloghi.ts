@@ -63,18 +63,18 @@ async function leggiJson(catalogo: Catalogo, url: string, signal?: AbortSignal):
     throw new ErroreCatalogo(
       catalogo,
       scaduto
-        ? 'non ha risposto entro 20 secondi'
+        ? 'dopo 20 secondi non ha ancora risposto'
         : catalogo === 'semanticscholar'
-          ? 'non risponde dal browser (spesso limita le richieste senza chiave): gli altri cataloghi bastano'
-          : 'non raggiungibile dal browser (rete, blocco CORS o estensione del browser)',
+          ? 'non risponde (spesso blocca chi non ha una chiave): bastano gli altri archivi'
+          : 'non raggiungibile: controlla internet o qualche estensione del browser che lo blocca',
     )
   }
-  if (risposta.status === 429) throw new ErroreCatalogo(catalogo, 'troppe richieste (429): riprova fra qualche minuto')
-  if (!risposta.ok) throw new ErroreCatalogo(catalogo, `errore ${risposta.status}`)
+  if (risposta.status === 429) throw new ErroreCatalogo(catalogo, 'troppe ricerche di fila (429): riprova fra qualche minuto')
+  if (!risposta.ok) throw new ErroreCatalogo(catalogo, `non ha funzionato (errore ${risposta.status})`)
   try {
     return await risposta.json()
   } catch {
-    throw new ErroreCatalogo(catalogo, 'risposta non leggibile')
+    throw new ErroreCatalogo(catalogo, 'ha risposto, ma non riesco a leggere la risposta')
   }
 }
 
@@ -310,7 +310,7 @@ export async function provaCataloghi(): Promise<EsitoProva[]> {
     CATALOGHI.map(async ({ key }) => {
       try {
         const r = await CERCA[key]('olive oil drought', 1)
-        return { catalogo: key, ok: true, messaggio: r.length ? 'risponde dal browser' : 'risponde, ma senza risultati' }
+        return { catalogo: key, ok: true, messaggio: r.length ? 'funziona' : 'funziona, ma non trova niente' }
       } catch (err) {
         return { catalogo: key, ok: false, messaggio: err instanceof Error ? err.message : 'errore' }
       }

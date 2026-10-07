@@ -77,7 +77,7 @@ export function estraiJson(incollato: string): unknown {
   const t = incollato.replace(/```(?:json)?/gi, '').trim()
   const inizio = t.indexOf('{')
   const fine = t.lastIndexOf('}')
-  if (inizio < 0 || fine <= inizio) throw new Error('Nella risposta incollata non c\'è un oggetto JSON: copia tutta la risposta di Claude.')
+  if (inizio < 0 || fine <= inizio) throw new Error('In quello che hai incollato non trovo la risposta: copia tutta la risposta di Claude e incollala qui.')
   const corpo = t.slice(inizio, fine + 1)
   try {
     return JSON.parse(corpo)
@@ -89,7 +89,7 @@ export function estraiJson(incollato: string): unknown {
       return JSON.parse(corpo.replace(/\r?\n/g, ''))
     } catch {
       throw new Error(
-        'Il JSON incollato è incompleto o rovinato. Se la risposta di Claude si è interrotta, scrivigli "continua" e incolla anche il seguito sotto il primo pezzo.',
+        'La risposta incollata è a metà o rovinata. Se Claude si è fermato, scrivigli "continua" e incolla anche il resto sotto il primo pezzo.',
       )
     }
   }
@@ -97,16 +97,16 @@ export function estraiJson(incollato: string): unknown {
 
 /** Controllo minimo: le proprietà obbligatorie del primo livello devono esserci. */
 export function controllaSchema(dati: unknown, schema: Record<string, unknown>): string | null {
-  if (typeof dati !== 'object' || dati === null || Array.isArray(dati)) return 'La risposta non è un oggetto JSON.'
+  if (typeof dati !== 'object' || dati === null || Array.isArray(dati)) return 'La risposta non è nel formato giusto.'
   const richieste = (schema.required as string[] | undefined) ?? []
   const mancanti = richieste.filter((k) => !(k in (dati as Record<string, unknown>)))
-  return mancanti.length ? `Nella risposta mancano: ${mancanti.join(', ')}. Copia tutta la risposta, oppure chiedi a Claude di rispettare il formato.` : null
+  return mancanti.length ? `Nella risposta mancano dei pezzi (${mancanti.join(', ')}). Copia tutta la risposta, oppure chiedi a Claude di seguire il formato.` : null
 }
 
 /** Il Controllore aggiunge alle istruzioni il motivo dello scarto quando ripete un passo. */
 function avvisoTentativo(testo: string): string | null {
   const m = testo.match(/ATTENZIONE: la tua risposta precedente non è utilizzabile\. ([^\n]*?) Rifalla da capo/)
-  return m ? m[1].trim() || 'non rispettava il formato.' : null
+  return m ? m[1].trim() || 'non era nel formato giusto.' : null
 }
 
 /** Mette in coda una richiesta e aspetta che lo studente incolli la risposta. */

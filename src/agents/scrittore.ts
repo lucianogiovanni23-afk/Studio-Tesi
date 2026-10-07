@@ -309,7 +309,7 @@ function integra(pre: Prefisso, sez: Sezione, grezzi: ParagrafoGrezzo[]): { para
 function trova(capitoloId: string, sezioneId: string): { cap: Capitolo; sez: Sezione } {
   const cap = useStudio.getState().progetto.capitoli.find((c) => c.id === capitoloId)
   const sez = cap?.sezioni.find((s) => s.id === sezioneId)
-  if (!cap || !sez) throw new ApiError('sconosciuto', 'Sezione non trovata.')
+  if (!cap || !sez) throw new ApiError('sconosciuto', 'Non trovo più questa sezione.')
   return { cap, sez }
 }
 
@@ -324,7 +324,7 @@ async function chiama<T>(
   valida: (d: Consegna<T>) => { ok: boolean; suggerimento?: string },
 ): Promise<{ consegna: Consegna<T>; pre: Prefisso }> {
   if (useScrittore.getState().inCorso) {
-    throw new ApiError('sconosciuto', 'Lo Scrittore sta già lavorando: una sezione e un comando alla volta.')
+    throw new ApiError('sconosciuto', 'Lo scrittore sta già lavorando: aspetta che finisca, fa una cosa alla volta.')
   }
   const s = useStudio.getState()
   const client = creaClient(s.apiKey)
@@ -369,8 +369,8 @@ async function chiama<T>(
   } catch (err) {
     useStudio.getState().patchAgente('scrittore', {
       status: 'errore',
-      etichetta: 'errore',
-      errore: err instanceof Error ? err.message : 'Errore sconosciuto.',
+      etichetta: "c'è stato un problema",
+      errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.',
     })
     throw err
   } finally {
@@ -403,13 +403,13 @@ export async function proponiScaletta(capitoloId: string, sezioneId: string): Pr
   )
   useStudio.getState().setScaletta(capitoloId, sezioneId, punti)
   useScrittore.setState((s) => ({ lacune: { ...s.lacune, [sezioneId]: consegna.risultato.lacune } }))
-  logOk('scrittore', `Scaletta proposta per "${sez.titolo}": ${punti.length} punti, da approvare.`)
+  logOk('scrittore', `Scaletta pronta per "${sez.titolo}": ${punti.length} punti. Guardala e dimmi se va bene.`)
 }
 
 export async function proponiBozza(capitoloId: string, sezioneId: string): Promise<void> {
   const { cap, sez } = trova(capitoloId, sezioneId)
   if (!sez.fontiConfermate || !sez.scalettaApprovata) {
-    throw new ApiError('sconosciuto', 'Prima della bozza approva le fonti della sezione e la scaletta.')
+    throw new ApiError('sconosciuto', 'Prima di scrivere la bozza devi approvare le fonti della sezione e la scaletta.')
   }
   const { consegna, pre } = await chiama<{ paragrafi: ParagrafoGrezzo[] }>(
     cap,
@@ -427,7 +427,7 @@ export async function proponiBozza(capitoloId: string, sezioneId: string): Promi
 
 function paragrafoCorrente(sez: Sezione, indice: number): string {
   const p = paragrafi(sez.testo)[indice]
-  if (!p) throw new ApiError('sconosciuto', 'Seleziona un paragrafo del testo (tocca dentro il paragrafo).')
+  if (!p) throw new ApiError('sconosciuto', 'Prima scegli un paragrafo: tocca dentro il testo del paragrafo.')
   return p
 }
 
@@ -494,7 +494,7 @@ function registraProposta(p: Proposta) {
   useScrittore.setState((s) => ({ proposte: { ...s.proposte, [p.sezioneId]: p } }))
   const citazioni = p.opzioni.flatMap((o) => o.citazioni)
   const verdi = citazioni.filter((c) => c.testuale === 'verificato').length
-  logOk('scrittore', `Proposta pronta: ${citazioni.length} citazioni, ${verdi} verificate alla lettera.`)
+  logOk('scrittore', `Proposta pronta: ${citazioni.length} citazioni, ${verdi} controllate parola per parola.`)
 }
 
 /** Applica l'opzione scelta: il testo precedente resta fra le versioni. */
@@ -515,7 +515,7 @@ export function accettaProposta(sezioneId: string, indiceOpzione: number) {
   const base = p.indice === null ? [] : sez.citazioni.filter((c) => !delVecchio(c))
   const marcatori = new Set([...nuovoTesto.matchAll(/\[([FC]\d+)\]/g)].map((m) => m[1]))
   const citazioni = [...base, ...opzione.citazioni].filter((c) => marcatori.has(c.rif))
-  const nota = { bozza: 'Bozza dello Scrittore', riscrivi: 'Paragrafo riscritto', alternative: opzione.etichetta, corso: 'Collegamento al corso' }[p.comando]
+  const nota = { bozza: 'Bozza dello scrittore', riscrivi: 'Paragrafo riscritto', alternative: opzione.etichetta, corso: 'Collegamento al corso' }[p.comando]
   useStudio.getState().applicaTesto(p.capitoloId, sezioneId, nuovoTesto, citazioni, nota, 'scrittore')
   scartaProposta(sezioneId)
 }

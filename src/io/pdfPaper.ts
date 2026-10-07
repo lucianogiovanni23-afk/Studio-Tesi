@@ -23,7 +23,7 @@ export function daPagine(pagine: string[]): TestoConPagine {
 export async function testoDaBuffer(buffer: ArrayBuffer, suPagina?: (n: number, tot: number) => void): Promise<TestoConPagine> {
   const esito = await estraiPdf(buffer, suPagina)
   if (esito.scansionato) {
-    throw new Error('Il PDF non ha testo selezionabile (è una scansione): esportalo con il riconoscimento del testo (OCR) e ricaricalo.')
+    throw new Error('Questo PDF è una scansione, quindi non riesco a leggere il testo. Passalo in un\'app che riconosce il testo (OCR) e caricalo di nuovo.')
   }
   return daPagine(esito.pagine)
 }
@@ -40,13 +40,13 @@ export async function testoDaPdf(file: File, suPagina?: (n: number, tot: number)
 export async function fonteDaPdf(file: File, suPagina?: (n: number, tot: number) => void): Promise<{ fonte: Fonte; nota: string }> {
   const { testo, pagine } = await testoDaPdf(file, suPagina)
   const doi = (testo.slice(0, 12_000).match(DOI)?.[0] ?? '').replace(/[.)\]]+$/, '').toLowerCase()
-  let nota = doi ? '' : 'Nessun DOI trovato nel PDF: completa autori e anno a mano.'
+  let nota = doi ? '' : 'Nel PDF non ho trovato il codice DOI: scrivi tu autori e anno.'
   let meta = null
   if (doi) {
     try {
       meta = await metadatiDaDoi(doi)
     } catch {
-      nota = `DOI ${doi} trovato, ma Crossref non risponde dal browser: completa autori e anno a mano.`
+      nota = `Ho trovato il DOI ${doi}, ma Crossref non risponde: scrivi tu autori e anno.`
     }
   }
   const fonte: Fonte = {

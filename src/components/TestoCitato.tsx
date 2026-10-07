@@ -6,9 +6,9 @@ import type { Citazione, Fonte } from '../types'
 import { Esito } from './Esito'
 
 const GIUDIZIO = {
-  supportata: 'il Revisore la ritiene supportata',
-  parziale: 'il Revisore la ritiene supportata solo in parte',
-  non_supportata: 'il Revisore la ritiene non supportata',
+  supportata: 'per la revisora la fonte lo dice davvero',
+  parziale: 'per la revisora la fonte lo dice solo in parte',
+  non_supportata: 'per la revisora la fonte non lo dice',
 }
 
 function etichetta(rif: string, citazioni: Citazione[], fonti: Fonte[], stile: boolean, paragrafo: string): string {
@@ -42,11 +42,11 @@ export function DettaglioCitazioni({ rif, citazioni }: { rif: string; citazioni:
             return p ? `Materiale del corso: ${p.file}, ${p.pagine[0] === p.pagine[1] ? `p. ${p.pagine[0]}` : `pp. ${p.pagine[0]}–${p.pagine[1]}`}` : 'Materiale del corso'
           })()
         ) : (
-          'fonte non trovata in biblioteca'
+          'questa fonte non è in biblioteca'
         )}
       </p>
       {proprie.length === 0 ? (
-        <p className="testo-errore">Nessuna citazione registrata per questo marcatore: l'affermazione non ha un estratto che la sostenga.</p>
+        <p className="testo-errore">Per questo rimando non c'è nessuna citazione: la frase non ha un pezzo di fonte che la confermi.</p>
       ) : (
         proprie.map((c, i) => (
           <div key={i} className={`citazione-voce colore-${coloreCitazione(c)}`}>

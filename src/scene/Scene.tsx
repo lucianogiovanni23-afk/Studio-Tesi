@@ -7,7 +7,8 @@ import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useModoUso } from '../hooks/useModoUso'
 import { estrazioneInCorso, useStudio } from '../store'
 import type { AgentKey } from '../types'
-import { Sala, Scrivania } from './Arredamento'
+import { Sala } from './Arredamento'
+import { Scrivania } from './Scrivania'
 import { CameraRig, type ControlliOrbita } from './CameraRig'
 import { CAMERA_BERSAGLIO, CAMERA_CASA, DIETRO_SCRIVANIA, POSTAZIONI } from './layout'
 import { Persona3D } from './Persona3D'
@@ -45,7 +46,7 @@ function Postazione({ k, scelta, primoPiano, onScegli }: { k: AgentKey; scelta: 
         onPointerOver={cursore(true)}
         onPointerOut={cursore(false)}
       >
-        <Scrivania colore={def.colore} schermoAcceso={lavora || scelta} />
+        <Scrivania colore={def.colore} schermoAcceso={lavora || scelta} sfasamento={scrivania[0] / 10} />
         <group position={[0, 0, DIETRO_SCRIVANIA]}>
           <Persona3D persona={def.persona} lavora={lavora} scelta={scelta} parla={scelta} sfasamento={scrivania[0]} ombre={completa} />
         </group>
@@ -165,7 +166,7 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
         <directionalLight position={[0, 5, -10]} intensity={0.55} color="#e9f2ff" />
         <ContestoQualita.Provider value={qualita}>
           <Suspense fallback={null}>
-            <Sala />
+            <Sala etichette={vista === null} />
             {AGENTI.map((a) => (
               <Postazione key={a.key} k={a.key} scelta={scelto === a.key} primoPiano={vista === a.key} onScegli={scegli} />
             ))}
@@ -183,7 +184,7 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
             enableZoom={false}
             enableDamping={!fermo}
             dampingFactor={0.08}
-            minPolarAngle={Math.PI / 4.2}
+            minPolarAngle={1.2}
             maxPolarAngle={Math.PI / 2.15}
             minAzimuthAngle={-Math.PI / 5}
             maxAzimuthAngle={Math.PI / 5}

@@ -39,14 +39,14 @@ export async function generaQuadro(): Promise<void> {
     BUDGET_LETTORE,
   )
   if (passaggi.length === 0) {
-    throw new ApiError('sconosciuto', 'Il materiale del corso non contiene testo leggibile: carica almeno un PDF o un file di testo.')
+    throw new ApiError('sconosciuto', 'Nelle lezioni che hai caricato non riesco a leggere il testo: carica almeno un PDF o un file di testo.')
   }
 
   const client = creaClient(s.apiKey)
   controller = new AbortController()
   const signal = controller.signal
-  s.patchAgente('lettore', { status: 'lavoro', etichetta: 'leggo il materiale del corso…', errore: null })
-  logInfo('lettore', `Leggo ${passaggi.length} passaggi del corso da ${new Set(passaggi.map((p) => p.fileId)).size} file.`)
+  s.patchAgente('lettore', { status: 'lavoro', etichetta: 'leggo le lezioni del corso…', errore: null })
+  logInfo('lettore', `Leggo ${passaggi.length} pezzi delle lezioni da ${new Set(passaggi.map((p) => p.fileId)).size} file.`)
 
   try {
     const consegna = await sorveglia<Consegna<RisultatoGrezzo>>({
@@ -103,13 +103,13 @@ export async function generaQuadro(): Promise<void> {
       passaggi: consegna.passaggi,
       errore: null,
     })
-    logOk('lettore', `Quadro teorico: ${concetti.length} concetti, ${verificati} con estratto verificato alla lettera.`)
+    logOk('lettore', `Quadro teorico pronto: ${concetti.length} concetti, ${verificati} con la frase controllata parola per parola.`)
   } catch (err) {
     const aborted = err instanceof DOMException && err.name === 'AbortError'
     useStudio.getState().patchAgente('lettore', {
       status: aborted ? 'riposo' : 'errore',
-      etichetta: aborted ? 'fermato' : 'errore',
-      errore: aborted ? null : err instanceof Error ? err.message : 'Errore sconosciuto.',
+      etichetta: aborted ? 'fermato' : "c'è stato un problema",
+      errore: aborted ? null : err instanceof Error ? err.message : 'Qualcosa è andato storto.',
     })
     if (!aborted) throw err
   } finally {

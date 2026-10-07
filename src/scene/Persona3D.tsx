@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Persona } from '../agents/agenti'
+import { Sedia } from './Sedia'
 import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useStudio } from '../store'
 
@@ -189,23 +190,7 @@ export function Persona3D({
 
   return (
     <group>
-      {/* sedia da ufficio */}
-      <mesh position={[0, 0.45, -0.02]} castShadow={ombre}>
-        <boxGeometry args={[0.5, 0.07, 0.48]} />
-        <meshStandardMaterial color="#2a2c2f" roughness={0.7} />
-      </mesh>
-      <mesh position={[0, 0.86, -0.27]} rotation={[-0.08, 0, 0]} castShadow={ombre}>
-        <boxGeometry args={[0.48, 0.66, 0.07]} />
-        <meshStandardMaterial color="#2a2c2f" roughness={0.7} />
-      </mesh>
-      <mesh position={[0, 0.22, -0.02]}>
-        <cylinderGeometry args={[0.03, 0.03, 0.4, 10]} />
-        <meshStandardMaterial color="#8d9196" metalness={0.6} roughness={0.35} />
-      </mesh>
-      <mesh position={[0, 0.03, -0.02]}>
-        <cylinderGeometry args={[0.28, 0.28, 0.04, 5]} />
-        <meshStandardMaterial color="#2a2c2f" roughness={0.6} />
-      </mesh>
+      <Sedia accento={a.cravatta} ombre={ombre} />
 
       {/* gambe */}
       {[-1, 1].map((s) => (

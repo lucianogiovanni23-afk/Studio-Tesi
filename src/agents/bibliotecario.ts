@@ -101,7 +101,7 @@ async function pianifica(domanda: string, signal: AbortSignal): Promise<Consegna
   const client = creaClient(s.apiKey)
   return sorveglia<Consegna<Piano>>({
     agente: 'bibliotecario',
-    passo: 'Piano di ricerca',
+    passo: 'Piano della ricerca',
     signal,
     esegui: (_t, suggerimento) =>
       chiamataStrutturata<Consegna<Piano>>({
@@ -256,7 +256,7 @@ async function cercaSulWeb(
     effort: 'medium' as const,
     signal,
     chi: 'bibliotecario' as const,
-    azione: tipo === 'istituzionale' ? 'ricerca: siti istituzionali' : 'ricerca: web',
+    azione: tipo === 'istituzionale' ? 'ricerca: siti ufficiali' : 'ricerca: web',
     system: [{ type: 'text' as const, text: SYSTEM_BIBLIOTECARIO }],
     tools,
     nomeToolConsegna: TOOL_CONSEGNA_FONTI.name,
@@ -281,7 +281,7 @@ async function cercaSulWeb(
     blocchi = [...blocchi, ...secondo.blocchi]
     grezza = secondo.consegna
   }
-  if (!grezza) throw new ApiError('sconosciuto', 'Il Bibliotecario non ha consegnato le fonti nemmeno su richiesta esplicita.', null, true)
+  if (!grezza) throw new ApiError('sconosciuto', 'Il bibliotecario non mi ha dato le fonti, neanche quando gliel\'ho chiesto di nuovo.', null, true)
 
   const consegna = normalizzaConsegna(grezza)
   const raccolta = raccogliRicerca(blocchi)
@@ -289,11 +289,11 @@ async function cercaSulWeb(
 
   const esclusi: FonteEsclusa[] = [
     ...respinte.map((f) => ({
-      titolo: f.titolo || '(senza titolo)',
+      titolo: f.titolo || '(nessun titolo)',
       url: f.url,
-      motivo: 'URL non presente fra i risultati della ricerca né fra le pagine lette: escluso perché inventato o modificato.',
+      motivo: 'URL non presente nei risultati della ricerca né nelle pagine lette: il link è inventato o cambiato, quindi l\'ho tolto.',
     })),
-    ...consegna.fonti_scartate.map((f) => ({ titolo: f.titolo, url: f.url, motivo: `Scartata dal Bibliotecario: ${f.motivo}` })),
+    ...consegna.fonti_scartate.map((f) => ({ titolo: f.titolo, url: f.url, motivo: `Il bibliotecario l'ha scartata: ${f.motivo}` })),
   ]
 
   const fonti: Fonte[] = []
@@ -346,7 +346,7 @@ async function cercaSulWeb(
       esclusi.push({
         titolo: f.titolo,
         url: f.url,
-        motivo: `${scartati} estratt${scartati === 1 ? 'o' : 'i'} non ritrovat${scartati === 1 ? 'o' : 'i'} nel testo della pagina: scartat${scartati === 1 ? 'o' : 'i'} (la fonte resta).`,
+        motivo: `${scartati === 1 ? 'Una frase citata non c\'è' : `${scartati} frasi citate non ci sono`} davvero nella pagina: ${scartati === 1 ? 'l\'ho tolta' : 'le ho tolte'} (la fonte resta).`,
       })
     }
   }
@@ -375,7 +375,7 @@ async function seleziona(domanda: string, candidati: Candidato[], signal: AbortS
 
   return sorveglia<Consegna<Selezione>>({
     agente: 'bibliotecario',
-    passo: 'Selezione dei risultati',
+    passo: 'Scelta dei risultati',
     signal,
     esegui: (_t, suggerimento) =>
       chiamataStrutturata<Consegna<Selezione>>({
@@ -421,14 +421,14 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
     inCorso: true,
     errore: null,
     passi: [
-      { id: 'piano', titolo: 'Piano di ricerca', stato: 'attesa', dettaglio: '' },
-      { id: 'cataloghi', titolo: 'Cataloghi accademici', stato: opzioni.cataloghi ? 'attesa' : 'saltato', dettaglio: '' },
-      { id: 'istituzionali', titolo: 'Siti istituzionali', stato: opzioni.istituzionali ? 'attesa' : 'saltato', dettaglio: '' },
-      { id: 'web', titolo: 'Web generico', stato: opzioni.web ? 'attesa' : 'saltato', dettaglio: '' },
-      { id: 'selezione', titolo: 'Selezione', stato: 'attesa', dettaglio: '' },
+      { id: 'piano', titolo: 'Preparo la ricerca', stato: 'attesa', dettaglio: '' },
+      { id: 'cataloghi', titolo: 'Archivi di articoli', stato: opzioni.cataloghi ? 'attesa' : 'saltato', dettaglio: '' },
+      { id: 'istituzionali', titolo: 'Siti ufficiali', stato: opzioni.istituzionali ? 'attesa' : 'saltato', dettaglio: '' },
+      { id: 'web', titolo: 'Resto del web', stato: opzioni.web ? 'attesa' : 'saltato', dettaglio: '' },
+      { id: 'selezione', titolo: 'Scelgo i migliori', stato: 'attesa', dettaglio: '' },
     ],
   })
-  st().patchAgente('bibliotecario', { status: 'lavoro', etichetta: 'preparo le query…', errore: null })
+  st().patchAgente('bibliotecario', { status: 'lavoro', etichetta: 'preparo le ricerche…', errore: null })
 
   const esclusi: FonteEsclusa[] = []
   const passaggi: string[] = []
@@ -445,7 +445,7 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
 
     if (opzioni.cataloghi) {
       passo('cataloghi', 'corso')
-      st().patchAgente('bibliotecario', { etichetta: 'consulto i cataloghi…' })
+      st().patchAgente('bibliotecario', { etichetta: 'cerco negli archivi di articoli…' })
       const esito = await cercaNeiCataloghi(piano.risultato.query_cataloghi, signal)
       perCatalogo = esito.perCatalogo
       candidati.push(
@@ -455,14 +455,14 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
       passo(
         'cataloghi',
         esito.uniti.length === 0 ? 'avviso' : errori.length ? 'avviso' : 'ok',
-        `${Object.entries(perCatalogo).map(([k, v]) => `${k}: ${typeof v === 'number' ? `${v} risultati` : v}`).join(' · ')} → ${esito.uniti.length} nuovi senza doppioni`,
+        `${Object.entries(perCatalogo).map(([k, v]) => `${k}: ${typeof v === 'number' ? `${v} risultati` : v}`).join(' · ')} → ${esito.uniti.length} nuovi, senza doppioni`,
       )
     }
 
     for (const tipo of ['istituzionali', 'web'] as const) {
       if (!opzioni[tipo]) continue
       passo(tipo, 'corso')
-      st().patchAgente('bibliotecario', { etichetta: tipo === 'istituzionali' ? 'cerco nei siti istituzionali…' : 'cerco sul web…' })
+      st().patchAgente('bibliotecario', { etichetta: tipo === 'istituzionali' ? 'cerco nei siti ufficiali…' : 'cerco sul web…' })
       try {
         const r = await cercaSulWeb(tipo === 'istituzionali' ? 'istituzionale' : 'web', domanda, piano.risultato.query_web, signal)
         const nuove = r.fonti.filter((f) => !giàInBiblioteca(st().progetto.fonti, f) && !giàInBiblioteca(candidati.map((c) => c.fonte), f))
@@ -475,13 +475,13 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
         passo(
           tipo,
           r.avvisi.length || inventati ? 'avviso' : 'ok',
-          [`${nuove.length} fonti con URL verificato`, inventati ? `${inventati} escluse per URL inventato` : '', ...r.avvisi].filter(Boolean).join(' · '),
+          [`${nuove.length} fonti con link controllato`, inventati ? `${inventati} tolte perché il link era inventato` : '', ...r.avvisi].filter(Boolean).join(' · '),
         )
       } catch (err) {
         if (signal.aborted) throw err
         const msg = err instanceof Error ? err.message : 'errore'
         passo(tipo, 'errore', msg)
-        logAvviso('bibliotecario', `${tipo}: ${msg}`)
+        logAvviso('bibliotecario', `${tipo === 'istituzionali' ? 'Siti ufficiali' : 'Web'}: ${msg}`)
         // Un errore non ritentabile (chiave, richiesta) ferma tutta la ricerca.
         if (err instanceof ApiError && !err.ritentabile && err.kind !== 'sconosciuto') throw err
       }
@@ -489,7 +489,7 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
 
     if (candidati.length > 0) {
       passo('selezione', 'corso')
-      st().patchAgente('bibliotecario', { etichetta: 'seleziono i risultati…' })
+      st().patchAgente('bibliotecario', { etichetta: 'scelgo i risultati migliori…' })
       try {
         const sel = await seleziona(domanda, candidati, signal)
         passaggi.push(...sel.passaggi)
@@ -504,13 +504,13 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
           }
         })
         const tenuti = candidati.filter((c) => c.consiglio?.decisione === 'tenere').length
-        passo('selezione', 'ok', `${tenuti} consigliati su ${candidati.length}`)
+        passo('selezione', 'ok', `te ne consiglio ${tenuti} su ${candidati.length}`)
       } catch (err) {
         if (signal.aborted) throw err
-        passo('selezione', 'errore', `${err instanceof Error ? err.message : 'errore'} — i risultati restano da valutare a mano.`)
+        passo('selezione', 'errore', `${err instanceof Error ? err.message : 'errore'}. I risultati li scegli tu a mano.`)
       }
     } else {
-      passo('selezione', 'saltato', 'nessun risultato da selezionare')
+      passo('selezione', 'saltato', 'non c\'è niente da scegliere')
     }
 
     // Prima i consigliati e i più pertinenti.
@@ -534,21 +534,21 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
     st().registraRicerca(registro, candidati)
     st().patchAgente('bibliotecario', {
       status: candidati.length ? 'attesa' : 'fatto',
-      etichetta: candidati.length ? `${candidati.length} risultati da approvare` : 'nessun risultato nuovo',
+      etichetta: candidati.length ? `${candidati.length} risultati da guardare` : 'niente di nuovo',
       passaggi: passaggi.slice(0, 8),
       errore: null,
     })
-    logOk('bibliotecario', `Ricerca conclusa: ${candidati.length} risultati da approvare, ${esclusi.length} segnalazioni.`)
+    logOk('bibliotecario', `Ricerca finita: ${candidati.length} risultati da guardare, ${esclusi.length} cose da segnalarti.`)
   } catch (err) {
     const annullata = signal.aborted
-    const msg = annullata ? 'Ricerca fermata.' : err instanceof Error ? err.message : 'Errore sconosciuto.'
+    const msg = annullata ? 'Ricerca fermata.' : err instanceof Error ? err.message : 'Qualcosa è andato storto.'
     useRicerca.setState((s) => ({
       errore: annullata ? null : msg,
       passi: s.passi.map((p) => (p.stato === 'corso' || p.stato === 'attesa' ? { ...p, stato: 'saltato' as const } : p)),
     }))
     st().patchAgente('bibliotecario', {
       status: annullata ? 'riposo' : 'errore',
-      etichetta: annullata ? 'fermato' : 'errore',
+      etichetta: annullata ? 'fermato' : "c'è stato un problema",
       errore: annullata ? null : msg,
     })
     if (!annullata) logInfo('bibliotecario', msg)

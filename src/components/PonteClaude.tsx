@@ -48,7 +48,7 @@ function Finestra({ r, inCoda }: { r: RichiestaPonte; inCoda: number }) {
       setErrore('')
     } catch {
       area.current?.focus()
-      setErrore('Il browser non permette di leggere gli appunti: tieni premuto nel riquadro e scegli Incolla.')
+      setErrore('Il browser non mi fa leggere quello che hai copiato: tieni premuto nel riquadro e scegli Incolla.')
     }
   }
 
@@ -61,7 +61,7 @@ function Finestra({ r, inCoda }: { r: RichiestaPonte; inCoda: number }) {
       if (problema) return setErrore(problema)
       r.risolvi(JSON.stringify(dati))
     } catch (err) {
-      setErrore(err instanceof Error ? err.message : 'Risposta non leggibile.')
+      setErrore(err instanceof Error ? err.message : 'Non riesco a leggere la risposta.')
     }
   }
 
@@ -71,7 +71,7 @@ function Finestra({ r, inCoda }: { r: RichiestaPonte; inCoda: number }) {
     <div className="ponte-sfondo" role="dialog" aria-modal="true" aria-labelledby={`ponte-titolo-${r.id}`}>
       <div className="ponte">
         <p className="ponte-chi">
-          {r.chi ? nomeChi(r.chi) : 'Agente'} · gratis con Claude.ai{inCoda > 0 ? ` · poi altre ${inCoda}` : ''}
+          {r.chi ? nomeChi(r.chi) : 'Collega'} · gratis con Claude.ai{inCoda > 0 ? ` · dopo ce ne sono altre ${inCoda}` : ''}
         </p>
         <h2 id={`ponte-titolo-${r.id}`} ref={titolo} tabIndex={-1}>
           {r.azione.charAt(0).toUpperCase() + r.azione.slice(1)}
@@ -79,15 +79,15 @@ function Finestra({ r, inCoda }: { r: RichiestaPonte; inCoda: number }) {
 
         {r.avviso && (
           <p className="allerta" role="status">
-            <strong>Serve un nuovo passaggio:</strong> la risposta di prima è stata scartata dal controllo dell'app ({r.avviso}).
-            La richiesta qui sotto è aggiornata e lo dice a Claude: copiala di nuovo, nella stessa chat va bene.
+            <strong>Rifacciamo un passaggio:</strong> la risposta di prima non andava bene ({r.avviso}). Ho aggiornato la
+            richiesta qui sotto e lo spiego a Claude: copiala di nuovo, anche nella stessa chat va bene.
           </p>
         )}
         <ol className="ponte-passi">
           <li>
             <div className="riga-editor">
               <button type="button" className="bottone bottone-primario" onClick={() => void copia()}>
-                {copiata ? 'Richiesta copiata ✓' : 'Copia la richiesta'}
+                {copiata ? 'Copiata ✓' : 'Copia la richiesta'}
               </button>
               <span className="nota">{caratteri} caratteri</span>
             </div>
@@ -97,13 +97,13 @@ function Finestra({ r, inCoda }: { r: RichiestaPonte; inCoda: number }) {
               Apri Claude.ai
             </a>
             <p className="nota">
-              Apri una <strong>chat nuova</strong>, incolla e invia. Se la richiesta è lunga, Claude.ai la mostra come allegato:
-              va bene così.
+              Apri una <strong>chat nuova</strong>, incolla e invia. Se il testo è lungo, Claude.ai lo mette come allegato: va
+              bene così.
             </p>
           </li>
           <li>
             <p className="nota">
-              Quando Claude ha finito, copia la sua risposta (il pulsante "Copia" sotto il messaggio) e incollala qui.
+              Quando Claude ha finito, copia la sua risposta (c'è il tasto "Copia" sotto il messaggio) e incollala qui.
             </p>
             <textarea
               ref={area}
@@ -119,7 +119,7 @@ function Finestra({ r, inCoda }: { r: RichiestaPonte; inCoda: number }) {
             />
             <div className="riga-editor">
               <button type="button" className="bottone" onClick={() => void incolla()}>
-                {risposta ? 'Incolla il seguito' : 'Incolla dagli appunti'}
+                {risposta ? 'Incolla il resto' : 'Incolla la risposta'}
               </button>
               <button type="button" className="bottone bottone-primario" onClick={usa}>
                 Usa questa risposta
@@ -134,8 +134,8 @@ function Finestra({ r, inCoda }: { r: RichiestaPonte; inCoda: number }) {
           </p>
         )}
         <p className="nota">
-          Se la risposta di Claude si interrompe a metà, scrivigli <strong>continua</strong> e incolla anche il seguito,
-          sotto il primo pezzo. L'app controlla da sola che la risposta sia completa.
+          Se la risposta di Claude si ferma a metà, scrivigli <strong>continua</strong> e incolla anche il resto, sotto il
+          primo pezzo. L'app controlla da sola che ci sia tutta.
         </p>
 
         <details className="ponte-dettagli">

@@ -120,8 +120,8 @@ export function esaminaCitazioni(testo: string, citazioni: Citazione[]): EsameCi
   }
   const nelTesto = new Set(marcatori(testo))
   const citati = new Set(citazioni.map((c) => (c.rif ?? '').toUpperCase()))
-  for (const m of nelTesto) if (!citati.has(m)) esame.incoerenze.push(`marcatore [${m}] senza citazione`)
-  for (const c of citati) if (!nelTesto.has(c)) esame.incoerenze.push(`citazione ${c} senza marcatore nel testo`)
+  for (const m of nelTesto) if (!citati.has(m)) esame.incoerenze.push(`il rimando [${m}] non ha una citazione`)
+  for (const c of citati) if (!nelTesto.has(c)) esame.incoerenze.push(`la citazione ${c} non ha il suo rimando nel testo`)
 
   for (const c of citazioni) {
     esame.totali += 1

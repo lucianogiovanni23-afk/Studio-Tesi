@@ -15,16 +15,16 @@ export async function aggiungiPdfInBiblioteca(
     try {
       const { fonte, nota } = await fonteDaPdf(file, (n, tot) => suAvanzamento(`Leggo "${file.name}": pagina ${n} di ${tot}`))
       if (giàInBiblioteca(useStudio.getState().progetto.fonti, fonte)) {
-        note.push(`"${fonte.titolo}" è già in biblioteca.`)
+        note.push(`"${fonte.titolo}" ce l'hai già in biblioteca.`)
         continue
       }
       useStudio.getState().aggiungiFonte(fonte)
       const salvata = useStudio.getState().progetto.fonti.find((f) => f.id === fonte.id) ?? fonte
       aggiunte.push(salvata)
-      logOk('bibliotecario', `PDF "${file.name}" aggiunto alla biblioteca.`)
-      note.push(nota || `"${fonte.titolo}" aggiunto con i metadati di Crossref.`)
+      logOk('bibliotecario', `Ho messo il PDF "${file.name}" in biblioteca.`)
+      note.push(nota || `"${fonte.titolo}" aggiunto: autori, anno e rivista li ho presi da Crossref.`)
     } catch (err) {
-      note.push(`"${file.name}": ${err instanceof Error ? err.message : 'lettura non riuscita'}`)
+      note.push(`"${file.name}": ${err instanceof Error ? err.message : 'non sono riuscito a leggerlo'}`)
     }
   }
   return { aggiunte, note }

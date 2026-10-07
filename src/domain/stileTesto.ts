@@ -28,8 +28,8 @@ interface Formula {
   suggerimento: string
 }
 
-const ENFASI = 'Togli la premessa e scrivi direttamente il fatto.'
-const RUOLO = 'Di\' che cosa fa concretamente (aumenta, riduce, sposta, rende più incerto).'
+const ENFASI = 'Togli il giro di parole e scrivi subito il fatto.'
+const RUOLO = 'Di\' cosa fa in pratica (aumenta, riduce, sposta, rende più incerto).'
 
 /**
  * \b di JavaScript non riconosce le lettere accentate ("È", "è" a inizio
@@ -42,26 +42,26 @@ function unicode(f: Formula): Formula {
 
 /** Formule ricorrenti nei testi generati: non sono errori, ma sommate danno il "sapore" dell'IA. */
 export const FORMULE: Formula[] = [
-  { re: /\bè (?:fondamentale|importante|cruciale|essenziale|doveroso|opportuno) (?:sottolineare|notare|evidenziare|ricordare|considerare|precisare)\b/gi, spiegazione: 'formula di enfasi vuota', suggerimento: ENFASI },
-  { re: /\b(?:va|vale la pena|occorre|bisogna) (?:sottolineat[oa]|sottolineare|notare|evidenziare|ricordare)\b/gi, spiegazione: 'formula di enfasi vuota', suggerimento: ENFASI },
-  { re: /\b(?:gioca|giocano|riveste|rivestono|assume|assumono|ricopre|ricoprono) un ruolo (?:cruciale|fondamentale|chiave|centrale|determinante|di primo piano|essenziale|decisivo)\b/gi, spiegazione: 'metafora logora ("ruolo cruciale")', suggerimento: RUOLO },
-  { re: /\bnel (?:complesso |variegato |vasto |moderno |attuale )?panorama\b/gi, spiegazione: 'apertura generica ("nel panorama")', suggerimento: 'Parti dal caso concreto: Calabria, campagna, frantoio.' },
-  { re: /\bin un (?:contesto|mondo|scenario|mercato) (?:sempre più|in continua|in rapida)\b/gi, spiegazione: 'apertura generica', suggerimento: 'Sostituisci con un dato o un fatto preciso.' },
-  { re: /\bsempre più (?:complesso|complessa|incerto|incerta|dinamico|dinamica|globalizzato|competitivo|competitiva|rilevante|centrale)\b/gi, spiegazione: '"sempre più…" generico', suggerimento: 'Indica rispetto a quando e di quanto.' },
-  { re: /\b(?:sfide e opportunità|opportunità e sfide|rischi e opportunità)\b/gi, spiegazione: 'coppia fatta ("sfide e opportunità")', suggerimento: 'Nomina la sfida specifica.' },
-  { re: /\ba 360 gradi\b/gi, spiegazione: 'espressione abusata', suggerimento: 'Togli o specifica gli aspetti considerati.' },
-  { re: /\bin modo (?:significativo|sostanziale|approfondito|esaustivo|olistico)\b/gi, spiegazione: 'avverbio vago', suggerimento: 'Quantifica o togli.' },
-  { re: /\b(?:alla luce di quanto|da quanto) (?:detto|esposto|emerso|visto|analizzato)\b/gi, spiegazione: 'raccordo riassuntivo', suggerimento: 'Collega direttamente alla frase precedente.' },
-  { re: /\b(?:emerge|risulta|appare) (?:chiaramente|evidente|con chiarezza)\b/gi, spiegazione: 'formula di evidenza', suggerimento: 'Mostra il dato che lo prova.' },
-  { re: /\b(?:si può|possiamo|è possibile) (?:quindi |dunque |pertanto )?(?:affermare|concludere|dire|osservare) che\b/gi, spiegazione: 'premessa superflua', suggerimento: 'Scrivi direttamente la conclusione.' },
-  { re: /\b(?:il presente|questo) (?:capitolo|paragrafo|lavoro|elaborato) (?:si propone di|intende|mira a|vuole)\b/gi, spiegazione: 'annuncio di intenti', suggerimento: 'Entra nel merito: l\'indice dice già che cosa farai.' },
-  { re: /\besplor(?:are|eremo|a|ano|ando|ato)\b/gi, spiegazione: '"esplorare" in senso figurato', suggerimento: 'Usa analizzare, esaminare, confrontare.' },
+  { re: /\bè (?:fondamentale|importante|cruciale|essenziale|doveroso|opportuno) (?:sottolineare|notare|evidenziare|ricordare|considerare|precisare)\b/gi, spiegazione: 'frase a effetto che non dice niente', suggerimento: ENFASI },
+  { re: /\b(?:va|vale la pena|occorre|bisogna) (?:sottolineat[oa]|sottolineare|notare|evidenziare|ricordare)\b/gi, spiegazione: 'frase a effetto che non dice niente', suggerimento: ENFASI },
+  { re: /\b(?:gioca|giocano|riveste|rivestono|assume|assumono|ricopre|ricoprono) un ruolo (?:cruciale|fondamentale|chiave|centrale|determinante|di primo piano|essenziale|decisivo)\b/gi, spiegazione: 'espressione trita ("ruolo cruciale")', suggerimento: RUOLO },
+  { re: /\bnel (?:complesso |variegato |vasto |moderno |attuale )?panorama\b/gi, spiegazione: 'inizio troppo generico ("nel panorama")', suggerimento: 'Parti dal caso concreto: Calabria, campagna, frantoio.' },
+  { re: /\bin un (?:contesto|mondo|scenario|mercato) (?:sempre più|in continua|in rapida)\b/gi, spiegazione: 'inizio troppo generico', suggerimento: 'Metti al suo posto un dato o un fatto preciso.' },
+  { re: /\bsempre più (?:complesso|complessa|incerto|incerta|dinamico|dinamica|globalizzato|competitivo|competitiva|rilevante|centrale)\b/gi, spiegazione: '"sempre più…" generico', suggerimento: 'Di\' rispetto a quando e di quanto.' },
+  { re: /\b(?:sfide e opportunità|opportunità e sfide|rischi e opportunità)\b/gi, spiegazione: 'coppia di parole fatta ("sfide e opportunità")', suggerimento: 'Di\' qual è la sfida vera.' },
+  { re: /\ba 360 gradi\b/gi, spiegazione: 'espressione usata troppo', suggerimento: 'Toglila o di\' quali aspetti intendi.' },
+  { re: /\bin modo (?:significativo|sostanziale|approfondito|esaustivo|olistico)\b/gi, spiegazione: 'parola vaga', suggerimento: 'Metti un numero o toglila.' },
+  { re: /\b(?:alla luce di quanto|da quanto) (?:detto|esposto|emerso|visto|analizzato)\b/gi, spiegazione: 'riassunto inutile', suggerimento: 'Attacca direttamente alla frase prima.' },
+  { re: /\b(?:emerge|risulta|appare) (?:chiaramente|evidente|con chiarezza)\b/gi, spiegazione: 'dice che è evidente senza mostrarlo', suggerimento: 'Fai vedere il dato che lo prova.' },
+  { re: /\b(?:si può|possiamo|è possibile) (?:quindi |dunque |pertanto )?(?:affermare|concludere|dire|osservare) che\b/gi, spiegazione: 'premessa che non serve', suggerimento: 'Scrivi subito la conclusione.' },
+  { re: /\b(?:il presente|questo) (?:capitolo|paragrafo|lavoro|elaborato) (?:si propone di|intende|mira a|vuole)\b/gi, spiegazione: 'annuncia cosa farai invece di farlo', suggerimento: 'Vai al punto: l\'indice dice già cosa farai.' },
+  { re: /\besplor(?:are|eremo|a|ano|ando|ato)\b/gi, spiegazione: '"esplorare" usato in senso figurato', suggerimento: 'Usa analizzare, esaminare, confrontare.' },
   { re: /\b(?:evidenzia|evidenziano|sottolinea|sottolineano|mette in luce|mettono in luce) come\b/gi, spiegazione: '"evidenzia come"', suggerimento: 'Scrivi "mostra che" seguito dal fatto.' },
-  { re: /\bdi (?:fondamentale|primaria|cruciale|vitale) importanza\b/gi, spiegazione: 'enfasi vuota', suggerimento: 'Spiega perché conta.' },
-  { re: /\bin (?:un'ottica|quest'ottica|tale ottica)\b/gi, spiegazione: 'formula burocratica', suggerimento: 'Riformula in modo diretto.' },
-  { re: /\b(?:sinergi[ae]|olistic[oaie]|poliedric[oaie]|intrinsecamente|imprescindibil[ei])\b/gi, spiegazione: 'parola ricercata tipica dei testi generati', suggerimento: 'Usa una parola più semplice o togli.' },
-  { re: /\bnon solo\b[^.]{0,90}\bma anche\b/gi, spiegazione: 'costruzione "non solo… ma anche"', suggerimento: 'Va bene una volta; ripetuta diventa un tic.' },
-  { re: /—/g, spiegazione: 'trattino lungo', suggerimento: 'Nella prosa italiana di una tesi usa virgole o parentesi.' },
+  { re: /\bdi (?:fondamentale|primaria|cruciale|vitale) importanza\b/gi, spiegazione: 'frase a effetto che non dice niente', suggerimento: 'Spiega perché conta.' },
+  { re: /\bin (?:un'ottica|quest'ottica|tale ottica)\b/gi, spiegazione: 'modo di dire burocratico', suggerimento: 'Dillo in modo più diretto.' },
+  { re: /\b(?:sinergi[ae]|olistic[oaie]|poliedric[oaie]|intrinsecamente|imprescindibil[ei])\b/gi, spiegazione: 'parola difficile tipica dei testi scritti dall\'IA', suggerimento: 'Usa una parola più semplice o toglila.' },
+  { re: /\bnon solo\b[^.]{0,90}\bma anche\b/gi, spiegazione: 'giro "non solo… ma anche"', suggerimento: 'Una volta va bene; se lo ripeti diventa un tic.' },
+  { re: /—/g, spiegazione: 'trattino lungo', suggerimento: 'In una tesi in italiano usa virgole o parentesi.' },
 ].map(unicode)
 
 const JOLLY = ['fondamentale', 'cruciale', 'significativo', 'significativa', 'significativi', 'significative', 'notevole', 'notevoli', 'essenziale', 'determinante', 'rilevante', 'rilevanti']
@@ -116,8 +116,8 @@ export function analizzaStile(testo: string, glossario: VoceGlossario[] = []): S
         tipo: 'chiusura',
         paragrafo: i,
         testo: ultima.slice(0, 120),
-        spiegazione: 'chiusura riassuntiva del paragrafo',
-        suggerimento: 'Togli la frase che riassume: il paragrafo ha già detto la cosa.',
+        spiegazione: 'il paragrafo finisce con un riassunto',
+        suggerimento: 'Togli la frase di riassunto: il paragrafo l\'ha già detto.',
       })
     }
   })
@@ -135,7 +135,7 @@ export function analizzaStile(testo: string, glossario: VoceGlossario[] = []): S
         paragrafo: Math.max(0, i),
         testo: j,
         spiegazione: `"${j}" ripetuto ${n} volte`,
-        suggerimento: 'Sostituisci con l\'effetto concreto o con un numero.',
+        suggerimento: 'Metti al suo posto l\'effetto concreto o un numero.',
       })
     }
   }
@@ -143,9 +143,9 @@ export function analizzaStile(testo: string, glossario: VoceGlossario[] = []): S
     segnalazioni.push({
       tipo: 'parola_jolly',
       paragrafo: 0,
-      testo: `${totaleJolly} aggettivi enfatici`,
-      spiegazione: 'troppi aggettivi enfatici (fondamentale, cruciale, significativo…)',
-      suggerimento: 'Tienine al massimo uno ogni due paragrafi.',
+      testo: `${totaleJolly} parole a effetto`,
+      spiegazione: 'troppe parole a effetto (fondamentale, cruciale, significativo…)',
+      suggerimento: 'Al massimo una ogni due paragrafi.',
     })
   }
 
@@ -164,7 +164,7 @@ export function analizzaStile(testo: string, glossario: VoceGlossario[] = []): S
         paragrafo: dove[0],
         testo: c,
         spiegazione: `${dove.length} frasi iniziano con "${c}"`,
-        suggerimento: 'Varia o togli il connettivo: spesso il legame è già chiaro.',
+        suggerimento: 'Cambia o togli la parola iniziale: spesso il legame si capisce già.',
       })
     }
   }
@@ -179,8 +179,8 @@ export function analizzaStile(testo: string, glossario: VoceGlossario[] = []): S
         tipo: 'ritmo',
         paragrafo: 0,
         testo: `frasi di circa ${Math.round(media)} parole`,
-        spiegazione: 'ritmo monotono: quasi tutte le frasi hanno la stessa lunghezza',
-        suggerimento: 'Alterna frasi brevi e frasi più articolate.',
+        spiegazione: 'testo monotono: quasi tutte le frasi sono lunghe uguali',
+        suggerimento: 'Alterna frasi corte e frasi più lunghe.',
       })
     }
   }
@@ -190,8 +190,8 @@ export function analizzaStile(testo: string, glossario: VoceGlossario[] = []): S
       tipo: 'lessico',
       paragrafo: v.paragrafo,
       testo: v.variante,
-      spiegazione: `"${v.variante}" al posto di "${v.termine}"`,
-      suggerimento: `Usa il termine del corso e del glossario: "${v.termine}".`,
+      spiegazione: `hai scritto "${v.variante}" invece di "${v.termine}"`,
+      suggerimento: `Usa la parola del corso: "${v.termine}".`,
     })
   }
 

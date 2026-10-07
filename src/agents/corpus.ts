@@ -210,6 +210,13 @@ export async function svuotaCorpus() {
   await del(CHIAVE_IDB)
 }
 
+/** Toglie dal corpus tutto tranne i file indicati (usato dal ripristino). */
+export async function tieniSoloNelCorpus(ids: Set<string>) {
+  for (const id of [...corpus.keys()]) if (!ids.has(id)) corpus.delete(id)
+  indice = null
+  await salvaSuDisco()
+}
+
 /** Tutto il corpus, per il file di progetto. */
 export function esportaCorpus(): Record<string, Passaggio[]> {
   return Object.fromEntries(corpus)

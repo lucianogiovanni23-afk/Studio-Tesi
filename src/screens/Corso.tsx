@@ -55,8 +55,8 @@ function Caricamento() {
           Aggiungi PDF o appunti
         </button>
         <p className="nota">
-          PDF delle lezioni, dispense, appunti in .txt o .md, anche molti insieme. Il testo viene estratto nel browser,
-          diviso in passaggi con file e pagina e salvato sul dispositivo. Mentre si estrae il testo la scena 3D si ferma.
+          Metti qui i PDF delle lezioni, le dispense o i tuoi appunti (.txt o .md), anche tanti insieme. Leggo il testo qui
+          nel browser e lo salvo su questo dispositivo, con file e pagina. Mentre leggo, la scena 3D si ferma un attimo.
         </p>
         <input
           ref={input}
@@ -71,16 +71,16 @@ function Caricamento() {
         />
       </div>
 
-      {scartati.length > 0 && <p className="allerta">Formato non supportato, file ignorati: {scartati.join(', ')}.</p>}
+      {scartati.length > 0 && <p className="allerta">Questi file non riesco a leggerli, li ho saltati: {scartati.join(', ')}.</p>}
 
       {courseFiles.length > 0 && (
         <>
           <div className="testa-progresso">
             <span>
-              {occupato ? 'Lettura in corso' : 'Materiale pronto'}: <strong>{complessivo}%</strong>
+              {occupato ? 'Sto leggendo i file' : 'Materiale pronto'}: <strong>{complessivo}%</strong>
             </span>
             <span className="nota">
-              {pronti.length} file pronti · {passaggi} passaggi citabili
+              {pronti.length} file pronti · {passaggi} passaggi da citare
             </span>
           </div>
           <span className="progresso">
@@ -103,7 +103,7 @@ function Caricamento() {
                 <Conferma
                   classe="icona"
                   etichetta="✕"
-                  domanda={`Togliere "${f.name}"?`}
+                  domanda={`Tolgo "${f.name}"?`}
                   conferma="Togli"
                   pericolosa
                   disabilitato={f.status === 'lettura' || f.status === 'estrazione'}
@@ -141,26 +141,26 @@ function Quadro() {
     try {
       await generaQuadro()
     } catch (err) {
-      setErrore(err instanceof Error ? err.message : 'Errore sconosciuto.')
+      setErrore(err instanceof Error ? err.message : 'Qualcosa è andato storto.')
     }
   }
 
   return (
     <section className="pannello">
       <div className="pannello-testa">
-        <h2>Quadro teorico del corso</h2>
-        {quadro && <span className="nota">generato il {new Date(quadro.generatoIl).toLocaleDateString('it-IT')}</span>}
+        <h2>Le idee principali del corso</h2>
+        {quadro && <span className="nota">fatto il {new Date(quadro.generatoIl).toLocaleDateString('it-IT')}</span>}
       </div>
       <p className="nota">
-        Il Lettore del corso ricava dal tuo materiale i concetti che userai in ogni capitolo (rischio operativo, leva
-        operativa, liquidità, volatilità dei flussi…). Ogni definizione ha una frase copiata dal corso, confrontata in
-        codice con il testo: verde se c'è alla lettera, ambra se quasi, rosso se non si ritrova.
+        Il Lettore legge il tuo materiale e tira fuori i concetti che userai in ogni capitolo (rischio operativo, leva
+        operativa, liquidità, volatilità dei flussi…). Per ogni concetto c'è una frase presa dal corso, controllata sul
+        testo: verde se è uguale, ambra se è quasi uguale, rosso se non si trova.
       </p>
 
-      {obsoleto && <p className="allerta">Hai cambiato i file del corso dopo l'ultima generazione: conviene aggiornare il quadro.</p>}
+      {obsoleto && <p className="allerta">Hai cambiato i file del corso: conviene aggiornare le idee principali.</p>}
 
       {pronti === 0 ? (
-        <p className="nota">Carica almeno un file del corso per generare il quadro.</p>
+        <p className="nota">Carica almeno un file del corso e poi le preparo.</p>
       ) : inCorso ? (
         <div className="riga-editor">
           <span className="in-corso">Il Lettore sta leggendo il materiale…</span>
@@ -171,13 +171,13 @@ function Quadro() {
       ) : (
         <Conferma
           classe="bottone bottone-primario"
-          etichetta={quadro ? 'Aggiorna il quadro teorico' : 'Genera il quadro teorico'}
+          etichetta={quadro ? 'Aggiorna le idee' : 'Trova le idee principali'}
           domanda={
             stima
               ? `${costoStimato(stima)}${modalitaGratuita() ? '' : ` con ${modello}`}. Procedo?`
               : 'Procedo?'
           }
-          conferma="Genera"
+          conferma="Vai"
           disabilitato={occupato}
           onConferma={() => void avvia()}
         />
@@ -213,7 +213,7 @@ function Quadro() {
           </ul>
           {quadro.collegamenti.length > 0 && (
             <>
-              <h3>Collegamenti con i capitoli</h3>
+              <h3>Come si collegano ai capitoli</h3>
               <ul className="elenco-semplice">
                 {quadro.collegamenti.map((c, i) => (
                   <li key={i}>
@@ -223,12 +223,12 @@ function Quadro() {
               </ul>
             </>
           )}
-          <h3>Temi non trattati dal corso</h3>
+          <h3>Cose che il corso non tratta</h3>
           {quadro.lacune.length === 0 ? (
-            <p className="nota">Nessuna lacuna segnalata.</p>
+            <p className="nota">Niente da segnalare.</p>
           ) : (
             <>
-              <p className="nota">Per il vincolo di materia questi temi non andranno sviluppati nella tesi.</p>
+              <p className="nota">La tesi deve restare sugli argomenti del corso, quindi questi temi meglio lasciarli fuori.</p>
               <ul className="elenco-semplice">
                 {quadro.lacune.map((l, i) => (
                   <li key={i}>{l}</li>
@@ -249,7 +249,7 @@ function CercaNelCorso() {
 
   return (
     <section className="pannello">
-      <h2>Cerca nel materiale</h2>
+      <h2>Cerca nei file del corso</h2>
       <form
         className="riga-editor"
         onSubmit={(e) => {
@@ -269,7 +269,7 @@ function CercaNelCorso() {
           Cerca
         </button>
       </form>
-      {risultati && risultati.length === 0 && <p className="nota">Nessun passaggio pertinente.</p>}
+      {risultati && risultati.length === 0 && <p className="nota">Non ho trovato niente su questo.</p>}
       {risultati && risultati.length > 0 && (
         <ul className="elenco-passaggi">
           {risultati.map((p) => (
@@ -297,31 +297,31 @@ function Lessico() {
 
   return (
     <section className="pannello">
-      <h2>Lessico del corso</h2>
+      <h2>Le parole del corso</h2>
       <p className="nota">
-        Il Lettore ricava dalle lezioni i termini tecnici come li scrive il tuo corso e li mette nel glossario. Lo Scrittore e il Revisore devono
-        usare quelli e non le loro varianti; il rilevatore della scrittura segnala ogni variante. In codice si tengono solo i termini che compaiono
-        davvero nei tuoi file.
+        Il Lettore trova nelle lezioni le parole tecniche, scritte come le usa il tuo corso, e le mette nel glossario. Chi scrive e chi
+        rilegge la tesi deve usare proprio quelle, e mentre scrivi ti segnalo ogni sinonimo. Tengo solo le parole che ci sono davvero
+        nei tuoi file.
       </p>
       {lettore.status === 'lavoro' && lettore.etichetta.includes('lessico') ? (
-        <p className="in-corso">Il Lettore sta ricavando il lessico…</p>
+        <p className="in-corso">Il Lettore sta cercando le parole…</p>
       ) : (
         <Conferma
           classe="bottone bottone-primario"
-          etichetta={delCorso.length ? 'Aggiorna il lessico del corso' : 'Ricava il lessico del corso'}
+          etichetta={delCorso.length ? 'Aggiorna le parole' : 'Trova le parole'}
           disabilitato={pronti === 0 || occupato}
           domanda={stima ? `${costoStimato(stima)}. Procedo?` : 'Procedo?'}
-          conferma="Ricava"
+          conferma="Vai"
           onConferma={async () => {
             setMessaggio(null)
             try {
               const e = await ricavaLessico()
               setMessaggio({
                 tono: 'ok',
-                testo: `${e.nuove} termini nuovi e ${e.aggiornate} aggiornati nel glossario.${e.scartati.length ? ` Scartati perché non compaiono nei tuoi file: ${e.scartati.join(', ')}.` : ''}${e.variantiTolte ? ` ${e.variantiTolte} varianti non vietate perché le usa anche il corso.` : ''}`,
+                testo: `${e.nuove} parole nuove e ${e.aggiornate} aggiornate nel glossario.${e.scartati.length ? ` Queste le ho tolte perché non sono nei tuoi file: ${e.scartati.join(', ')}.` : ''}${e.variantiTolte ? ` ${e.variantiTolte} sinonimi li lascio passare perché li usa anche il corso.` : ''}`,
               })
             } catch (err) {
-              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Errore.' })
+              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
             }
           }}
         />
@@ -338,7 +338,7 @@ function Lessico() {
             ))}
           </ul>
           <button type="button" className="link" onClick={() => vai('glossario')}>
-            Modifica nel glossario
+            Cambiale nel glossario
           </button>
         </>
       )}

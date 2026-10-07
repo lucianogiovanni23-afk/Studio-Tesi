@@ -43,12 +43,12 @@ function Tabella({ titolo, righe }: { titolo: string; righe: Riga[] }) {
         <thead>
           <tr>
             <th scope="col">Voce</th>
-            <th scope="col">Chiamate</th>
-            <th scope="col">Input</th>
-            <th scope="col">Output</th>
-            <th scope="col">Da cache</th>
+            <th scope="col">Richieste</th>
+            <th scope="col">Token inviati</th>
+            <th scope="col">Token ricevuti</th>
+            <th scope="col">Token riusati</th>
             <th scope="col">Costo</th>
-            <th scope="col">Risparmio cache</th>
+            <th scope="col">Risparmiato</th>
           </tr>
         </thead>
         <tbody>
@@ -96,7 +96,7 @@ export function Costi() {
       <div className="pannello-testa">
         <h2>Costi</h2>
         <span className="nota">
-          totale {formattaDollari(totale)} · risparmiati con la cache {formattaDollari(risparmio)}
+          in tutto {formattaDollari(totale)} · risparmiati {formattaDollari(risparmio)} grazie alla cache
         </span>
       </div>
       <form
@@ -108,28 +108,28 @@ export function Costi() {
         }}
       >
         <label className="campo-blocco">
-          <span className="etichetta">Budget mensile in dollari (vuoto = nessun tetto)</span>
-          <input className="campo" inputMode="decimal" value={bozzaBudget} onChange={(e) => setBozzaBudget(e.target.value)} placeholder="per esempio 15" />
+          <span className="etichetta">Quanto vuoi spendere al mese, in dollari (vuoto = nessun limite)</span>
+          <input className="campo" inputMode="decimal" value={bozzaBudget} onChange={(e) => setBozzaBudget(e.target.value)} placeholder="es. 15" />
         </label>
         <button type="submit" className="bottone">
-          Salva il budget
+          Salva il limite
         </button>
       </form>
       <p className="nota">
         Questo mese: {formattaDollari(mese)}
-        {budget !== null && ` su ${formattaDollari(budget)} (${Math.min(100, Math.round((mese / budget) * 100))}%). Raggiunto il tetto, nessuna chiamata parte finché non lo alzi.`}
+        {budget !== null && ` su ${formattaDollari(budget)} (${Math.min(100, Math.round((mese / budget) * 100))}%). Arrivato al limite, non parte più nessuna richiesta finché non lo alzi.`}
       </p>
       {usi.length === 0 ? (
-        <p className="nota">Nessuna chiamata registrata finora.</p>
+        <p className="nota">Per ora non hai speso niente.</p>
       ) : (
         <>
           <Tabella titolo="Per mese" righe={perMese} />
-          <Tabella titolo="Per agente" righe={perAgente} />
-          <Tabella titolo="Per azione" righe={perAzione} />
+          <Tabella titolo="Per collega" righe={perAgente} />
+          <Tabella titolo="Per attività" righe={perAzione} />
           <Conferma
             classe="bottone bottone-vuoto bottone-piccolo"
-            etichetta="Azzera il registro dei costi"
-            domanda="Cancellare tutto il registro dei costi?"
+            etichetta="Azzera i costi"
+            domanda="Vuoi cancellare tutta la lista dei costi?"
             conferma="Azzera"
             pericolosa
             onConferma={azzera}
@@ -137,8 +137,8 @@ export function Costi() {
         </>
       )}
       <p className="nota">
-        Importi calcolati dai token che l'API riporta in ogni risposta e dal listino pubblico: sono una stima, non la
-        fattura. Prima di ogni azione costosa l'app mostra una stima e chiede conferma.
+        Sono cifre calcolate dai token che l'API indica in ogni risposta e dai prezzi pubblici: è una stima, non la
+        fattura. Prima di ogni azione che costa di più l'app ti dice quanto e ti chiede l'ok.
       </p>
     </section>
   )

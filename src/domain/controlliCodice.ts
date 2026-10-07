@@ -46,8 +46,8 @@ export function controlliInCodice(p: Progetto): RilievoTesi[] {
         capitoloId: cap.id,
         sezioneId: sez.id,
         passo: fraseCon(pars[u.paragrafo] ?? sez.testo, u.variante),
-        problema: `Nella sezione ${etichetta} compare «${u.variante}», variante di «${u.termine}» nel glossario.`,
-        suggerimento: `Usa «${u.termine}» in tutta la tesi.`,
+        problema: `Nella sezione ${etichetta} hai scritto «${u.variante}», ma nel glossario la parola giusta è «${u.termine}».`,
+        suggerimento: `Usa sempre «${u.termine}», in tutta la tesi.`,
       })
     }
   }
@@ -69,8 +69,8 @@ export function controlliInCodice(p: Progetto): RilievoTesi[] {
           capitoloId: cap.id,
           sezioneId: sez.id,
           passo: f,
-          problema: `La stessa frase compare nella sezione ${prima.etichetta} e nella sezione ${etichetta}.`,
-          suggerimento: 'Tienila in un solo punto e, se serve, rimanda a quella sezione.',
+          problema: `Questa frase c'è uguale sia nella sezione ${prima.etichetta} sia nella ${etichetta}.`,
+          suggerimento: 'Lasciala in un posto solo e, se serve, rimanda a quella sezione.',
         })
       } else {
         viste.set(chiave, { etichetta, capId: cap.id, sezId: sez.id, frase: f })
@@ -107,8 +107,8 @@ export function controlliInCodice(p: Progetto): RilievoTesi[] {
         capitoloId: cap.id,
         sezioneId: sez.id,
         passo: fraseCon(sez.testo, termine.trim()),
-        problema: `Nella sezione ${etichetta} compare «${termine.trim()}»: possibile sconfinamento fuori dalla Finanza Aziendale.`,
-        suggerimento: 'Al massimo una frase, solo come causa di un effetto finanziario.',
+        problema: `Nella sezione ${etichetta} c'è «${termine.trim()}»: forse stai uscendo dalla Finanza Aziendale.`,
+        suggerimento: 'Al massimo una frase, e solo per spiegare un effetto sui soldi (ricavi, costi, liquidità).',
       })
     }
   }
@@ -128,11 +128,11 @@ export function controlliInCodice(p: Progetto): RilievoTesi[] {
       passo: rosse[0]?.affermazione ?? orfani.map((o) => `[${o}]`).join(' '),
       problema: [
         rosse.length ? `${rosse.length} citazion${rosse.length === 1 ? 'e rossa' : 'i rosse'} nella sezione ${etichetta}` : '',
-        orfani.length ? `marcatori senza citazione: ${orfani.join(', ')}` : '',
+        orfani.length ? `rimandi senza citazione: ${orfani.join(', ')}` : '',
       ]
         .filter(Boolean)
         .join('; ') + '.',
-      suggerimento: 'Apri la sezione, tocca i marcatori rossi e correggi l\'estratto o togli l\'affermazione.',
+      suggerimento: 'Apri la sezione, tocca i rimandi rossi e sistema la frase citata, oppure togli quello che hai scritto.',
     })
   }
 

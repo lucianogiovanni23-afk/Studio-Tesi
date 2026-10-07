@@ -62,14 +62,14 @@ interface PropostaGrezza {
 export async function proponiPerOsservazione(osservazioneId: string): Promise<{ scartate: number }> {
   const s = useStudio.getState()
   const oss = s.progetto.osservazioni.find((o) => o.id === osservazioneId)
-  if (!oss) throw new ApiError('sconosciuto', 'Osservazione non trovata.')
+  if (!oss) throw new ApiError('sconosciuto', 'Non trovo più questa osservazione.')
   const elenco = posti(oss.capitoloId)
   if (!elenco.some((x) => x.sez.testo.trim())) {
-    throw new ApiError('sconosciuto', 'Il capitolo indicato non ha ancora testo da rivedere.')
+    throw new ApiError('sconosciuto', 'In questo capitolo non c\'è ancora niente di scritto da rivedere.')
   }
 
   const client = creaClient(s.apiKey)
-  s.patchAgente('revisore', { status: 'lavoro', etichetta: 'leggo l\'osservazione del relatore…', errore: null })
+  s.patchAgente('revisore', { status: 'lavoro', etichetta: 'leggo cosa ha detto il relatore…', errore: null })
   try {
     const consegna = await sorveglia<Consegna<{ lettura: string; proposte: PropostaGrezza[] }>>({
       agente: 'revisore',
@@ -132,16 +132,16 @@ export async function proponiPerOsservazione(osservazioneId: string): Promise<{ 
         proposta: testo.trim(),
         motivo: g.motivo,
         stato: 'in_attesa',
-        ...(estranei.length ? { avviso: `Tolti i marcatori senza citazione: ${estranei.join(', ')}.` } : {}),
+        ...(estranei.length ? { avviso: `Ho tolto questi rimandi alle fonti perché non avevano una citazione: ${estranei.join(', ')}.` } : {}),
       })
     }
 
     useStudio.getState().aggiornaOsservazione(osservazioneId, { proposte, lettura: consegna.risultato.lettura })
-    useStudio.getState().patchAgente('revisore', { status: 'attesa', etichetta: `${proposte.length} proposte da decidere`, passaggi: consegna.passaggi, errore: null })
-    logOk('revisore', `Osservazione del relatore: ${proposte.length} proposte${scartate ? `, ${scartate} scartate perché il paragrafo citato non c'è` : ''}.`)
+    useStudio.getState().patchAgente('revisore', { status: 'attesa', etichetta: `${proposte.length} proposte da guardare`, passaggi: consegna.passaggi, errore: null })
+    logOk('revisore', `Osservazione del relatore: ${proposte.length} proposte${scartate ? `, ${scartate} tolte perché il paragrafo di cui parlavano non c'è` : ''}.`)
     return { scartate }
   } catch (err) {
-    useStudio.getState().patchAgente('revisore', { status: 'errore', etichetta: 'errore', errore: err instanceof Error ? err.message : 'Errore.' })
+    useStudio.getState().patchAgente('revisore', { status: 'errore', etichetta: "c'è stato un problema", errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     throw err
   }
 }
@@ -160,7 +160,7 @@ export function accettaPropostaRevisione(osservazioneId: string, propostaId: str
   const indice = sez ? paragrafi(sez.testo).findIndex((p) => normalizza(p) === normalizza(prop.originale)) : -1
   if (!sez || indice < 0) {
     s.aggiornaPropostaRevisione(osservazioneId, propostaId, {
-      avviso: 'Il paragrafo è cambiato dopo la proposta: non si può applicare in automatico. Rifiutala o chiedi nuove proposte.',
+      avviso: 'Nel frattempo il paragrafo è cambiato, quindi non posso applicare la modifica da solo. Scartala o chiedi nuove proposte.',
     })
     return
   }
@@ -170,7 +170,7 @@ export function accettaPropostaRevisione(osservazioneId: string, propostaId: str
   // Quando tutte le proposte sono decise, l'osservazione si può chiudere.
   const dopo = useStudio.getState().progetto.osservazioni.find((o) => o.id === osservazioneId)
   if (dopo && dopo.proposte.every((x) => x.stato !== 'in_attesa')) {
-    useStudio.getState().patchAgente('revisore', { status: 'fatto', etichetta: 'proposte decise' })
+    useStudio.getState().patchAgente('revisore', { status: 'fatto', etichetta: 'proposte tutte decise' })
   }
 }
 
@@ -203,9 +203,9 @@ export async function controlloConRevisore(): Promise<void> {
   const s = useStudio.getState()
   const elenco = posti(null)
   const testo = testoEtichettato(elenco)
-  if (!elenco.some((x) => x.sez.testo.trim())) throw new ApiError('sconosciuto', 'La tesi non ha ancora testo da controllare.')
+  if (!elenco.some((x) => x.sez.testo.trim())) throw new ApiError('sconosciuto', 'Nella tesi non c\'è ancora niente di scritto da controllare.')
   if (testo.length > MAX_CARATTERI_TESI) {
-    throw new ApiError('sconosciuto', 'La tesi è troppo lunga per un controllo in una sola richiesta: usa il controllo in codice o le osservazioni per capitolo.')
+    throw new ApiError('sconosciuto', 'La tesi è troppo lunga per controllarla tutta in una volta: usa il controllo gratis oppure le osservazioni capitolo per capitolo.')
   }
 
   const client = creaClient(s.apiKey)
@@ -258,10 +258,10 @@ export async function controlloConRevisore(): Promise<void> {
     }
     const p = useStudio.getState().progetto
     useStudio.getState().setControllo({ data: adesso(), rilievi: [...controlliInCodice(p), ...delRevisore], conRevisore: true, scartati })
-    useStudio.getState().patchAgente('revisore', { status: 'fatto', etichetta: 'controllo concluso', passaggi: consegna.passaggi, errore: null })
-    logOk('revisore', `Controllo della tesi: ${delRevisore.length} rilievi del Revisore${scartati ? `, ${scartati} scartati perché il passo non c'è` : ''}.`)
+    useStudio.getState().patchAgente('revisore', { status: 'fatto', etichetta: 'controllo finito', passaggi: consegna.passaggi, errore: null })
+    logOk('revisore', `Controllo della tesi: la revisora ha trovato ${delRevisore.length} cose da sistemare${scartati ? ` (${scartati} tolte perché la frase indicata non c'è)` : ''}.`)
   } catch (err) {
-    useStudio.getState().patchAgente('revisore', { status: 'errore', etichetta: 'errore', errore: err instanceof Error ? err.message : 'Errore.' })
+    useStudio.getState().patchAgente('revisore', { status: 'errore', etichetta: "c'è stato un problema", errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     throw err
   }
 }
