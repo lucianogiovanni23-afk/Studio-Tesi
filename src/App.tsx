@@ -5,6 +5,8 @@ import { AgentiBar } from './components/AgentiBar'
 import { ModalitaCarta } from './components/ModalitaCarta'
 import { useModoUso } from './hooks/useModoUso'
 import { avviaCopieAutomatiche } from './io/copie'
+import { avviaSincronizzazione } from './io/sincronizzazione'
+import { AvvisoSincronizzazione, ChipSincronizzazione } from './components/Sincronizzazione'
 import { Corso } from './screens/Corso'
 import { Cruscotto } from './screens/Cruscotto'
 import { Glossario } from './screens/Glossario'
@@ -104,6 +106,7 @@ export default function App() {
   useEffect(() => {
     void sincronizzaCorpus()
     avviaCopieAutomatiche()
+    avviaSincronizzazione()
   }, [])
   useEffect(() => {
     window.scrollTo({ top: 0 })
@@ -142,7 +145,10 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <ChipSincronizzazione onApri={() => vai('impostazioni')} />
       </header>
+
+      <AvvisoSincronizzazione />
 
       <AgentiBar />
 

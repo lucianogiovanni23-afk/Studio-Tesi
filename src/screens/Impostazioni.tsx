@@ -6,6 +6,8 @@ import { creaCopia, elencoCopie, ripristinaCopia, type CopiaSicurezza } from '..
 import { AvvisoChiave } from '../components/AvvisoChiave'
 import { Conferma } from '../components/Conferma'
 import { Costi } from '../components/Costi'
+import { PannelloSincronizzazione } from '../components/Sincronizzazione'
+import { useSync } from '../io/sincronizzazione'
 import { MODELLI_PREDEFINITI } from '../domain/progettoIniziale'
 import { apriProgetto, leggiFileProgetto, salvaProgetto, type AnteprimaFile } from '../io/fileProgetto'
 import { useModoUso } from '../hooks/useModoUso'
@@ -76,8 +78,8 @@ function FileProgetto() {
     <section className="pannello">
       <h2>Salva e apri il progetto</h2>
       <p className="nota">
-        Il progetto vive in questo browser. Per spostarlo fra computer e iPad salvalo in un file e mettilo in iCloud o
-        Drive; dall'altro dispositivo aprilo da qui. Il file contiene indice, testi con versioni, biblioteca, glossario,
+        Il progetto vive in questo browser. Con la sincronizzazione qui sopra si allinea da solo; in alternativa salvalo in
+        un file, mettilo in iCloud o Drive e aprilo da qui sull'altro dispositivo. Il file contiene indice, testi con versioni, biblioteca, glossario,
         osservazioni, costi e il testo estratto dei PDF. Non contiene la chiave API.
       </p>
       <div className="riga-editor">
@@ -309,6 +311,7 @@ function CopieSicurezza() {
   const [copie, setCopie] = useState<CopiaSicurezza[] | null>(null)
   const [messaggio, setMessaggio] = useState<string | null>(null)
   const aggiorna = async () => setCopie(await elencoCopie())
+  const ultimaSync = useSync((s) => s.ultima)
   useEffect(() => {
     // Lettura asincrona da IndexedDB: lo stato si aggiorna quando arriva la risposta.
     let attivo = true
@@ -316,14 +319,15 @@ function CopieSicurezza() {
     return () => {
       attivo = false
     }
-  }, [])
+    // Dopo una sincronizzazione può esserci una copia nuova ("Prima di ricevere…").
+  }, [ultimaSync])
 
   return (
     <section className="pannello">
       <h2>Copie di sicurezza automatiche</h2>
       <p className="nota">
         Il browser conserva le ultime 10 istantanee del progetto: una all'avvio e una ogni 15 minuti se qualcosa è cambiato. Servono a tornare
-        indietro dopo un errore; per spostare il progetto o proteggerlo davvero resta il file su iCloud o Drive.
+        indietro dopo un errore; per proteggerlo davvero usa la sincronizzazione o il file su iCloud o Drive.
       </p>
       <button
         type="button"
@@ -387,6 +391,7 @@ export function Impostazioni() {
     <div className="griglia-due">
       <div>
         <Chiave />
+        <PannelloSincronizzazione />
         <FileProgetto />
         <Tesi />
       </div>

@@ -2636,3 +2636,95 @@ code {
 .modo-ipad .oa {
   font-size: 15px;
 }
+
+/* Sincronizzazione fra dispositivi */
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--bordo);
+  border-radius: 999px;
+  background: var(--carta);
+  color: var(--inchiostro-2);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.sync-pallino {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--verde-ok);
+}
+
+.sync-in_corso .sync-pallino,
+.sync-attesa .sync-pallino {
+  background: var(--cielo);
+}
+
+.sync-offline .sync-pallino {
+  background: var(--inchiostro-3);
+}
+
+.sync-conflitto .sync-pallino {
+  background: var(--ambra);
+}
+
+.sync-errore .sync-pallino {
+  background: var(--rosso);
+}
+
+.sync-errore,
+.sync-conflitto {
+  border-color: currentColor;
+  color: var(--inchiostro);
+}
+
+.avviso-sync {
+  margin: 12px 20px 0;
+}
+
+.campi-sync {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.campi-sync .bottone {
+  justify-self: start;
+}
+
+.istruzioni-sync ol {
+  margin: 8px 0;
+  padding-left: 20px;
+  line-height: 1.5;
+}
+
+.istruzioni-sync li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 700px) {
+  .avviso-sync {
+    margin: 10px 12px 0;
+  }
+  .testata .sync-chip {
+    position: absolute;
+    top: calc(14px + env(safe-area-inset-top));
+    right: 12px;
+  }
+  .testata .sync-testo {
+    display: none;
+  }
+  .testata:has(.sync-chip) .marchio {
+    padding-right: 44px;
+  }
+}
+
+.istruzioni-sync code {
+  font-size: 1em;
+}

@@ -9,10 +9,10 @@ import type { Passaggio, Progetto } from '../types'
  * la chiave API né le preferenze del dispositivo.
  */
 
-const FORMATO = 'studio-tesi-progetto'
-const VERSIONE = 1
+export const FORMATO = 'studio-tesi-progetto'
+export const VERSIONE = 1
 
-interface FileProgetto {
+export interface FileProgetto {
   formato: typeof FORMATO
   versione: number
   salvatoIl: string
@@ -20,10 +20,19 @@ interface FileProgetto {
   corpus: Record<string, Passaggio[]>
 }
 
-/** Nessuna chiave API deve finire in un file di progetto. */
+/** Nessuna chiave API, né token di GitHub, deve finire in un file di progetto. */
 function contieneChiave(json: string): boolean {
-  // Il prefisso delle chiavi Anthropic, scritto in modo da non comparire letterale nel codice.
-  return /sk-an[t]-/i.test(json)
+  // I prefissi delle chiavi, scritti in modo da non comparire letterali nel codice.
+  return /sk-an[t]-|githu[b]_pat_|gh[p]_[A-Za-z0-9]{20}/i.test(json)
+}
+
+/** Blocca un contenuto che sta per uscire dal browser se contiene una chiave. */
+export function controllaSegreti(json: string) {
+  if (contieneChiave(json)) {
+    throw new Error(
+      'Nel progetto compare un testo che somiglia a una chiave API Anthropic o a un token di GitHub: il salvataggio è bloccato. Cerca e togli la chiave dai testi prima di salvare.',
+    )
+  }
 }
 
 function nomeFile(titolo: string): string {
@@ -48,11 +57,7 @@ export function preparaFile(): { nome: string; contenuto: string } {
     corpus: esportaCorpus(),
   }
   const contenuto = JSON.stringify(dati)
-  if (contieneChiave(contenuto)) {
-    throw new Error(
-      'Nel progetto compare un testo che somiglia a una chiave API Anthropic: il salvataggio è bloccato. Cerca e togli la chiave dai testi prima di salvare.',
-    )
-  }
+  controllaSegreti(contenuto)
   return { nome: nomeFile(progetto.titolo), contenuto }
 }
 
@@ -121,17 +126,20 @@ export async function leggiFileProgetto(file: File): Promise<AnteprimaFile> {
   }
 }
 
-/** Sostituisce il progetto corrente con quello del file (dopo la conferma in linea). */
-export async function apriProgetto(anteprima: AnteprimaFile) {
-  const { progetto, corpus } = anteprima.dati
-  await importaCorpus(corpus)
-  // I file del corso senza testo nel file vanno ricaricati.
-  const courseFiles = progetto.courseFiles.map((f) =>
+/** I file del corso senza testo nel corpus vanno ricaricati. */
+export function fileCorsoControllati(progetto: Progetto, corpus: Record<string, Passaggio[]>): Progetto['courseFiles'] {
+  return progetto.courseFiles.map((f) =>
     f.status === 'pronto' && !corpus[f.id]
       ? { ...f, status: 'errore' as const, errore: 'Il testo di questo file non era nel progetto: ricaricalo.' }
       : f.status === 'lettura' || f.status === 'estrazione'
         ? { ...f, status: 'errore' as const, errore: 'Lettura interrotta: ricarica il file.' }
         : f,
   )
-  useStudio.getState().sostituisciProgetto({ ...progetto, courseFiles })
+}
+
+/** Sostituisce il progetto corrente con quello del file (dopo la conferma in linea). */
+export async function apriProgetto(anteprima: AnteprimaFile) {
+  const { progetto, corpus } = anteprima.dati
+  await importaCorpus(corpus)
+  useStudio.getState().sostituisciProgetto({ ...progetto, courseFiles: fileCorsoControllati(progetto, corpus) })
 }

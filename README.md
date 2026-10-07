@@ -16,7 +16,7 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 | 2. Biblioteca e ricerca | cataloghi accademici, fonti istituzionali, web verificato, schede di lettura, tabella della letteratura | **fatta** |
 | 3. Scrittura | scaletta da approvare, bozze, riscritture, alternative, citazioni verificate | **fatta** |
 | 4. Revisione | osservazioni del relatore, coerenza fra capitoli, bibliografia, chat | **fatta** |
-| 5. Sincronizzazione | facoltativa, opzioni da proporre prima | da fare |
+| 5. Sincronizzazione | iPhone, iPad e computer allineati tramite un repository GitHub privato | **fatta** |
 
 ## Cosa c'è nella fase 1
 
@@ -256,6 +256,29 @@ biologia, se non come causa di un effetto finanziario in una frase).
   serve un backend che la nasconda."*
 - Niente `alert`, `confirm`, `prompt`: tutte le conferme sono in linea.
 
+## Sincronizzazione fra dispositivi
+
+Senza un server, i dati passano da un **repository GitHub privato** dello studente, letto e
+scritto dal browser con l'API di GitHub (Impostazioni → Sincronizzazione fra dispositivi).
+
+- **Preparazione, una volta**: un repository privato vuoto (per esempio `studio-tesi-dati`) e un
+  token *fine-grained* limitato a quel repository, con *Contents* in lettura e scrittura. Su ogni
+  dispositivo si incollano nome del repository e token. L'app rifiuta i repository pubblici.
+- **Cosa va su GitHub**: `studio-tesi/progetto.json` (tutto il progetto) e
+  `studio-tesi/corpus.json` (il testo dei file del corso, inviato solo quando cambia). Ogni invio
+  è un commit "Aggiornamento da iPhone/iPad/computer", quindi resta anche la storia delle versioni.
+- **Quando**: 15 secondi dopo l'ultima modifica, quando si esce dall'app o si torna a usarla,
+  all'avvio e ogni due minuti mentre è aperta. Mentre un file del corso è in lettura si aspetta.
+  Ricevendo, si resta sulla schermata in cui si è.
+- **Conflitti**: se entrambi i dispositivi hanno cambiato qualcosa dall'ultima volta, nulla parte
+  da solo; un avviso chiede quale versione tenere. Lo stato di questo dispositivo finisce prima fra
+  le copie di sicurezza, quello dell'altro resta nella storia del repository. Un dispositivo nuovo
+  e vuoto riceve il progetto senza domande.
+- **Sicurezza**: il token sta solo in `localStorage` (`studio-tesi.github-token`), viene inviato
+  solo ad `api.github.com` e non entra mai nel progetto né nei file; l'invio si blocca se nei dati
+  compare qualcosa che somiglia a una chiave Anthropic o a un token GitHub. La chiave API
+  Anthropic non si sincronizza: va inserita su ogni dispositivo.
+
 ## Avvio e collaudo
 
 ```bash
@@ -264,6 +287,13 @@ npm run dev      # http://localhost:5173
 npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-Tesi/)
 npm run lint
 ```
+
+Il collaudo della sincronizzazione aggiunge 26 controlli con GitHub simulato e due dispositivi
+(un iPhone e un computer) sullo stesso repository: repository pubblico rifiutato, token sbagliato
+spiegato, primo invio, file del corso caricato dall'iPhone che arriva da solo dopo la pausa e si
+legge dal computer senza ricaricarlo, modifiche nei due versi, conflitto con le due scelte (copia
+di sicurezza e allineamento dell'altro dispositivo), token mai nei dati inviati né nel file,
+scollegamento.
 
 Il collaudo del testo completo e delle pagine aggiunge 19 controlli: quattro fonti dai cataloghi
 (una scaricabile, una bloccata dall'editore e letta via API con web_fetch base su Haiku, una
