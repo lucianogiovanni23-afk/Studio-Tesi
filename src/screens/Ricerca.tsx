@@ -1,14 +1,19 @@
+import '../styles/fonti.css'
 import { costoStimato } from '../agents/api'
 import { useEffect, useMemo, useState } from 'react'
 import { annullaRicerca, avviaRicerca, stimaRicerca, useRicerca, type OpzioniRicerca } from '../agents/bibliotecario'
 import { CATALOGHI, provaCataloghi, type EsitoProva } from '../agents/cataloghi'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
+import { Ritratto } from '../components/Ritratto'
 import { TemiChips } from '../components/TemiChips'
 import { ETICHETTA_ORIGINE, autoreAnno } from '../domain/bibliografia'
 import { DOMINI_ISTITUZIONALI } from '../domain/dominio'
 import { useStudio } from '../store'
 import type { Candidato } from '../types'
+import { Fisarmonica } from '../ui/Fisarmonica'
+import { Icona } from '../ui/Icona'
+import { Info } from '../ui/Info'
 
 const ICONA_PASSO = { attesa: '○', corso: '…', ok: '✓', avviso: '!', errore: '✕', saltato: '–' }
 
@@ -26,10 +31,13 @@ function Modulo() {
   const opzioni = gratuita ? { ...scelte, istituzionali: false, web: false } : scelte
   const stima = useMemo(() => stimaRicerca(opzioni), [opzioni, modelli]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const casella = (k: keyof OpzioniRicerca, testo: string, nota: string) => (
-    <label className="interruttore">
+  const casella = (k: keyof OpzioniRicerca, testo: string, nota: string, icona: string) => (
+    <label className={`ric-opzione interruttore ${opzioni[k] ? 'ric-opzione-attiva' : ''} ${gratuita && k !== 'cataloghi' ? 'ric-opzione-spenta' : ''}`}>
       <input type="checkbox" checked={opzioni[k]} onChange={(e) => setOpzioni({ ...scelte, [k]: e.target.checked })} disabled={inCorso || (gratuita && k !== 'cataloghi')} />
-      <span>
+      <span className="ric-opzione-icona" aria-hidden>
+        <Icona nome={icona} dimensione={18} />
+      </span>
+      <span className="ric-opzione-testo">
         {testo}
         <small className="nota"> — {nota}</small>
       </span>
@@ -37,8 +45,10 @@ function Modulo() {
   )
 
   return (
-    <section className="pannello">
-      <h2>Cerca fonti nuove</h2>
+    <section className="pannello ric-modulo">
+      <h2>
+        <Icona nome="lente" /> Cerca fonti nuove
+      </h2>
       <label className="campo-blocco">
         <span className="etichetta">Cosa vuoi cercare?</span>
         <textarea
@@ -50,32 +60,44 @@ function Modulo() {
           disabled={inCorso}
         />
       </label>
-      {casella('cataloghi', 'Archivi di articoli', 'OpenAlex, Crossref, Semantic Scholar. Gratis')}
-      {casella('istituzionali', 'Siti ufficiali', 'ISMEA, ISTAT, CREA-RICA, ARPACAL, Copernicus e altri')}
-      {casella('web', 'Resto del web', 'studi e report anche in inglese e spagnolo')}
-
-      {gratuita && (
-        <p className="nota">
-          Sei in modalità gratis: cerco solo negli archivi di articoli. Per i siti ufficiali e il resto del web serve la
-          chiave API. I report di ISMEA, ISTAT e simili puoi scaricarli tu e metterli in Biblioteca come PDF.
-        </p>
-      )}
+      <span className="etichetta ric-dove">
+        Dove cerco
+        {gratuita && (
+          <Info>
+            Sei in modalità gratis: cerco solo negli archivi di articoli. Per i siti ufficiali e il resto del web serve la chiave API. I report di
+            ISMEA, ISTAT e simili puoi scaricarli tu e metterli in Biblioteca come PDF.
+          </Info>
+        )}
+      </span>
+      <div className="ric-opzioni">
+        {casella('cataloghi', 'Archivi di articoli', 'OpenAlex, Crossref, Semantic Scholar. Gratis', 'libri')}
+        {casella('istituzionali', 'Siti ufficiali', 'ISMEA, ISTAT, CREA-RICA, ARPACAL, Copernicus e altri', 'scudo')}
+        {casella('web', 'Resto del web', 'studi e report anche in inglese e spagnolo', 'link')}
+      </div>
+      {gratuita && <p className="nota ric-gratis">Modalità gratis: solo archivi di articoli.</p>}
       {inCorso ? (
-        <div className="riga-editor">
+        <div className="riga-editor ric-invia">
           <span className="in-corso">Il Bibliotecario sta cercando…</span>
           <button type="button" className="bottone bottone-vuoto" onClick={annullaRicerca}>
             Ferma
           </button>
         </div>
       ) : (
+        <div className="ric-invia">
         <Conferma
-          classe="bottone bottone-primario"
-          etichetta="Cerca"
+          classe="bottone bottone-primario ric-cerca"
+          etichetta={
+            <>
+              <Icona nome="cerca" />
+              Cerca
+            </>
+          }
           disabilitato={domanda.trim().length < 8 || !(opzioni.cataloghi || opzioni.istituzionali || opzioni.web)}
           domanda={`${costoStimato(stima)} (gli archivi di articoli sono gratis). Procedo?`}
           conferma="Cerca"
           onConferma={() => void avviaRicerca(domanda.trim(), opzioni)}
         />
+        </div>
       )}
       <details className="dettagli-piccoli">
         <summary>Quali siti ufficiali guardo</summary>
@@ -90,8 +112,10 @@ function Avanzamento() {
   const errore = useRicerca((s) => s.errore)
   if (passi.length === 0) return null
   return (
-    <section className="pannello">
-      <h2>A che punto sono</h2>
+    <section className="pannello ric-avanzamento">
+      <h2>
+        <Icona nome="orologio" /> A che punto sono
+      </h2>
       <ol className="passi-ricerca">
         {passi.map((p) => (
           <li key={p.id} className={`passo-${p.stato}`}>
@@ -114,15 +138,20 @@ function ProvaCataloghi() {
   const [esiti, setEsiti] = useState<EsitoProva[] | null>(null)
   const [prova, setProva] = useState(false)
   return (
-    <section className="pannello">
-      <h2>Prova gli archivi</h2>
-      <p className="nota">
-        Gli archivi di articoli li consulto direttamente da questo browser, gratis. Con una prova veloce vedi se
-        rispondono (la rete della scuola, un proxy o un'estensione potrebbero bloccarli).
-      </p>
+    <Fisarmonica
+      titolo="Prova gli archivi"
+      icona="scudo"
+      riassunto={esiti ? `${esiti.filter((e) => e.ok).length} di ${esiti.length} rispondono` : 'Vedi se gli archivi rispondono da qui'}
+      azioni={
+        <Info>
+          Gli archivi di articoli li consulto direttamente da questo browser, gratis. Con una prova veloce vedi se rispondono (la rete della scuola, un
+          proxy o un'estensione potrebbero bloccarli).
+        </Info>
+      }
+    >
       <button
         type="button"
-        className="bottone"
+        className="bottone bottone-secondario"
         disabled={prova}
         onClick={async () => {
           setProva(true)
@@ -130,6 +159,7 @@ function ProvaCataloghi() {
           setProva(false)
         }}
       >
+        <Icona nome="aggiorna" />
         {prova ? 'Provo…' : 'Fai una prova'}
       </button>
       {esiti && (
@@ -141,7 +171,7 @@ function ProvaCataloghi() {
           ))}
         </ul>
       )}
-    </section>
+    </Fisarmonica>
   )
 }
 
@@ -150,20 +180,22 @@ function CartaCandidato({ c }: { c: Candidato }) {
   const aggiorna = useStudio((s) => s.aggiornaCandidato)
   const f = c.fonte
   const [aperto, setAperto] = useState(false)
+  const decisione = c.consiglio?.decisione
 
   return (
-    <li className={`candidato ${c.consiglio?.decisione === 'scartare' ? 'candidato-sconsigliato' : ''}`}>
+    <li className={`candidato ric-carta ${decisione === 'scartare' ? 'candidato-sconsigliato' : decisione === 'tenere' ? 'ric-carta-consigliata' : ''}`}>
       <div className="candidato-testa">
-        <span className="pastiglia-origine">{ETICHETTA_ORIGINE[f.origine]}</span>
-        <span className={`verifica verifica-${c.verifica}`}>
-          {c.verifica === 'catalogo' ? "dati presi dall'archivio" : 'link controllato'}
-        </span>
-        {f.oaUrl && <span className="verifica">gratis online</span>}
         {c.consiglio && (
           <span className={`consiglio consiglio-${c.consiglio.decisione}`}>
             {c.consiglio.decisione === 'tenere' ? `consigliata · quanto c'entra: ${c.consiglio.pertinenza}` : 'sconsigliata'}
           </span>
         )}
+        <span className="pastiglia-origine">{ETICHETTA_ORIGINE[f.origine]}</span>
+        <span className={`verifica verifica-${c.verifica}`}>
+          <Icona nome="spunta" dimensione={12} />
+          {c.verifica === 'catalogo' ? "dati presi dall'archivio" : 'link controllato'}
+        </span>
+        {f.oaUrl && <span className="verifica">gratis online</span>}
       </div>
       <h3 className="candidato-titolo">
         {f.url ? (
@@ -174,12 +206,17 @@ function CartaCandidato({ c }: { c: Candidato }) {
           f.titolo
         )}
       </h3>
-      <p className="nota">
+      <p className="nota ric-autori">
         {autoreAnno(f, false)}
         {f.rivista ? ` · ${f.rivista}` : ''}
         {f.doi ? ` · DOI ${f.doi}` : ''}
       </p>
-      {c.consiglio && <p className="motivo">{c.consiglio.motivo}</p>}
+      {c.consiglio && (
+        <div className="ric-motivo">
+          <Ritratto k="bibliotecario" dimensione={28} />
+          <p className="motivo">{c.consiglio.motivo}</p>
+        </div>
+      )}
       {f.estratti.length > 0 && (
         <ul className="estratti-candidato">
           {f.estratti.map((e, i) => (
@@ -191,7 +228,8 @@ function CartaCandidato({ c }: { c: Candidato }) {
       )}
       {f.abstract && (
         <>
-          <button type="button" className="link" onClick={() => setAperto((a) => !a)} aria-expanded={aperto}>
+          <button type="button" className="link ric-leggi" onClick={() => setAperto((a) => !a)} aria-expanded={aperto}>
+            <Icona nome={aperto ? 'su' : 'giu'} dimensione={14} />
             {aperto ? 'Nascondi il riassunto' : 'Leggi il riassunto'}
           </button>
           {aperto && <p className="abstract">{f.abstract}</p>}
@@ -201,9 +239,11 @@ function CartaCandidato({ c }: { c: Candidato }) {
         <TemiChips temi={f.temi} onCambia={(temi) => aggiorna(c.id, { temi })} />
         <span className="azioni-candidato">
           <button type="button" className="bottone bottone-vuoto" onClick={() => decidi(c.id, false)}>
+            <Icona nome="chiudi" />
             Scarta
           </button>
-          <button type="button" className="bottone bottone-primario" onClick={() => decidi(c.id, true)}>
+          <button type="button" className="bottone ric-tieni" onClick={() => decidi(c.id, true)}>
+            <Icona nome="spunta" />
             Tienila
           </button>
         </span>
@@ -224,43 +264,60 @@ export function InAttesa() {
   const sconsigliati = useMemo(() => inAttesa.filter((c) => c.consiglio?.decisione === 'scartare'), [inAttesa])
 
   return (
-    <section className="pannello">
+    <section className="pannello ric-attesa">
       <div className="pannello-testa">
-        <h2>Da controllare ({inAttesa.length})</h2>
-        <label>
-          <span className="sr">Mostra</span>
-          <select className="campo campo-stretto" value={filtro} onChange={(e) => setFiltro(e.target.value as 'tutti' | 'consigliati')}>
-            <option value="tutti">tutti</option>
-            <option value="consigliati">solo consigliati</option>
-          </select>
-        </label>
+        <h2>
+          <Icona nome="cassetto" /> Da controllare ({inAttesa.length})
+          <Info>Una fonte entra in biblioteca solo se decidi di tenerla. Per ognuna il Bibliotecario ti scrive perché te la consiglia o no.</Info>
+        </h2>
+        {inAttesa.length > 0 && (
+          <label>
+            <span className="sr">Mostra</span>
+            <select className="campo campo-stretto" value={filtro} onChange={(e) => setFiltro(e.target.value as 'tutti' | 'consigliati')}>
+              <option value="tutti">tutti</option>
+              <option value="consigliati">solo consigliati</option>
+            </select>
+          </label>
+        )}
       </div>
       {inAttesa.length === 0 ? (
-        <p className="nota">Non c'è niente da controllare. Una fonte entra in biblioteca solo se decidi di tenerla.</p>
+        <div className="ric-vuoto">
+          <span className="ric-vuoto-icona" aria-hidden>
+            <Icona nome="cassetto" dimensione={28} />
+          </span>
+          <p className="nota">Non c'è niente da controllare. Una fonte entra in biblioteca solo se decidi di tenerla.</p>
+        </div>
       ) : (
         <>
-          <div className="riga-editor">
-            {consigliati.length > 0 && (
-              <Conferma
-                classe="bottone"
-                etichetta={`Tieni i ${consigliati.length} consigliati`}
-                domanda={`Metto in biblioteca ${consigliati.length} fonti?`}
-                conferma="Sì, tienile"
-                onConferma={() => consigliati.forEach((c) => decidi(c.id, true))}
-              />
-            )}
-            {sconsigliati.length > 0 && (
-              <Conferma
-                classe="bottone bottone-vuoto"
-                etichetta={`Scarta i ${sconsigliati.length} sconsigliati`}
-                domanda={`Scarto ${sconsigliati.length} risultati?`}
-                conferma="Scarta"
-                pericolosa
-                onConferma={() => sconsigliati.forEach((c) => decidi(c.id, false))}
-              />
-            )}
-          </div>
-          <ul className="elenco-candidati">
+          {(consigliati.length > 0 || sconsigliati.length > 0) && (
+            <div className="riga-editor ric-tutti">
+              {consigliati.length > 0 && (
+                <Conferma
+                  classe="bottone bottone-secondario"
+                  etichetta={
+                    <>
+                      <Icona nome="spunta" />
+                      {`Tieni i ${consigliati.length} consigliati`}
+                    </>
+                  }
+                  domanda={`Metto in biblioteca ${consigliati.length} fonti?`}
+                  conferma="Sì, tienile"
+                  onConferma={() => consigliati.forEach((c) => decidi(c.id, true))}
+                />
+              )}
+              {sconsigliati.length > 0 && (
+                <Conferma
+                  classe="bottone bottone-vuoto"
+                  etichetta={`Scarta i ${sconsigliati.length} sconsigliati`}
+                  domanda={`Scarto ${sconsigliati.length} risultati?`}
+                  conferma="Scarta"
+                  pericolosa
+                  onConferma={() => sconsigliati.forEach((c) => decidi(c.id, false))}
+                />
+              )}
+            </div>
+          )}
+          <ul className="elenco-candidati ric-carte">
             {visibili.map((c) => (
               <CartaCandidato key={c.id} c={c} />
             ))}
@@ -275,8 +332,7 @@ function Storico() {
   const ricerche = useStudio((s) => s.progetto.ricerche)
   if (ricerche.length === 0) return null
   return (
-    <section className="pannello">
-      <h2>Ricerche fatte</h2>
+    <Fisarmonica titolo="Ricerche fatte" icona="orologio" riassunto={`${ricerche.length} ${ricerche.length === 1 ? 'ricerca' : 'ricerche'} · l'ultima il ${new Date(ricerche[0].data).toLocaleDateString('it-IT')}`}>
       <ul className="storico">
         {ricerche.map((r) => (
           <li key={r.id}>
@@ -308,22 +364,20 @@ function Storico() {
           </li>
         ))}
       </ul>
-    </section>
+    </Fisarmonica>
   )
 }
 
 export function Ricerca() {
   return (
-    <div className="griglia-due">
-      <div>
+    <div className="ricerca-pagina">
+      <div className="ric-colonna">
         <Modulo />
         <Avanzamento />
         <ProvaCataloghi />
         <Storico />
       </div>
-      <div>
-        <InAttesa />
-      </div>
+      <InAttesa />
     </div>
   )
 }

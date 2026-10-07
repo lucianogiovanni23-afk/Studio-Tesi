@@ -1,0 +1,351 @@
+/* ================================================================== */
+/* Guscio dell'app: barra laterale (computer e iPad), tema scuro       */
+/* premium, caratteri.                                                 */
+/* ================================================================== */
+
+/* --- caratteri ------------------------------------------------------ */
+body {
+  font-size: 16.5px;
+  line-height: 1.6;
+  letter-spacing: -0.003em;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
+}
+
+.pannello h2,
+.pannello-testa h2 {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.32rem;
+}
+
+.pannello h3 {
+  font-size: 1.04rem;
+}
+
+/* --- tema scuro premium: nero caldo e oro ---------------------------- */
+:root[data-tema='scuro'] {
+  --crema: #0f0e0b;
+  --crema-2: #1f1c16;
+  --carta: #17150f;
+  --campo: #1c1a14;
+  --inchiostro: #f1ebd9;
+  --inchiostro-2: #c9c0a8;
+  --inchiostro-3: #8f8770;
+  --oliva: #8a9d3e;
+  --oliva-scuro: #c8d98a;
+  --oliva-chiaro: #262a17;
+  --oliva-premuto: #6f8030;
+  --scheda-attiva: #2b2719;
+  --oro: #e0b94f;
+  --bordo: #2c2820;
+  --bagliore-1: rgba(224, 185, 79, 0.07);
+  --bagliore-2: rgba(138, 157, 62, 0.09);
+  --bagliore-3: rgba(224, 185, 79, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-tema='auto'] {
+    --crema: #0f0e0b;
+    --crema-2: #1f1c16;
+    --carta: #17150f;
+    --campo: #1c1a14;
+    --inchiostro: #f1ebd9;
+    --inchiostro-2: #c9c0a8;
+    --inchiostro-3: #8f8770;
+    --oliva: #8a9d3e;
+    --oliva-scuro: #c8d98a;
+    --oliva-chiaro: #262a17;
+    --oliva-premuto: #6f8030;
+    --scheda-attiva: #2b2719;
+    --oro: #e0b94f;
+    --bordo: #2c2820;
+    --bagliore-1: rgba(224, 185, 79, 0.07);
+    --bagliore-2: rgba(138, 157, 62, 0.09);
+    --bagliore-3: rgba(224, 185, 79, 0.05);
+  }
+}
+
+:root[data-tema='scuro'] .pannello,
+:root[data-tema='scuro'] .testa-schermata {
+  border-color: color-mix(in srgb, var(--oro) 14%, var(--bordo));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-tema='auto'] .pannello,
+  :root[data-tema='auto'] .testa-schermata {
+    border-color: color-mix(in srgb, var(--oro) 14%, var(--bordo));
+  }
+}
+
+/* --- barra laterale -------------------------------------------------- */
+@media (min-width: 701px) {
+  .app {
+    --larghezza-barra: 84px;
+    padding-left: var(--larghezza-barra);
+  }
+
+  .testata {
+    justify-content: space-between;
+  }
+
+  .testata-azioni {
+    margin-left: auto;
+  }
+
+  .app > .navigazione {
+    position: fixed;
+    z-index: 70;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: var(--larghezza-barra);
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 6px;
+    padding: calc(76px + env(safe-area-inset-top)) 12px 16px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--carta) 82%, transparent);
+    backdrop-filter: saturate(1.5) blur(18px);
+    -webkit-backdrop-filter: saturate(1.5) blur(18px);
+    border-right: 1px solid color-mix(in srgb, var(--bordo) 70%, transparent);
+    transition:
+      width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 0.28s ease;
+  }
+
+  /* il marchio sta in cima alla barra, sopra le voci */
+  .app > .navigazione::before {
+    content: '';
+    position: absolute;
+    top: calc(14px + env(safe-area-inset-top));
+    left: 22px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background:
+      radial-gradient(circle at 40% 55%, #6b7d2e 0 34%, transparent 35%),
+      radial-gradient(circle at 64% 40%, #c9a43a 0 24%, transparent 25%),
+      color-mix(in srgb, var(--oliva) 14%, var(--carta));
+  }
+
+  .app > .navigazione:hover,
+  .app > .navigazione:has(:focus-visible) {
+    width: 236px;
+    box-shadow: 18px 0 50px -24px rgba(40, 35, 20, 0.45);
+  }
+
+  .app > .navigazione .nav-voce {
+    justify-content: flex-start;
+    gap: 16px;
+    min-height: 52px;
+    padding: 0 18px;
+    border-radius: 16px;
+    font-size: 0.98rem;
+  }
+
+  .app > .navigazione .icona-nav {
+    width: 22px;
+    height: 22px;
+  }
+
+  .app > .navigazione .nav-nome {
+    opacity: 0;
+    transform: translateX(-6px);
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .app > .navigazione:hover .nav-nome,
+  .app > .navigazione:has(:focus-visible) .nav-nome {
+    opacity: 1;
+    transform: none;
+  }
+
+  .app > .navigazione .nav-attiva {
+    background: linear-gradient(135deg, var(--oliva), var(--oliva-premuto));
+    color: #fff;
+    box-shadow: 0 10px 22px -10px color-mix(in srgb, var(--oliva) 80%, transparent);
+  }
+
+  .app > .navigazione .nav-attiva::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--oro);
+  }
+
+  /* la Panoramica si separa dai quattro passi */
+  .app > .navigazione .nav-voce:nth-child(3) {
+    margin-top: 14px;
+  }
+
+  .app > .navigazione .nav-voce:nth-child(3)::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 14px;
+    right: 14px;
+    height: 1px;
+    background: var(--bordo);
+  }
+
+  /* in concentrazione la barra sparisce */
+  .concentrazione {
+    padding-left: 0;
+  }
+
+  .concentrazione > .navigazione {
+    display: none;
+  }
+
+  /* niente più etichette in testata: c'è la barra */
+  .marchio-segno {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app > .navigazione,
+  .app > .navigazione .nav-nome {
+    transition: none;
+  }
+}
+
+/* --- illustrazione nell'intestazione di pagina ----------------------- */
+.testa-schermata {
+  isolation: isolate;
+}
+
+.testa-schermata::after {
+  display: none;
+}
+
+.illustrazione-pagina {
+  position: absolute;
+  z-index: 0;
+  right: 230px;
+  bottom: -6px;
+  width: 300px;
+  height: 160px;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.testa-testo,
+.testa-agente,
+.testa-schermata .sotto-schede {
+  z-index: 1;
+}
+
+@media (max-width: 1100px) {
+  .illustrazione-pagina {
+    right: 10px;
+    width: 220px;
+    height: 118px;
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 700px) {
+  .illustrazione-pagina {
+    width: 160px;
+    height: 86px;
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .illustrazione-pagina {
+    animation: galleggia 6s ease-in-out infinite;
+  }
+}
+
+@keyframes galleggia {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* chip dei temi nel tema scuro: sfondo scuro tinto, testo chiaro */
+:root[data-tema='scuro'] .tema:not(.tema-spento) {
+  --colore-tema-chiaro: color-mix(in srgb, var(--colore-tema) 24%, #17150f);
+  color: color-mix(in srgb, var(--colore-tema) 35%, #f1ebd9);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-tema='auto'] .tema:not(.tema-spento) {
+    --colore-tema-chiaro: color-mix(in srgb, var(--colore-tema) 24%, #17150f);
+    color: color-mix(in srgb, var(--colore-tema) 35%, #f1ebd9);
+  }
+}
+
+/* sotto-schede: su telefono niente a capo */
+.sotto-voce {
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  .sotto-voce {
+    padding: 0 11px;
+    font-size: 0.86rem;
+  }
+}
+
+/* dispositivi touch (iPad): la barra non si allarga, il nome sta sotto l'icona */
+@media (min-width: 701px) and (hover: none) {
+  .app > .navigazione,
+  .app > .navigazione:hover,
+  .app > .navigazione:has(:focus-visible) {
+    width: var(--larghezza-barra);
+    box-shadow: none;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .app > .navigazione .nav-voce {
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-height: 62px;
+    padding: 6px 2px;
+    font-size: 0.68rem;
+  }
+  .app > .navigazione .nav-nome,
+  .app > .navigazione:hover .nav-nome {
+    opacity: 1;
+    transform: none;
+  }
+  .app > .navigazione .nav-numero {
+    display: none;
+  }
+  .app > .navigazione .nav-attiva::before {
+    left: -8px;
+  }
+}
+
+.testa-testo p {
+  max-width: 58ch;
+}
+
+@media (max-width: 1400px) {
+  .illustrazione-pagina {
+    right: 24px;
+    bottom: -14px;
+    opacity: 0.45;
+  }
+}

@@ -4,6 +4,7 @@ import { AGENTE } from './agenti'
 import type { Messaggio } from './api'
 import { chiamataChatStream, creaClient, toApiError } from './api'
 import { contestoStabile, contestoVariabile } from './chat'
+import { suonoRisposta, suonoTasto } from '../ui/suoni'
 import { SYSTEM_CHAT } from './prompts'
 
 /**
@@ -60,10 +61,12 @@ export async function chiediAgente(k: AgentKey, domanda: string): Promise<void> 
       onTesto: (pezzo) => {
         accumulato += pezzo
         useStudio.getState().aggiornaBattuta(k, id, accumulato)
+        if (k === 'scrittore') suonoTasto()
       },
     })
     useStudio.getState().aggiornaBattuta(k, id, finale || accumulato || '(nessuna risposta)')
     useStudio.getState().faiParlare(Math.min(6000, 1500 + (finale || '').length * 25))
+    suonoRisposta()
   } catch (err) {
     const annullato = err instanceof DOMException && err.name === 'AbortError'
     useStudio.getState().aggiornaBattuta(k, id, annullato ? 'Va bene, lasciamo stare per ora.' : `Scusa, non sono riuscito a risponderti: ${toApiError(err).message}`)

@@ -1,0 +1,57 @@
+/* Comandi sopra la sala 3D: interruttore giorno/notte. */
+.scena-comandi {
+  align-items: center;
+}
+
+.gettone-tondo {
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  color: var(--inchiostro);
+  box-shadow: 0 6px 18px rgba(30, 30, 20, 0.14);
+  transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+}
+
+.gettone-tondo:hover {
+  transform: translateY(-1px);
+}
+
+.gettone-tondo:focus-visible {
+  outline: 2px solid var(--oliva);
+  outline-offset: 2px;
+}
+
+.gettone-notte svg {
+  color: #c98a12;
+}
+
+.gettone-notte-attivo {
+  background: rgba(20, 26, 48, 0.78);
+  border-color: rgba(160, 175, 230, 0.45);
+  color: #f3e7c4;
+  box-shadow: 0 0 0 1px rgba(255, 220, 150, 0.12), 0 6px 22px rgba(120, 140, 255, 0.28);
+}
+
+.gettone-notte-attivo svg {
+  color: #ffe2a0;
+  filter: drop-shadow(0 0 4px rgba(255, 220, 150, 0.7));
+}
+
+/* Di notte anche il "Tutta la sala" si scurisce un po', per non abbagliare. */
+.gettone-notte-attivo ~ .gettone-sala {
+  background: rgba(20, 26, 48, 0.72);
+  color: #eef0f8;
+  border-color: rgba(160, 175, 230, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gettone-tondo {
+    transition: none;
+  }
+
+  .gettone-tondo:hover {
+    transform: none;
+  }
+}

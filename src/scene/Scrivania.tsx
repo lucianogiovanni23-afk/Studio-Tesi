@@ -1,10 +1,11 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { COLORI } from './layout'
-import { useQualita } from './qualita'
+import { useNotte, useQualita } from './qualita'
+import { textureAlone } from './notte'
 import { useRgb } from './rgb'
 
 /**
@@ -14,8 +15,17 @@ import { useRgb } from './rgb'
  */
 
 /** Quello che si vede sul monitor: un'interfaccia scura con il colore della persona. */
-function useSchermata(colore: string): THREE.CanvasTexture | null {
-  return useMemo(() => {
+interface Schermata {
+  texture: THREE.CanvasTexture
+  /** Ridisegna la pagina di testo scorsa di `scorrimento` pixel. */
+  pagina: (scorrimento: number, cursore: boolean) => void
+}
+
+const RIGA = 11
+const PAGINA = { x: 96, y: 16, w: 210, h: 160 }
+
+function useSchermata(colore: string): Schermata | null {
+  const schermata = useMemo<Schermata | null>(() => {
     if (typeof document === 'undefined') return null
     const c = document.createElement('canvas')
     c.width = 512
@@ -34,13 +44,6 @@ function useSchermata(colore: string): THREE.CanvasTexture | null {
       g.fillStyle = i === 1 ? colore : '#2c3446'
       g.fillRect(14, 18 + i * 26, 42, 10)
     }
-    // pagina di testo
-    g.fillStyle = '#e9edf3'
-    g.fillRect(96, 16, 210, 160)
-    g.fillStyle = '#9aa3b2'
-    for (let i = 0; i < 12; i++) g.fillRect(110, 34 + i * 11, 120 + ((i * 37) % 60), 4)
-    g.fillStyle = colore
-    g.fillRect(110, 24, 90, 6)
     // grafico a destra
     g.strokeStyle = colore
     g.lineWidth = 3
@@ -53,16 +56,76 @@ function useSchermata(colore: string): THREE.CanvasTexture | null {
       g.fillRect(330 + i * 34, 160 - (20 + ((i * 29) % 30)), 22, 20 + ((i * 29) % 30))
     }
     g.globalAlpha = 1
-    const t = new THREE.CanvasTexture(c)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
+    const texture = new THREE.CanvasTexture(c)
+    texture.colorSpace = THREE.SRGBColorSpace
+    // pagina di testo: righe che scorrono mentre la persona scrive
+    const pagina = (scorrimento: number, cursore: boolean) => {
+      const { x, y, w, h } = PAGINA
+      g.fillStyle = '#e9edf3'
+      g.fillRect(x, y, w, h)
+      g.save()
+      g.beginPath()
+      g.rect(x, y + 4, w, h - 8)
+      g.clip()
+      const primo = Math.floor(scorrimento / RIGA)
+      const scarto = scorrimento - primo * RIGA
+      let ultima = 0
+      for (let i = 0; i < 16; i++) {
+        const n = primo + i
+        const ry = y + 10 + i * RIGA - scarto
+        // ogni 9 righe un titoletto nel colore della persona, poi un paragrafo
+        const pos = n % 9
+        if (pos === 8) continue
+        const titolo = pos === 0
+        g.fillStyle = titolo ? colore : '#9aa3b2'
+        const largh = titolo ? 90 : pos === 7 ? 60 + ((n * 13) % 40) : 120 + ((n * 37) % 60)
+        g.fillRect(x + 14, ry, largh, titolo ? 6 : 4)
+        if (ry < y + h - 12) ultima = ry
+        if (ry >= y + h - 12 && ultima === 0) ultima = ry
+      }
+      g.restore()
+      if (cursore) {
+        g.fillStyle = colore
+        g.fillRect(x + 14 + 150, Math.min(y + h - 16, ultima) - 3, 3, 10)
+      }
+      texture.needsUpdate = true
+    }
+    pagina(0, false)
+    return { texture, pagina }
   }, [colore])
+  useEffect(() => () => schermata?.texture.dispose(), [schermata])
+  return schermata
 }
 
 /** Monitor curvo 34" ultrawide: segmento di cilindro, cornice sottilissima, braccio in alluminio. */
-function MonitorCurvo({ colore, acceso }: { colore: string; acceso: boolean }) {
-  const schermata = useSchermata(colore)
+function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: boolean; lavora: boolean }) {
+  const s = useSchermata(colore)
+  const schermata = s?.texture ?? null
   const ombre = useQualita() === 'completa'
+  const notte = useNotte()
+  const fermo = useMovimentoRidotto()
+  const scorre = useRef({ y: 0, attesa: 0, cursore: false, sporca: false })
+
+  // Mentre lavora il testo scorre (a scatti leggeri, ~12 volte al secondo: niente allocazioni).
+  useFrame((stato, delta) => {
+    if (!s) return
+    const r = scorre.current
+    if (!lavora || fermo) {
+      if (r.sporca) {
+        r.sporca = false
+        r.y = 0
+        s.pagina(0, false)
+      }
+      return
+    }
+    r.attesa += delta
+    if (r.attesa < 0.08) return
+    r.y += r.attesa * 14
+    r.attesa = 0
+    r.cursore = Math.floor(stato.clock.elapsedTime * 2.5) % 2 === 0
+    r.sporca = true
+    s.pagina(r.y, r.cursore)
+  })
   const R = 1.1
   const L = 0.74
   return (
@@ -93,7 +156,7 @@ function MonitorCurvo({ colore, acceso }: { colore: string; acceso: boolean }) {
           color={schermata ? '#ffffff' : '#19212b'}
           emissive="#ffffff"
           emissiveMap={schermata ?? undefined}
-          emissiveIntensity={acceso ? 0.95 : 0.4}
+          emissiveIntensity={notte ? (acceso ? 1.35 : 0.7) : acceso ? 0.95 : 0.4}
           roughness={0.25}
           side={THREE.BackSide}
           toneMapped={false}
@@ -104,6 +167,20 @@ function MonitorCurvo({ colore, acceso }: { colore: string; acceso: boolean }) {
         <cylinderGeometry args={[R + 0.018, R + 0.018, 0.012, 48, 1, true, Math.PI - L / 2 + 0.05, L - 0.1]} />
         <meshBasicMaterial color={colore} toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
+      {notte && (
+        <>
+          {/* bagliore dello schermo sulla parete e sul piano */}
+          <mesh position={[0, 0.4, -0.06]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[1.25, 0.75]} />
+            <meshBasicMaterial map={textureAlone() ?? undefined} color={acceso ? '#8fb4ff' : '#4a5f99'} transparent opacity={acceso ? 0.5 : 0.28} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, 0.4, -0.08]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[0.9, 0.42]} />
+            <meshBasicMaterial map={textureAlone() ?? undefined} color={colore} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+          {ombre && <pointLight position={[0, 0.4, 0.35]} intensity={acceso ? 0.9 : 0.45} distance={1.8} decay={2} color="#a9c4ff" />}
+        </>
+      )}
     </group>
   )
 }
@@ -139,6 +216,7 @@ function Ventola({ posizione, materiale, gira }: { posizione: [number, number, n
 /** Case con vetro temperato su due lati, tre ventole frontali, scheda video e RAM illuminate. */
 function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }) {
   const completa = useQualita() === 'completa'
+  const notte = useNotte()
   const fermo = useMovimentoRidotto()
   const rgb = useRgb(sfasamento)
   const W = 0.24
@@ -201,7 +279,19 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
         <planeGeometry args={[W + 0.04, D + 0.04]} />
         <meshBasicMaterial ref={rgb(8)} transparent opacity={0.35} toneMapped={false} />
       </mesh>
-      {completa && <pointLight position={[0, H / 2, 0]} intensity={0.35} distance={0.9} color={colore} />}
+      {completa && <pointLight position={[0, H / 2, 0]} intensity={notte ? 1.3 : 0.35} distance={notte ? 1.6 : 0.9} color={colore} />}
+      {notte && (
+        <>
+          {/* alone RGB: un finto "bloom" senza post-processing */}
+          <sprite position={[0.02, H / 2, D / 2 + 0.02]} scale={[0.75, 0.9, 1]}>
+            <spriteMaterial ref={rgb(9) as never} map={textureAlone() ?? undefined} transparent opacity={0.5} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </sprite>
+          <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[0.9, 0.9]} />
+            <meshBasicMaterial ref={rgb(10)} map={textureAlone() ?? undefined} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+        </>
+      )}
     </group>
   )
 }
@@ -233,8 +323,19 @@ function Tastiera({ sfasamento }: { sfasamento: number }) {
   )
 }
 
-export function Scrivania({ colore, schermoAcceso, sfasamento = 0 }: { colore: string; schermoAcceso: boolean; sfasamento?: number }) {
+export function Scrivania({
+  colore,
+  schermoAcceso,
+  lavora = false,
+  sfasamento = 0,
+}: {
+  colore: string
+  schermoAcceso: boolean
+  lavora?: boolean
+  sfasamento?: number
+}) {
   const ombre = useQualita() === 'completa'
+  const notte = useNotte()
   const led = useRgb(sfasamento + 0.5, 0.05, 0.55)
   return (
     <group>
@@ -247,6 +348,13 @@ export function Scrivania({ colore, schermoAcceso, sfasamento = 0 }: { colore: s
         <boxGeometry args={[1.7, 0.008, 0.008]} />
         <meshBasicMaterial ref={led(0)} toneMapped={false} />
       </mesh>
+      {notte && (
+        // luce del LED che cade sul pavimento davanti alla scrivania
+        <mesh position={[0, 0.012, 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[2.4, 1.1]} />
+          <meshBasicMaterial ref={led(1)} map={textureAlone() ?? undefined} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
       {/* gambe a portale in alluminio scuro, regolabili in altezza */}
       {[-0.8, 0.8].map((x) => (
         <group key={x} position={[x, 0, 0]}>
@@ -274,7 +382,7 @@ export function Scrivania({ colore, schermoAcceso, sfasamento = 0 }: { colore: s
 
       {/* monitor curvo di lato, girato verso la persona: il viso resta libero */}
       <group position={[0.56, 0.76, -0.14]} rotation={[0, Math.PI + 0.95, 0]}>
-        <MonitorCurvo colore={colore} acceso={schermoAcceso} />
+        <MonitorCurvo colore={colore} acceso={schermoAcceso} lavora={lavora} />
       </group>
       {/* PC sul piano, vetro verso la sala */}
       <group position={[-0.66, 0.763, 0.1]} rotation={[0, 0.25, 0]}>

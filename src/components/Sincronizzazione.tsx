@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { collega, nomeDispositivo, preposizione, scollega, sincronizza, useSync, type StatoSync } from '../io/sincronizzazione'
+import { Icona } from '../ui/Icona'
+import { Info } from '../ui/Info'
 import { Conferma } from './Conferma'
 
 const ETICHETTA: Record<StatoSync, string> = {
@@ -80,15 +82,60 @@ export function PannelloSincronizzazione() {
   const [errore, setErrore] = useState('')
   const [lavoro, setLavoro] = useState(false)
 
+  const collegato = Boolean(repo)
+  const statoBreve = !collegato ? 'Spenta' : stato === 'errore' ? 'Ferma' : stato === 'conflitto' ? 'Da scegliere' : stato === 'offline' ? 'Offline' : 'Attiva'
+
   return (
-    <section className="pannello" id="sincronizzazione">
-      <h2>Sincronizzazione fra dispositivi</h2>
+    <section className="pannello imp-carta imp-sync" id="sincronizzazione">
+      <div className="imp-testa">
+        <span className="imp-testa-icona" aria-hidden>
+          <Icona nome="aggiorna" dimensione={20} />
+        </span>
+        <div className="imp-testa-titoli">
+          <div className="imp-testa-riga">
+            <h2>Sincronizzazione fra dispositivi</h2>
+            <Info>
+              {collegato ? (
+                <>
+                  Le modifiche partono da sole pochi secondi dopo che smetti di scrivere e quando chiudi l'app. Quelle fatte
+                  sull'altro dispositivo arrivano quando riapri l'app, e ogni due minuti mentre è aperta.
+                </>
+              ) : (
+                <>
+                  Senza sincronizzazione ogni dispositivo ha la sua copia della tesi. Se colleghi iPhone, iPad e computer allo
+                  stesso repository GitHub privato, testi, fonti e lezioni si aggiornano da soli su tutti.
+                </>
+              )}
+            </Info>
+          </div>
+          <p className="imp-testa-sotto">La stessa tesi su iPhone, iPad e computer.</p>
+        </div>
+        <div className="imp-testa-azioni">
+          <span className={`imp-stato ${collegato && (stato === 'ok' || stato === 'in_corso' || stato === 'attesa') ? 'imp-stato-ok' : ''} ${stato === 'errore' || stato === 'conflitto' ? 'imp-stato-errore' : ''}`}>
+            <span className="imp-stato-pallino" aria-hidden />
+            {statoBreve}
+          </span>
+        </div>
+      </div>
+
+      <div className="imp-sync-dispositivi" aria-hidden>
+        <span className="imp-sync-tile">
+          <Icona nome="dispositivi" dimensione={22} />
+        </span>
+        <span className={`imp-sync-filo ${collegato ? 'imp-sync-filo-acceso' : ''}`} />
+        <span className="imp-sync-tile imp-sync-centro">
+          <Icona nome={collegato ? 'link' : 'scudo'} dimensione={22} />
+        </span>
+        <span className={`imp-sync-filo ${collegato ? 'imp-sync-filo-acceso' : ''}`} />
+        <span className="imp-sync-tile">
+          <Icona nome="dispositivi" dimensione={22} />
+        </span>
+      </div>
+
       {repo ? (
         <>
-          <p className="nota">
-            Questo {nomeDispositivo()} è collegato al tuo repository privato <strong>{repo}</strong>. Le modifiche partono da
-            sole pochi secondi dopo che smetti di scrivere e quando chiudi l'app. Quelle fatte sull'altro dispositivo arrivano
-            quando riapri l'app, e ogni due minuti mentre è aperta.
+          <p className="nota imp-sync-repo">
+            Questo {nomeDispositivo()} è collegato al tuo repository privato <strong>{repo}</strong>.
           </p>
           <p className={stato === 'errore' ? 'allerta allerta-errore' : 'nota nota-ok'} role="status">
             {stato === 'in_corso'
@@ -99,13 +146,14 @@ export function PannelloSincronizzazione() {
                   ? 'Scegli quale versione tenere nel messaggio in alto.'
                   : messaggio || (ultima ? `Ultima sincronizzazione: ${quando(ultima)}.` : 'Collegato.')}
           </p>
-          <div className="riga-editor">
+          <div className="riga-editor imp-azioni">
             <button
               type="button"
               className="bottone bottone-primario"
               disabled={stato === 'in_corso' || stato === 'conflitto'}
               onClick={() => void sincronizza()}
             >
+              <Icona nome="aggiorna" dimensione={16} />
               Sincronizza adesso
             </button>
             <Conferma
@@ -120,10 +168,6 @@ export function PannelloSincronizzazione() {
         </>
       ) : (
         <>
-          <p className="nota">
-            Senza sincronizzazione ogni dispositivo ha la sua copia della tesi. Se colleghi iPhone, iPad e computer allo
-            stesso repository GitHub <strong>privato</strong>, testi, fonti e lezioni si aggiornano da soli su tutti.
-          </p>
           <details className="istruzioni-sync">
             <summary>Come si fa (una volta sola, 3 minuti)</summary>
             <ol>
@@ -186,6 +230,7 @@ export function PannelloSincronizzazione() {
               />
             </label>
             <button type="submit" className="bottone bottone-primario" disabled={lavoro || !bozzaRepo.trim() || !token.trim()}>
+              <Icona nome="link" dimensione={16} />
               {lavoro ? 'Collego…' : 'Collega'}
             </button>
           </form>

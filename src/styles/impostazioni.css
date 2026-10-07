@@ -1,0 +1,961 @@
+/* Impostazioni: schede in alto, carte con icona, righe in stile "impostazioni del telefono". */
+
+.imp {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.imp-nascosto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* --- schede (controllo segmentato) ---------------------------------- */
+.imp-schede {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--inchiostro) 5%, var(--crema));
+  border: 1px solid color-mix(in srgb, var(--bordo) 70%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--inchiostro) 6%, transparent);
+}
+
+.imp-scheda {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 15px;
+  background: transparent;
+  color: var(--inchiostro-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.25s ease,
+    transform 0.12s ease;
+}
+
+.imp-scheda:hover {
+  color: var(--inchiostro);
+  background: color-mix(in srgb, var(--carta) 55%, transparent);
+}
+
+.imp-scheda:active {
+  transform: scale(0.98);
+}
+
+.imp-scheda:focus-visible {
+  outline: 2px solid var(--oliva);
+  outline-offset: 2px;
+}
+
+.imp-scheda[aria-selected='true'] {
+  background: var(--carta);
+  color: var(--inchiostro);
+  border-color: color-mix(in srgb, var(--bordo) 70%, transparent);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--inchiostro) 8%, transparent),
+    0 8px 22px -12px color-mix(in srgb, var(--oliva) 60%, transparent);
+}
+
+.imp-scheda-icona {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--inchiostro-3);
+  background: color-mix(in srgb, var(--inchiostro) 6%, transparent);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.imp-scheda[aria-selected='true'] .imp-scheda-icona {
+  color: var(--su-accento);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--oliva) 80%, #fff) 0%, var(--oliva) 60%, var(--oliva-premuto) 100%);
+  box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--oliva) 70%, transparent);
+}
+
+.imp-scheda-testi {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.imp-scheda-nome {
+  font-weight: 650;
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.imp-scheda-sotto {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--inchiostro-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- pannello di una scheda ------------------------------------------ */
+.imp-pannello {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+  animation: imp-entra 0.28s ease both;
+}
+
+.imp-pannello[hidden] {
+  display: none;
+}
+
+.imp-colonna {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.imp-largo {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+@keyframes imp-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- carte --------------------------------------------------------------- */
+.imp .imp-carta {
+  position: relative;
+  margin: 0;
+  padding: 22px 24px 24px;
+  border-radius: 20px;
+}
+
+.imp .imp-carta:hover {
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--inchiostro) 6%, transparent),
+    0 14px 32px -18px color-mix(in srgb, var(--inchiostro) 35%, transparent);
+}
+
+.imp-testa {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+
+.imp .imp-testa.pannello-testa {
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  margin-bottom: 18px;
+}
+
+.imp-testa-icona {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: var(--oliva-scuro);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--oliva) 20%, var(--carta)) 0%, color-mix(in srgb, var(--oliva) 9%, var(--carta)) 100%);
+  border: 1px solid color-mix(in srgb, var(--oliva) 18%, transparent);
+}
+
+.imp-testa-titoli {
+  flex: 1;
+  min-width: 0;
+}
+
+.imp-testa-riga {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 26px;
+}
+
+.imp-testa-riga h2 {
+  margin: 0;
+  font-size: 1.12rem;
+  font-weight: 680;
+  line-height: 1.25;
+}
+
+.imp-testa-riga .info {
+  margin-left: 2px;
+}
+
+.imp .imp-testa-sotto {
+  margin: 3px 0 0;
+  font-size: 0.875rem;
+  color: var(--inchiostro-3);
+  line-height: 1.4;
+}
+
+.imp-testa-azioni {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* pallino di stato ("Gratis", "Chiave attiva", "Attiva") */
+.imp-stato {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  white-space: nowrap;
+  color: var(--inchiostro-2);
+  background: color-mix(in srgb, var(--inchiostro) 6%, transparent);
+}
+
+.imp-stato-pallino {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--inchiostro-3);
+}
+
+.imp-stato-ok {
+  color: var(--verde-ok);
+  background: var(--verde-chiaro);
+}
+
+.imp-stato-ok .imp-stato-pallino {
+  background: var(--verde-ok);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--verde-ok) 22%, transparent);
+}
+
+.imp-stato-errore {
+  color: var(--rosso);
+  background: var(--rosso-chiaro);
+}
+
+.imp-stato-errore .imp-stato-pallino {
+  background: var(--rosso);
+}
+
+/* azioni in fondo alla carta */
+.imp-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 0;
+}
+
+.imp-azioni .nota {
+  margin: 0;
+}
+
+.imp .bottone .ico {
+  margin-right: 2px;
+}
+
+.imp-piccola {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 0 0;
+  font-size: 0.82rem;
+}
+
+.imp-vuoto {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px dashed var(--bordo);
+  text-align: center;
+}
+
+.imp .nota-ok .ico,
+.imp .imp-piccola .ico {
+  vertical-align: -0.2em;
+}
+
+/* --- chiave API --------------------------------------------------------- */
+.imp-gratis {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+}
+
+.imp-gratis p {
+  line-height: 1.5;
+}
+
+.imp-gratis .info {
+  vertical-align: -0.35em;
+}
+
+.imp-spiega {
+  margin: 0 0 18px;
+  line-height: 1.5;
+}
+
+.imp-chiave {
+  padding-top: 18px;
+  border-top: 1px solid color-mix(in srgb, var(--bordo) 70%, transparent);
+}
+
+.imp-sottotitolo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.imp-sottotitolo .ico {
+  color: var(--oliva);
+}
+
+.imp .avviso-chiave {
+  position: relative;
+  margin: 0 0 14px;
+  padding: 11px 14px 11px 42px;
+  border: 1px solid var(--bordo-cielo);
+  border-left-width: 1px;
+  border-radius: 12px;
+  background: var(--cielo-chiaro);
+  color: var(--inchiostro);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* scudo disegnato col CSS: il testo dell'avviso resta identico */
+.imp .avviso-chiave::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  width: 18px;
+  height: 18px;
+  background: var(--cielo);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 5 6v6c0 4.5 3 7.5 7 9 4-1.5 7-4.5 7-9V6z'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.imp-chiave-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.imp-campo-con-bottone {
+  flex: 1 1 260px;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.imp-campo-con-bottone .campo {
+  flex: 1;
+  min-width: 0;
+}
+
+.imp-chiave-salvata {
+  margin: 0;
+}
+
+/* --- righe stile telefono (Questo dispositivo) --------------------------- */
+.imp-righe {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--bordo) 75%, transparent);
+  border-radius: 16px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--crema) 45%, var(--carta));
+}
+
+.imp-riga {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  min-height: 60px;
+}
+
+.imp-riga + .imp-riga {
+  border-top: 1px solid color-mix(in srgb, var(--bordo) 65%, transparent);
+}
+
+.imp-riga-icona {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--oliva-scuro);
+  background: color-mix(in srgb, var(--oliva) 12%, var(--carta));
+}
+
+.imp-riga-campo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.imp-riga-nome {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.imp-riga-campo .campo {
+  width: auto;
+  flex: 0 1 260px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* --- interruttori ------------------------------------------------------- */
+.imp .imp-interruttore {
+  justify-content: flex-start;
+  gap: 12px;
+  margin: 6px 0 12px;
+  line-height: 1.4;
+}
+
+.imp .imp-interruttore input[type='checkbox'] {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 28px;
+  margin: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--inchiostro) 18%, var(--carta));
+  cursor: pointer;
+  transition: background 0.22s ease;
+}
+
+.imp .imp-interruttore input[type='checkbox']::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.22s cubic-bezier(0.3, 1.4, 0.6, 1);
+}
+
+.imp .imp-interruttore input[type='checkbox']:checked {
+  background: var(--oliva);
+}
+
+.imp .imp-interruttore input[type='checkbox']:checked::after {
+  transform: translateX(18px);
+}
+
+.imp .imp-interruttore input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--oliva);
+  outline-offset: 2px;
+}
+
+.imp .imp-riga-interruttore {
+  flex: 1;
+  justify-content: space-between;
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+/* --- la tesi ------------------------------------------------------------ */
+.imp-obiettivo {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--oro-chiaro) 0%, color-mix(in srgb, var(--oliva) 10%, var(--carta)) 100%);
+}
+
+.imp-obiettivo-numero {
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--inchiostro);
+}
+
+.imp-obiettivo-unita {
+  color: var(--inchiostro-2);
+  font-size: 0.9rem;
+}
+
+.imp .imp-campi-obiettivo {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.imp .imp-campi-obiettivo .campo-blocco {
+  width: auto;
+  margin: 0;
+}
+
+.imp-esempio {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--inchiostro) 4%, var(--carta));
+  color: var(--inchiostro-2);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.imp-esempio .ico {
+  margin-top: 1px;
+  color: var(--oliva);
+}
+
+.imp-caso {
+  margin: 4px 0 0;
+}
+
+/* --- sincronizzazione --------------------------------------------------- */
+.imp-sync-dispositivi {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 0 0 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 140% at 50% 0%, color-mix(in srgb, var(--cielo) 14%, transparent) 0%, transparent 70%),
+    color-mix(in srgb, var(--crema) 50%, var(--carta));
+  border: 1px solid color-mix(in srgb, var(--bordo) 60%, transparent);
+}
+
+.imp-sync-tile {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  color: var(--inchiostro-2);
+  background: var(--carta);
+  border: 1px solid color-mix(in srgb, var(--bordo) 80%, transparent);
+  box-shadow: var(--ombra);
+}
+
+.imp-sync-centro {
+  width: 54px;
+  height: 54px;
+  color: var(--cielo);
+  border-color: var(--bordo-cielo);
+}
+
+.imp-sync-filo {
+  flex: 0 1 64px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--bordo) 0 6px, transparent 6px 11px);
+}
+
+.imp-sync-filo-acceso {
+  background: repeating-linear-gradient(90deg, var(--cielo) 0 6px, transparent 6px 11px);
+  background-size: 22px 2px;
+  animation: imp-filo 1.2s linear infinite;
+}
+
+@keyframes imp-filo {
+  to {
+    background-position: 22px 0;
+  }
+}
+
+.imp-sync-repo {
+  margin: 0 0 8px;
+}
+
+.imp-sync .istruzioni-sync {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--bordo) 75%, transparent);
+  background: color-mix(in srgb, var(--crema) 45%, var(--carta));
+}
+
+.imp-sync .istruzioni-sync summary {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.imp-sync .avviso-chiave {
+  margin: 16px 0 0;
+}
+
+/* --- copie di sicurezza ------------------------------------------------- */
+.imp .imp-copie {
+  position: relative;
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  max-height: none;
+}
+
+.imp .imp-copie li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 10px 4px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--bordo) 55%, transparent);
+  background: none;
+  flex-wrap: wrap;
+}
+
+.imp .imp-copie li:last-child {
+  border-bottom: 0;
+}
+
+.imp-copia-punto {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--oliva);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--oliva) 15%, transparent);
+}
+
+.imp-copia-testo {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.imp-copia-testo .nota {
+  font-size: 0.8rem;
+}
+
+/* --- ricomincia da capo ------------------------------------------------- */
+.imp .imp-pericolo {
+  border-color: color-mix(in srgb, var(--rosso) 28%, var(--bordo));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--rosso) 5%, var(--carta)) 0%, var(--carta) 60%);
+}
+
+.imp-pericolo .imp-testa-icona {
+  color: var(--rosso);
+  background: var(--rosso-chiaro);
+  border-color: color-mix(in srgb, var(--rosso) 22%, transparent);
+}
+
+/* --- avanzate ----------------------------------------------------------- */
+.imp-modelli {
+  display: grid;
+  gap: 2px;
+}
+
+.imp-diagnosi {
+  margin-top: 14px;
+}
+
+.imp-registro summary {
+  font-weight: 600;
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--inchiostro) 4%, var(--carta));
+}
+
+.imp-cifre {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.imp-cifra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--crema) 55%, var(--carta));
+  border: 1px solid color-mix(in srgb, var(--bordo) 65%, transparent);
+  min-width: 0;
+}
+
+.imp-cifra-nome {
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--inchiostro-3);
+}
+
+.imp-cifra-valore {
+  font-family: var(--serif);
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.imp-cifra-sotto {
+  font-size: 0.8rem;
+  color: var(--inchiostro-2);
+}
+
+.imp-barra {
+  margin: 0 0 8px;
+}
+
+.imp-barra-binario {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--inchiostro) 9%, var(--carta));
+  overflow: hidden;
+}
+
+.imp-barra-binario span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--oliva), color-mix(in srgb, var(--oliva) 70%, var(--oro)));
+  transition: width 0.4s ease;
+}
+
+.imp-barra-media .imp-barra-binario span {
+  background: var(--ambra);
+}
+
+.imp-barra-alta .imp-barra-binario span {
+  background: var(--rosso);
+}
+
+.imp .imp-budget {
+  align-items: flex-end;
+  gap: 10px;
+  margin: 8px 0 18px;
+}
+
+.imp .imp-budget .campo-blocco {
+  flex: 0 1 420px;
+  margin: 0;
+}
+
+.imp-tabelle {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.imp-costi .tabella-scorrevole {
+  border: 1px solid color-mix(in srgb, var(--bordo) 70%, transparent);
+  border-radius: 14px;
+  padding: 4px 4px 2px;
+}
+
+.imp-costi .tabella caption {
+  text-align: left;
+  padding: 8px 10px 4px;
+  font-weight: 650;
+}
+
+/* --- tablet e telefono --------------------------------------------------- */
+@media (max-width: 1100px) {
+  .imp-scheda-sotto {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .imp-pannello {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .imp-largo {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .imp {
+    gap: 16px;
+  }
+
+  .imp-schede {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .imp-schede::-webkit-scrollbar {
+    display: none;
+  }
+
+  .imp-scheda {
+    flex: 1 1 0;
+    min-width: 72px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-height: 62px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    text-align: center;
+    scroll-snap-align: center;
+  }
+
+  .imp-scheda-icona {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .imp-scheda-nome {
+    font-size: 0.74rem;
+    line-height: 1.15;
+  }
+
+  .imp-riga {
+    align-items: flex-start;
+  }
+
+  .imp-pannello,
+  .imp-colonna {
+    gap: 16px;
+  }
+
+  .imp .imp-carta {
+    padding: 18px 16px 20px;
+    border-radius: 18px;
+  }
+
+  .imp-testa {
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .imp-testa-icona {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .imp-testa-titoli {
+    flex: 1 1 160px;
+  }
+
+  .imp-riga {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  .imp-riga-campo {
+    flex-basis: calc(100% - 46px);
+  }
+
+  .imp-riga-campo .campo {
+    flex: 1 1 100%;
+  }
+
+  .imp .imp-campi-obiettivo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .imp-cifre {
+    gap: 6px;
+  }
+
+  .imp-cifra {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .imp-cifra-nome {
+    font-size: 0.64rem;
+    letter-spacing: 0.02em;
+  }
+
+  .imp-cifra-valore {
+    font-size: 1.15rem;
+  }
+
+  .imp-cifra-sotto {
+    font-size: 0.72rem;
+  }
+
+  .imp-sync-filo {
+    flex-basis: 40px;
+  }
+
+  .imp-chiave-form .bottone-primario,
+  .imp .imp-budget .bottone-primario {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imp-pannello,
+  .imp-sync-filo-acceso {
+    animation: none;
+  }
+
+  .imp-scheda,
+  .imp .imp-interruttore input[type='checkbox'],
+  .imp .imp-interruttore input[type='checkbox']::after,
+  .imp-barra-binario span {
+    transition: none;
+  }
+}

@@ -1,7 +1,7 @@
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { ContactShadows, Environment, Html, Lightformer, OrbitControls } from '@react-three/drei'
+import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei'
 import { AGENTE, AGENTI } from '../agents/agenti'
 import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useModoUso } from '../hooks/useModoUso'
@@ -12,7 +12,23 @@ import { Scrivania } from './Scrivania'
 import { CameraRig, type ControlliOrbita } from './CameraRig'
 import { CAMERA_BERSAGLIO, CAMERA_CASA, DIETRO_SCRIVANIA, POSTAZIONI } from './layout'
 import { Persona3D } from './Persona3D'
-import { ContestoQualita } from './qualita'
+import { ContestoEtichette, ContestoNotte, ContestoQualita } from './qualita'
+import { Etichetta } from './Etichetta'
+import { useNotteScena } from './notte'
+import { Icona } from '../ui/Icona'
+import '../styles/scena.css'
+
+const CHIAVE_INTRO = 'studio-tesi.intro-vista'
+
+/** L'intro parte solo alla prima visita e mai con meno animazioni. */
+function introDaFare(ridotto: boolean): boolean {
+  if (ridotto) return false
+  try {
+    return localStorage.getItem(CHIAVE_INTRO) === null
+  } catch {
+    return false
+  }
+}
 
 const STATO = {
   riposo: '',
@@ -46,9 +62,9 @@ function Postazione({ k, scelta, primoPiano, onScegli }: { k: AgentKey; scelta: 
         onPointerOver={cursore(true)}
         onPointerOut={cursore(false)}
       >
-        <Scrivania colore={def.colore} schermoAcceso={lavora || scelta} sfasamento={scrivania[0] / 10} />
+        <Scrivania colore={def.colore} schermoAcceso={lavora || scelta} lavora={lavora} sfasamento={scrivania[0] / 10} />
         <group position={[0, 0, DIETRO_SCRIVANIA]}>
-          <Persona3D persona={def.persona} lavora={lavora} scelta={scelta} parla={scelta} sfasamento={scrivania[0]} ombre={completa} />
+          <Persona3D persona={def.persona} lavora={lavora} status={runtime.status} scelta={scelta} parla={scelta} sfasamento={scrivania[0]} ombre={completa} />
         </group>
         {/* alone a terra per chi stai ascoltando */}
         {(scelta || sopra) && (
@@ -59,7 +75,7 @@ function Postazione({ k, scelta, primoPiano, onScegli }: { k: AgentKey; scelta: 
         )}
       </group>
       {!primoPiano && (
-      <Html position={[0, 1.8, DIETRO_SCRIVANIA]} center distanceFactor={9} zIndexRange={[30, 10]} pointerEvents="none">
+      <Etichetta position={[0, 1.8, DIETRO_SCRIVANIA]} distanceFactor={9} zIndexRange={[30, 10]} pointerEvents="none">
         <button
           type="button"
           className={`etichetta-scena cartellino ${scelta ? 'cartellino-scelto' : ''} stato-${runtime.status}`}
@@ -71,7 +87,7 @@ function Postazione({ k, scelta, primoPiano, onScegli }: { k: AgentKey; scelta: 
           <span>{def.persona.titolo}</span>
           {STATO[runtime.status] && <em>{runtime.etichetta || STATO[runtime.status]}</em>}
         </button>
-      </Html>
+      </Etichetta>
       )}
     </group>
   )
@@ -91,12 +107,72 @@ function CentroOttico({ spostamento }: { spostamento: number }) {
   const size = useThree((s) => s.size)
   const invalida = useThree((s) => s.invalidate)
   useEffect(() => {
-    if (spostamento > 0 && size.width > spostamento * 1.6) camera.setViewOffset(size.width + spostamento, size.height, spostamento, 0, size.width, size.height)
+    const offset = spostamento > 0 && size.width > spostamento * 1.6
+    // L'aspetto va calcolato sulla vista intera (canvas + pannello), altrimenti
+    // la porzione visibile risulta stirata in orizzontale.
+    Object.assign(camera, { manual: true, aspect: (offset ? size.width + spostamento : size.width) / Math.max(1, size.height) })
+    if (offset) camera.setViewOffset(size.width + spostamento, size.height, spostamento, 0, size.width, size.height)
     else camera.clearViewOffset()
+    // Se lo spazio libero è stretto (barra laterale, finestra piccola) allarga il campo
+    // visivo quel tanto che basta perché tutte e quattro le scrivanie restino nell'inquadratura.
+    const libera = (offset ? size.width - spostamento : size.width) / Math.max(1, size.height)
+    const fov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(27.5)) / libera) * 180) / Math.PI, 44, 56)
+    if (Math.abs(camera.fov - fov) > 0.01) Object.assign(camera, { fov })
+    camera.updateProjectionMatrix()
     invalida()
     return () => camera.clearViewOffset()
   }, [camera, size.width, size.height, spostamento, invalida])
   return null
+}
+
+/** Luci, cielo e riflessi: di giorno luce naturale, di notte lampade calde e bagliori. */
+function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
+  const sfondo = notte ? '#121828' : '#eef0ee'
+  return (
+    <>
+      <color attach="background" args={[sfondo]} />
+      <fog attach="fog" args={[sfondo, 26, 48]} />
+      {/* luce d'ambiente generata in locale: riflessi morbidi senza scaricare niente */}
+      <Environment key={notte ? 'notte' : 'giorno'} resolution={256} frames={1}>
+        {notte ? (
+          <>
+            <Lightformer form="rect" intensity={0.35} color="#4d5f9c" position={[0, 3, -9]} scale={[16, 5, 1]} />
+            <Lightformer form="rect" intensity={0.75} color="#ffd9a6" position={[0, 8, 0]} rotation-x={Math.PI / 2} scale={[14, 8, 1]} />
+            <Lightformer form="rect" intensity={0.25} color="#ffcf9a" position={[-10, 3, 2]} rotation-y={Math.PI / 2} scale={[10, 4, 1]} />
+            <Lightformer form="rect" intensity={0.25} color="#ffcf9a" position={[10, 3, 2]} rotation-y={-Math.PI / 2} scale={[10, 4, 1]} />
+          </>
+        ) : (
+          <>
+            <Lightformer form="rect" intensity={2.2} color="#fff6e8" position={[0, 3, -9]} scale={[16, 5, 1]} />
+            <Lightformer form="rect" intensity={1.2} color="#ffffff" position={[0, 8, 0]} rotation-x={Math.PI / 2} scale={[14, 8, 1]} />
+            <Lightformer form="rect" intensity={0.6} color="#dfe7ee" position={[-10, 3, 2]} rotation-y={Math.PI / 2} scale={[10, 4, 1]} />
+            <Lightformer form="rect" intensity={0.6} color="#fff0dc" position={[10, 3, 2]} rotation-y={-Math.PI / 2} scale={[10, 4, 1]} />
+          </>
+        )}
+      </Environment>
+      <hemisphereLight
+        args={notte ? ['#ffdcb0', '#2b2638', completa ? 0.28 : 0.62] : ['#ffffff', '#b9ae9c', completa ? 0.45 : 0.9]}
+      />
+      <directionalLight
+        position={[4, 9, 9]}
+        intensity={notte ? (completa ? 0.5 : 0.7) : completa ? 1.25 : 1.1}
+        color={notte ? '#ffcf96' : '#fff4e6'}
+        castShadow={completa}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-left={-13}
+        shadow-camera-right={13}
+        shadow-camera-top={8}
+        shadow-camera-bottom={-8}
+        shadow-camera-near={1}
+        shadow-camera-far={35}
+        shadow-bias={-0.0003}
+        shadow-normalBias={0.02}
+      />
+      {/* luce dalla vetrata, alle spalle delle persone: sole di giorno, luna di notte */}
+      <directionalLight position={[0, 5, -10]} intensity={notte ? 0.35 : 0.55} color={notte ? '#7f97e0' : '#e9f2ff'} />
+    </>
+  )
 }
 
 export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ridotta'; spazioDestra?: number }) {
@@ -112,6 +188,18 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
   const [vista, setVista] = useState<AgentKey | null>(null)
   const [token, setToken] = useState(0)
   const [inquadraturaPrima, setInquadraturaPrima] = useState(inquadratura)
+  const { notte, preferenza, alterna } = useNotteScena()
+  const [intro, setIntro] = useState(() => introDaFare(fermo))
+  const fineIntro = useCallback(() => setIntro(false), [])
+
+  useEffect(() => {
+    if (!intro) return
+    try {
+      localStorage.setItem(CHIAVE_INTRO, '1')
+    } catch {
+      /* storage non disponibile */
+    }
+  }, [intro])
 
   if (inquadraturaPrima !== inquadratura) {
     setInquadraturaPrima(inquadratura)
@@ -136,46 +224,23 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
         style={{ touchAction: 'pan-y' }}
         onCreated={({ camera }) => camera.lookAt(...CAMERA_BERSAGLIO)}
       >
-        <color attach="background" args={['#eef0ee']} />
-        <fog attach="fog" args={['#eef0ee', 26, 48]} />
-        {/* luce d'ambiente generata in locale: riflessi morbidi senza scaricare niente */}
-        <Environment resolution={256} frames={1}>
-          <Lightformer form="rect" intensity={2.2} color="#fff6e8" position={[0, 3, -9]} scale={[16, 5, 1]} />
-          <Lightformer form="rect" intensity={1.2} color="#ffffff" position={[0, 8, 0]} rotation-x={Math.PI / 2} scale={[14, 8, 1]} />
-          <Lightformer form="rect" intensity={0.6} color="#dfe7ee" position={[-10, 3, 2]} rotation-y={Math.PI / 2} scale={[10, 4, 1]} />
-          <Lightformer form="rect" intensity={0.6} color="#fff0dc" position={[10, 3, 2]} rotation-y={-Math.PI / 2} scale={[10, 4, 1]} />
-        </Environment>
-        <hemisphereLight args={['#ffffff', '#b9ae9c', completa ? 0.45 : 0.9]} />
-        <directionalLight
-          position={[4, 9, 9]}
-          intensity={completa ? 1.25 : 1.1}
-          color="#fff4e6"
-          castShadow={completa}
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-left={-13}
-          shadow-camera-right={13}
-          shadow-camera-top={8}
-          shadow-camera-bottom={-8}
-          shadow-camera-near={1}
-          shadow-camera-far={35}
-          shadow-bias={-0.0003}
-          shadow-normalBias={0.02}
-        />
-        {/* luce dalla vetrata, alle spalle delle persone */}
-        <directionalLight position={[0, 5, -10]} intensity={0.55} color="#e9f2ff" />
+        <Luci notte={notte} completa={completa} />
         <ContestoQualita.Provider value={qualita}>
-          <Suspense fallback={null}>
-            <Sala etichette={vista === null} />
-            {AGENTI.map((a) => (
-              <Postazione key={a.key} k={a.key} scelta={scelto === a.key} primoPiano={vista === a.key} onScegli={scegli} />
-            ))}
-            {completa && <ContactShadows position={[0, 0.01, 0]} scale={30} resolution={1024} blur={2.4} opacity={0.38} far={3} frames={1} />}
-          </Suspense>
+          <ContestoNotte.Provider value={notte}>
+            <ContestoEtichette.Provider value={{ spazioDestra, nascoste: intro }}>
+              <Suspense fallback={null}>
+                <Sala etichette={vista === null} />
+                {AGENTI.map((a) => (
+                  <Postazione key={a.key} k={a.key} scelta={scelto === a.key} primoPiano={vista === a.key} onScegli={scegli} />
+                ))}
+                {completa && <ContactShadows position={[0, 0.01, 0]} scale={30} resolution={1024} blur={2.4} opacity={notte ? 0.5 : 0.38} far={3} frames={1} />}
+              </Suspense>
+            </ContestoEtichette.Provider>
+          </ContestoNotte.Provider>
         </ContestoQualita.Provider>
 
         <CentroOttico spostamento={spazioDestra} />
-        <CameraRig controlli={controlli} fuoco={vista} token={token} />
+        <CameraRig controlli={controlli} fuoco={vista} token={token} intro={intro} onFineIntro={fineIntro} />
         {modo === 'computer' && (
           <OrbitControls
             ref={controlli as never}
@@ -184,7 +249,7 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
             enableZoom={false}
             enableDamping={!fermo}
             dampingFactor={0.08}
-            minPolarAngle={1.2}
+            minPolarAngle={1.3}
             maxPolarAngle={Math.PI / 2.15}
             minAzimuthAngle={-Math.PI / 5}
             maxAzimuthAngle={Math.PI / 5}
@@ -193,6 +258,16 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
       </Canvas>
 
       <div className="scena-comandi" role="toolbar" aria-label="Inquadrature">
+        <button
+          type="button"
+          className={`gettone gettone-tondo gettone-notte ${notte ? 'gettone-notte-attivo' : ''}`}
+          aria-label="Giorno o notte"
+          aria-pressed={notte}
+          title={`${notte ? 'Notte' : 'Giorno'}${preferenza === 'auto' ? ' (segue l’orologio)' : ''}: tocca per cambiare`}
+          onClick={alterna}
+        >
+          <Icona nome={notte ? 'luna' : 'sole'} dimensione={18} />
+        </button>
         {vista !== null && (
           <button
             type="button"

@@ -1,5 +1,5 @@
 import { costoStimato, modalitaGratuita } from '../../agents/api'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { controllaInCodice, giudicaCitazioni, stimaGiudizio, type EsitoControllo } from '../../agents/revisoreCitazioni'
 import {
   accettaProposta,
@@ -18,6 +18,9 @@ import { useStudio } from '../../store'
 import type { Capitolo, Citazione, Sezione } from '../../types'
 import { Conferma } from '../Conferma'
 import { TestoCitato } from '../TestoCitato'
+import { Icona } from '../../ui/Icona'
+import { MenuTendina } from '../../ui/MenuTendina'
+import { scegliVoce, usePaginaScrittura, type VoceScrittore } from './statoPagina'
 
 const NOME: Record<Comando, string> = {
   scaletta: 'Proponi una scaletta',
@@ -103,15 +106,38 @@ export function PannelloProposta({ sez }: { sez: Sezione }) {
   )
 }
 
-export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: Sezione; paragrafo: number | null }) {
+const ICONA: Record<VoceScrittore, string> = {
+  bozza: 'matita',
+  riscrivi: 'aggiorna',
+  alternative: 'copia',
+  corso: 'libro',
+  revisore: 'lente',
+}
+
+/**
+ * Barra di lavoro sopra il foglio: il menu "Chiedi allo scrittore" (una voce
+ * alla volta, con la conferma e il costo subito sotto la barra) e, a destra,
+ * gli strumenti passati da fuori (fonti e appunti, concentrazione, carta).
+ */
+export function ComandiScrittore({ cap, sez, paragrafo, strumenti }: { cap: Capitolo; sez: Sezione; paragrafo: number | null; strumenti?: ReactNode }) {
   const inCorso = useScrittore((s) => s.inCorso)
   const richiesta = useScrittore((s) => s.richiesta)
   const setRichiesta = (r: string) => useScrittore.setState({ richiesta: r })
+  const scelta = usePaginaScrittura((s) => s.scelta)
   const [errore, setErrore] = useState<string | null>(null)
   const [controllo, setControllo] = useState<EsitoControllo | null>(null)
   const [giudizioInCorso, setGiudizioInCorso] = useState(false)
+  const [sezioneMostrata, setSezioneMostrata] = useState(sez.id)
+  if (sezioneMostrata !== sez.id) {
+    // Cambiando sezione si chiude la conferma lasciata a metà.
+    setSezioneMostrata(sez.id)
+    setControllo(null)
+    setErrore(null)
+    scegliVoce(null)
+  }
   const pars = paragrafi(sez.testo)
   const scelto = paragrafo !== null && paragrafo < pars.length ? paragrafo : null
+  const occupato = inCorso !== null
 
   const esegui = async (fn: () => Promise<void>) => {
     setErrore(null)
@@ -122,75 +148,167 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
     }
   }
 
-  const comando = (c: Exclude<Comando, 'scaletta'>, abilitato: boolean, motivo: string, azione: () => Promise<void>) => {
-    const stima = abilitato ? stimaComando(cap, sez, c) : null
-    return (
-      <Conferma
-        key={c}
-        classe="bottone bottone-piccolo"
-        etichetta={NOME[c]}
-        disabilitato={!abilitato || inCorso !== null}
-        domanda={
-          stima
-            ? `${NOME[c]}: ${costoStimato(stima).replace('Costo', 'costo')}${stima.cache && !modalitaGratuita() ? ', in parte già in memoria (costa meno)' : ''}. Procedo?`
-            : motivo
-        }
-        conferma="Procedi"
-        onConferma={() => void esegui(azione)}
-      />
-    )
-  }
-
   const prontaBozza = sez.fontiConfermate && sez.scalettaApprovata
   const prontoParagrafo = sez.fontiConfermate && scelto !== null
+  const controllabile = sez.citazioni.length > 0 || /\[[FC]\d+\]/.test(sez.testo)
   const stimaG = sez.citazioni.length ? stimaGiudizio(sez) : null
+
+  const chiediRevisore = async () => {
+    setGiudizioInCorso(true)
+    await esegui(() => giudicaCitazioni(cap.id, sez.id))
+    setGiudizioInCorso(false)
+    setControllo(controllaInCodice(cap.id, sez.id))
+  }
+
+  /** Per ogni voce: se si può usare adesso, perché no, la domanda di conferma e l'azione. */
+  const voce = (v: VoceScrittore): { ok: boolean; motivo: string; domanda: string; azione: () => Promise<void> } => {
+    if (v === 'revisore') {
+      return {
+        ok: sez.citazioni.length > 0 && !giudizioInCorso,
+        motivo: 'Prima servono delle citazioni nel testo.',
+        domanda: stimaG ? `Il revisore controlla se ogni pezzo citato dice davvero quello che scrivi. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?',
+        azione: chiediRevisore,
+      }
+    }
+    const ok = !occupato && (v === 'bozza' ? prontaBozza : prontoParagrafo)
+    const motivo = v === 'bozza' ? 'Prima approva fonti e scaletta.' : sez.fontiConfermate ? 'Tocca un paragrafo del testo.' : 'Prima approva le fonti.'
+    const stima = ok ? stimaComando(cap, sez, v) : null
+    const domanda = stima
+      ? `${costoStimato(stima)}${stima.cache && !modalitaGratuita() ? ', in parte già in memoria (costa meno)' : ''}. Procedo?`
+      : motivo
+    const azione =
+      v === 'bozza'
+        ? () => proponiBozza(cap.id, sez.id)
+        : v === 'riscrivi'
+          ? () => riscriviParagrafo(cap.id, sez.id, scelto!, richiesta)
+          : v === 'alternative'
+            ? () => dueAlternative(cap.id, sez.id, scelto!)
+            : () => collegaAlCorso(cap.id, sez.id, scelto!)
+    return { ok, motivo, domanda, azione }
+  }
+
+  const voci = (['bozza', 'riscrivi', 'alternative', 'corso'] as const).map((v) => ({
+    id: v,
+    etichetta: NOME[v],
+    icona: ICONA[v],
+    disabilitata: !voce(v).ok,
+    onClick: () => scegliVoce(v),
+  }))
+
+  const attesa = scelta ? voce(scelta) : null
+  const mostraRichiesta = sez.fontiConfermate && (scelta === 'riscrivi' || richiesta.trim().length > 0)
 
   return (
     <div className="comandi-scrittore-box">
-      <div className="comandi-scrittore" role="toolbar" aria-label="Comandi dello Scrittore">
-        {comando('bozza', prontaBozza, 'Prima approva fonti e scaletta.', () => proponiBozza(cap.id, sez.id))}
-        {comando('riscrivi', prontoParagrafo, 'Tocca un paragrafo del testo.', () => riscriviParagrafo(cap.id, sez.id, scelto!, richiesta))}
-        {comando('alternative', prontoParagrafo, 'Tocca un paragrafo del testo.', () => dueAlternative(cap.id, sez.id, scelto!))}
-        {comando('corso', prontoParagrafo, 'Tocca un paragrafo del testo.', () => collegaAlCorso(cap.id, sez.id, scelto!))}
-        <button
-          type="button"
-          className="bottone bottone-piccolo"
-          disabled={sez.citazioni.length === 0 && !/\[[FC]\d+\]/.test(sez.testo)}
-          onClick={() => setControllo(controllaInCodice(cap.id, sez.id))}
-        >
-          Controlla le citazioni
-        </button>
+      <div className="sc-barra" role="toolbar" aria-label="Comandi dello Scrittore">
+        <MenuTendina
+          etichetta="Chiedi allo scrittore"
+          icona="bacchetta"
+          voci={[
+            ...voci,
+            {
+              id: 'controlla',
+              etichetta: 'Controlla le citazioni',
+              icona: 'spunta',
+              disabilitata: !controllabile,
+              onClick: () => {
+                scegliVoce(null)
+                setControllo(controllaInCodice(cap.id, sez.id))
+              },
+            },
+            { id: 'revisore', etichetta: 'Chiedi al revisore…', icona: ICONA.revisore, disabilitata: !voce('revisore').ok, onClick: () => scegliVoce('revisore') },
+          ]}
+        />
+        {sez.fontiConfermate && scelto !== null && (
+          <span className="sc-paragrafo-chip" title={pars[scelto].slice(0, 200)}>
+            <Icona nome="parola" dimensione={15} /> § {scelto + 1}
+          </span>
+        )}
+        <span className="sc-barra-spazio" />
+        {strumenti}
       </div>
-      {!sez.fontiConfermate && <p className="nota">Questi comandi funzionano dopo che approvi le fonti. Per la bozza serve anche la scaletta.</p>}
-      {sez.fontiConfermate && (
-        <p className="nota paragrafo-scelto">
+
+      {scelta && attesa && (
+        <div className="sc-conferma" role="group" aria-label={scelta === 'revisore' ? 'Chiedi al revisore' : NOME[scelta]}>
+          <span className="sc-conferma-icona">
+            <Icona nome={ICONA[scelta]} />
+          </span>
+          <div className="sc-conferma-corpo">
+            <strong>{scelta === 'revisore' ? 'Chiedi al revisore' : NOME[scelta]}</strong>
+            <span className="conferma-domanda">{attesa.ok ? attesa.domanda : attesa.motivo}</span>
+          </div>
+          <div className="sc-conferma-bottoni">
+            {attesa.ok && (
+              <button
+                type="button"
+                className="bottone bottone-primario"
+                onClick={() => {
+                  scegliVoce(null)
+                  void esegui(attesa.azione)
+                }}
+              >
+                Procedi
+              </button>
+            )}
+            <button type="button" className="bottone bottone-vuoto" onClick={() => scegliVoce(null)}>
+              Annulla
+            </button>
+          </div>
+          {mostraRichiesta && (
+            <label className="sc-richiesta">
+              <span className="etichetta">Come lo vuoi? (se vuoi)</span>
+              <input
+                disabled={scelto === null}
+                className="campo"
+                placeholder="Per esempio «più corto» o «separa raccolta e frantoio»"
+                value={richiesta}
+                onChange={(e) => setRichiesta(e.target.value)}
+                aria-label="Indicazione per la riscrittura"
+              />
+            </label>
+          )}
+        </div>
+      )}
+      {!scelta && mostraRichiesta && (
+        <label className="sc-richiesta sc-richiesta-sola">
+          <span className="etichetta">Indicazione per «Riscrivi questo paragrafo»</span>
+          <input
+            disabled={scelto === null}
+            className="campo"
+            placeholder="Per esempio «più corto» o «separa raccolta e frantoio»"
+            value={richiesta}
+            onChange={(e) => setRichiesta(e.target.value)}
+            aria-label="Indicazione per la riscrittura"
+          />
+        </label>
+      )}
+
+      {!sez.fontiConfermate ? (
+        <p className="nota sc-suggerimento">
+          <Icona nome="info" dimensione={15} /> I comandi dello Scrittore funzionano dopo che approvi le fonti. Per la bozza serve anche la scaletta.
+        </p>
+      ) : (
+        <p className="nota sc-suggerimento paragrafo-scelto">
+          <Icona nome="info" dimensione={15} />
           {scelto !== null ? (
-            <>
+            <span>
               Paragrafo scelto: <strong>{scelto + 1}</strong> — «{pars[scelto].slice(0, 90)}
               {pars[scelto].length > 90 ? '…' : ''}»
-            </>
+            </span>
           ) : (
-            'Tocca un paragrafo per riscriverlo, avere due alternative o collegarlo al corso.'
+            <span>Tocca un paragrafo per riscriverlo, avere due alternative o collegarlo al corso.</span>
           )}
         </p>
       )}
-      {sez.fontiConfermate && (
-        <input
-          disabled={scelto === null}
-          className="campo"
-          placeholder="Come lo vuoi? Per esempio «più corto» o «separa raccolta e frantoio» (puoi lasciarlo vuoto)"
-          value={richiesta}
-          onChange={(e) => setRichiesta(e.target.value)}
-          aria-label="Indicazione per la riscrittura"
-        />
-      )}
+
       {inCorso && inCorso.sezioneId === sez.id && inCorso.comando !== 'scaletta' && (
-        <p className="in-corso">Lo Scrittore ci sta lavorando: {NOME[inCorso.comando].toLowerCase()}…</p>
+        <p className="in-corso sc-in-corso">Lo Scrittore ci sta lavorando: {NOME[inCorso.comando].toLowerCase()}…</p>
       )}
+      {giudizioInCorso && <p className="in-corso sc-in-corso">Il revisore sta controllando le citazioni…</p>}
       {errore && <p className="allerta allerta-errore">{errore}</p>}
 
       {controllo && (
-        <div className="esito-controllo" role="status">
+        <div className="esito-controllo sc-controllo" role="status">
           <p>
             <strong>Controllo veloce:</strong> {controllo.citazioni} citazioni — {controllo.verdi} verdi, {controllo.ambra} ambra,{' '}
             {controllo.rosse} rosse.
@@ -198,26 +316,20 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
               <span className="testo-errore"> Rimandi senza citazione: {controllo.senzaCitazione.join(', ')}.</span>
             )}
           </p>
-          {sez.citazioni.length > 0 && (
-            <div className="riga-editor">
-              {giudizioInCorso ? (
-                <span className="in-corso">Il revisore sta controllando le citazioni…</span>
-              ) : (
-                <Conferma
-                  classe="bottone bottone-piccolo"
-                  etichetta="Chiedi al revisore"
-                  domanda={stimaG ? `Il revisore controlla se ogni pezzo citato dice davvero quello che scrivi. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?'}
-                  conferma="Procedi"
-                  onConferma={async () => {
-                    setGiudizioInCorso(true)
-                    await esegui(() => giudicaCitazioni(cap.id, sez.id))
-                    setGiudizioInCorso(false)
-                    setControllo(controllaInCodice(cap.id, sez.id))
-                  }}
-                />
-              )}
-            </div>
-          )}
+          <div className="riga-editor">
+            {sez.citazioni.length > 0 && !giudizioInCorso && (
+              <Conferma
+                classe="bottone bottone-piccolo bottone-secondario"
+                etichetta="Chiedi al revisore"
+                domanda={stimaG ? `Il revisore controlla se ogni pezzo citato dice davvero quello che scrivi. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?'}
+                conferma="Procedi"
+                onConferma={() => void chiediRevisore()}
+              />
+            )}
+            <button type="button" className="bottone bottone-piccolo bottone-vuoto" onClick={() => setControllo(null)}>
+              Chiudi
+            </button>
+          </div>
         </div>
       )}
 

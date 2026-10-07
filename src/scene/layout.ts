@@ -10,6 +10,13 @@ export const ALTEZZA_SALA = 6.6
 export const CAMERA_CASA: [number, number, number] = [0, 2.8, 10.6]
 export const CAMERA_BERSAGLIO: [number, number, number] = [0, 1.75, -2.4]
 
+/** Parete di fondo con la porta d'ingresso, alle spalle della vista d'insieme. */
+export const PARETE_FONDO_Z = 12
+export const PORTA = { larghezza: 2.4, altezza: 3.1 }
+/** Intro della prima visita: fuori dalla porta, poi la telecamera entra. */
+export const CAMERA_INGRESSO: [number, number, number] = [0, 1.65, 17.5]
+export const INGRESSO_BERSAGLIO: [number, number, number] = [0, 1.55, 4]
+
 export interface Postazione {
   /** Centro della scrivania. */
   scrivania: [number, number]

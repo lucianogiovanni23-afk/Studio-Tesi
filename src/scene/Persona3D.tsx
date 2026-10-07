@@ -1,10 +1,11 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Persona } from '../agents/agenti'
 import { Sedia } from './Sedia'
 import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useStudio } from '../store'
+import type { AgentStatus } from '../types'
 
 /**
  * Una persona seduta alla scrivania, in abito e cravatta, rivolta verso la
@@ -113,9 +114,23 @@ function Testa({ a, bocca }: { a: Persona['aspetto']; bocca: React.RefObject<THR
   )
 }
 
-function Braccio({ lato, abito, pelle, avambraccio }: { lato: 1 | -1; abito: string; pelle: string; avambraccio: React.RefObject<THREE.Group> }) {
+function Braccio({
+  lato,
+  abito,
+  pelle,
+  avambraccio,
+  spalla,
+}: {
+  lato: 1 | -1
+  abito: string
+  pelle: string
+  avambraccio: React.RefObject<THREE.Group>
+  spalla: React.RefObject<THREE.Group>
+}) {
+  // Il gruppo "spalla" ruota attorno all'articolazione: serve per alzare la mano e salutare.
   return (
-    <group>
+    <group ref={spalla} position={[lato * 0.205, 1.075, -0.01]}>
+    <group position={[-lato * 0.205, -1.075, 0.01]}>
       <mesh position={[lato * 0.205, 1.075, -0.01]} scale={[1, 0.85, 0.8]} castShadow>
         <sphereGeometry args={[0.075, 16, 12]} />
         <meshStandardMaterial color={abito} roughness={0.75} />
@@ -140,12 +155,17 @@ function Braccio({ lato, abito, pelle, avambraccio }: { lato: 1 | -1; abito: str
         </mesh>
       </group>
     </group>
+    </group>
   )
 }
+
+/** Quanto dura il saluto quando un lavoro è finito. */
+const DURATA_SALUTO = 2.2
 
 export function Persona3D({
   persona,
   lavora,
+  status,
   scelta,
   parla,
   sfasamento,
@@ -153,6 +173,7 @@ export function Persona3D({
 }: {
   persona: Persona
   lavora: boolean
+  status?: AgentStatus
   scelta: boolean
   parla: boolean
   sfasamento: number
@@ -165,18 +186,54 @@ export function Persona3D({
   const bocca = useRef<THREE.Mesh>(null)
   const sx = useRef<THREE.Group>(null)
   const dx = useRef<THREE.Group>(null)
+  const spallaSx = useRef<THREE.Group>(null)
+  const spallaDx = useRef<THREE.Group>(null)
+  const radice = useRef<THREE.Group>(null)
+  // Saluto: quando lo stato diventa "fatto" la persona si gira verso di te e alza la mano.
+  const saluto = useRef({ richiesto: false, inizio: -1, peso: 0 })
+  const statoPrima = useRef(status)
+  useEffect(() => {
+    if (status === 'fatto' && statoPrima.current !== undefined && statoPrima.current !== 'fatto') saluto.current.richiesto = true
+    statoPrima.current = status
+  }, [status])
   const risvolto = useMemo(() => scurisci(a.abito, -0.25), [a.abito])
   const pantaloni = useMemo(() => scurisci(a.abito, 0.08), [a.abito])
 
   useFrame((stato, delta) => {
     if (fermo) return
     const t = stato.clock.elapsedTime + sfasamento
-    if (busto.current) busto.current.scale.y = 1 + Math.sin(t * 1.7) * 0.008
+    const k = 1 - Math.exp(-delta * 4)
+    // peso del saluto: sale in fretta, resta, poi torna giù
+    const sal = saluto.current
+    if (sal.richiesto) {
+      sal.richiesto = false
+      sal.inizio = stato.clock.elapsedTime
+    }
+    const trascorso = sal.inizio < 0 ? 99 : stato.clock.elapsedTime - sal.inizio
+    const salutaOra = trascorso < DURATA_SALUTO
+    sal.peso += ((salutaOra ? 1 : 0) - sal.peso) * (1 - Math.exp(-delta * 7))
+    const w = sal.peso
+    if (busto.current) {
+      busto.current.scale.y = 1 + Math.sin(t * 1.7) * 0.008
+      // si gira verso la telecamera (solo il busto: sedia e gambe restano ferme)
+      let girata = 0
+      if (w > 0.001 && radice.current) {
+        const e = radice.current.matrixWorld.elements
+        const yawMondo = Math.atan2(e[8], e[10])
+        const dxCam = stato.camera.position.x - e[12]
+        const dzCam = stato.camera.position.z - e[14]
+        girata = THREE.MathUtils.clamp(Math.atan2(dxCam, dzCam) - yawMondo, -0.7, 0.7) * w
+      }
+      busto.current.rotation.y = girata
+    }
+    // braccio che saluta: spalla in fuori, avambraccio in alto che oscilla
+    const oscilla = Math.sin(trascorso * 11) * 0.38
+    if (spallaSx.current) spallaSx.current.rotation.z = -1.25 * w
     if (testa.current) {
-      // Chi è scelto guarda verso di te; gli altri si guardano intorno o guardano lo schermo.
-      const yaw = scelta ? 0 : lavora ? Math.sin(t * 0.7) * 0.08 : Math.sin(t * 0.35) * 0.35
-      const pitch = lavora && !scelta ? 0.22 : scelta ? -0.04 : Math.sin(t * 0.5) * 0.04
-      const k = 1 - Math.exp(-delta * 4)
+      // Chi è scelto (o saluta) guarda verso di te; gli altri si guardano intorno o guardano lo schermo.
+      const guarda = scelta || w > 0.5
+      const yaw = guarda ? 0 : lavora ? Math.sin(t * 0.7) * 0.08 : Math.sin(t * 0.35) * 0.35
+      const pitch = guarda ? -0.04 : lavora ? 0.22 : Math.sin(t * 0.5) * 0.04
       testa.current.rotation.y += (yaw - testa.current.rotation.y) * k
       testa.current.rotation.x += (pitch - testa.current.rotation.x) * k
     }
@@ -184,12 +241,16 @@ export function Persona3D({
     const parlaOra = parla && useStudio.getState().parlaFino > Date.now()
     if (bocca.current) bocca.current.scale.y = parlaOra ? 1 + Math.abs(Math.sin(t * 13)) * 2.2 : 1
     const battuta = lavora ? Math.sin(t * 14) * 0.05 : 0
-    if (sx.current) sx.current.rotation.x = Math.PI / 2 - 0.12 + battuta
+    if (sx.current) {
+      const riposo = Math.PI / 2 - 0.12 + battuta
+      sx.current.rotation.x = riposo + (0.15 - riposo) * w
+      sx.current.rotation.z = 0.18 + (1.3 + oscilla - 0.18) * w
+    }
     if (dx.current) dx.current.rotation.x = Math.PI / 2 - 0.12 - battuta
   })
 
   return (
-    <group>
+    <group ref={radice}>
       <Sedia accento={a.cravatta} ombre={ombre} />
 
       {/* gambe */}
@@ -246,8 +307,8 @@ export function Persona3D({
             <meshStandardMaterial color="#f7f7f4" roughness={0.6} />
           </mesh>
         ))}
-        <Braccio lato={-1} abito={a.abito} pelle={a.pelle} avambraccio={sx} />
-        <Braccio lato={1} abito={a.abito} pelle={a.pelle} avambraccio={dx} />
+        <Braccio lato={-1} abito={a.abito} pelle={a.pelle} avambraccio={sx} spalla={spallaSx} />
+        <Braccio lato={1} abito={a.abito} pelle={a.pelle} avambraccio={dx} spalla={spallaDx} />
         {/* collo e testa */}
         <mesh position={[0, 1.16, 0]}>
           <cylinderGeometry args={[0.05, 0.055, 0.1, 16]} />

@@ -1,3 +1,4 @@
+import '../styles/revisione.css'
 import { costoStimato } from '../agents/api'
 import { useMemo, useState } from 'react'
 import {
@@ -12,6 +13,9 @@ import { Conferma } from '../components/Conferma'
 import { esportaWord } from '../io/esportaWord'
 import { TestoCitato } from '../components/TestoCitato'
 import { bibliografia } from '../domain/bibliografia'
+import { coloreCitazione } from '../domain/citazioniTesto'
+import { Icona } from '../ui/Icona'
+import { Info } from '../ui/Info'
 import { useStudio } from '../store'
 import type { Osservazione, PropostaRevisione, TipoRilievo } from '../types'
 
@@ -111,7 +115,7 @@ export function CartaOsservazione({ o }: { o: Osservazione }) {
       ) : (
         o.stato === 'aperta' && (
           <Conferma
-            classe={o.proposte.length ? 'bottone bottone-piccolo' : 'bottone bottone-primario'}
+            classe={o.proposte.length ? 'bottone bottone-secondario bottone-piccolo' : 'bottone bottone-secondario'}
             etichetta={o.proposte.length ? 'Chiedi nuove proposte' : 'Chiedi al revisore'}
             domanda={`${costoStimato(stima)}${o.proposte.length ? '; le proposte di adesso verranno sostituite' : ''}. Procedo?`}
             conferma="Procedi"
@@ -151,9 +155,11 @@ function Osservazioni() {
   const ordinate = useMemo(() => [...osservazioni].sort((a, b) => Number(a.stato === 'risolta') - Number(b.stato === 'risolta')), [osservazioni])
 
   return (
-    <div className="colonna-unica">
-      <section className="pannello">
-        <h2>Nuova nota del relatore</h2>
+    <div className="rev-griglia">
+      <section className="pannello rev-carta rev-nuova">
+        <h2 className="rev-titolo">
+          <Icona nome="piu" dimensione={20} /> Nuova nota del relatore
+        </h2>
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -178,14 +184,25 @@ function Osservazioni() {
             </select>
           </label>
           <button type="submit" className="bottone bottone-primario" disabled={!testo.trim()}>
+            <Icona nome="piu" dimensione={18} />
             Aggiungi la nota
           </button>
         </form>
       </section>
-      <section className="pannello">
-        <h2>Note del relatore ({osservazioni.filter((o) => o.stato === 'aperta').length} da sistemare)</h2>
+      <section className="pannello rev-carta">
+        <div className="rev-testa">
+          <h2 className="rev-titolo">
+            <Icona nome="nota" dimensione={20} /> Note del relatore ({osservazioni.filter((o) => o.stato === 'aperta').length} da sistemare)
+          </h2>
+          <Info etichetta="Come funzionano le note">
+            Quando il relatore ti manda dei commenti, incollali qui: il revisore ti propone cosa cambiare e tu decidi, una cosa alla volta.
+          </Info>
+        </div>
         {ordinate.length === 0 ? (
-          <p className="nota">Ancora nessuna nota. Quando il relatore ti manda dei commenti, incollali qui: il revisore ti propone cosa cambiare e tu decidi, una cosa alla volta.</p>
+          <div className="rev-vuoto">
+            <Icona nome="nota" dimensione={30} />
+            <p>Ancora nessuna nota. Quando il relatore ti manda dei commenti, incollali qui: il revisore ti propone cosa cambiare e tu decidi, una cosa alla volta.</p>
+          </div>
         ) : (
           <ul className="elenco-osservazioni">
             {ordinate.map((o) => (
@@ -227,17 +244,38 @@ function Controllo() {
   }, [controllo])
 
   return (
-    <section className="pannello">
-      <h2>Controlla tutta la tesi</h2>
-      <p className="nota">
-        Il controllo veloce è gratis: trova termini scritti diversi dal glossario, frasi ripetute, parole che portano fuori tema
-        e citazioni rosse. Il revisore invece legge tutto e guarda se i capitoli si contraddicono o escono dal tema. Ogni cosa che
-        segnala deve citare una frase vera della tesi, se no la scarto.
-      </p>
-      <div className="riga-editor">
-        <button type="button" className="bottone" onClick={controlloSoloCodice}>
-          Controllo veloce (gratis)
-        </button>
+    <section className="pannello rev-carta">
+      <div className="rev-testa">
+        <h2 className="rev-titolo">
+          <Icona nome="lente" dimensione={20} /> Controlla tutta la tesi
+        </h2>
+        <Info etichetta="Cosa controllo">
+          Il controllo veloce è gratis: trova termini scritti diversi dal glossario, frasi ripetute, parole che portano fuori tema
+          e citazioni rosse. Il revisore invece legge tutto e guarda se i capitoli si contraddicono o escono dal tema. Ogni cosa che
+          segnala deve citare una frase vera della tesi, se no la scarto.
+        </Info>
+      </div>
+      <div className="rev-scelte">
+        <div className="rev-scelta">
+          <span className="rev-scelta-icona" aria-hidden>
+            <Icona nome="bacchetta" dimensione={20} />
+          </span>
+          <div>
+            <strong>Controllo veloce</strong>
+            <p className="nota">Gratis, in un attimo: glossario, ripetizioni, fuori tema, citazioni rosse.</p>
+          </div>
+          <button type="button" className="bottone bottone-secondario" onClick={controlloSoloCodice}>
+            Controllo veloce (gratis)
+          </button>
+        </div>
+        <div className="rev-scelta rev-scelta-forte">
+          <span className="rev-scelta-icona" aria-hidden>
+            <Icona nome="occhio" dimensione={20} />
+          </span>
+          <div>
+            <strong>Lettura del revisore</strong>
+            <p className="nota">Legge tutto: contraddizioni tra capitoli e parti fuori tema.</p>
+          </div>
         {lavoro ? (
           <span className="in-corso">Il revisore sta leggendo tutta la tesi…</span>
         ) : (
@@ -259,13 +297,14 @@ function Controllo() {
             }}
           />
         )}
+        </div>
       </div>
       {errore && <p className="allerta allerta-errore">{errore}</p>}
 
       {controllo && (
         <>
-          <p className="nota">
-            Ultimo controllo: {new Date(controllo.data).toLocaleString('it-IT')} · {controllo.conRevisore ? 'veloce + revisore' : 'solo veloce'} ·{' '}
+          <p className="nota rev-ultimo">
+            <Icona nome="orologio" dimensione={16} /> Ultimo controllo: {new Date(controllo.data).toLocaleString('it-IT')} · {controllo.conRevisore ? 'veloce + revisore' : 'solo veloce'} ·{' '}
             {controllo.rilievi.length} cose da guardare
             {controllo.scartati > 0 && ` · ${controllo.scartati} segnalazioni del revisore tolte perché citavano frasi che non ci sono`}
           </p>
@@ -329,17 +368,21 @@ function Bibliografia() {
   ].join('\n')
 
   return (
-    <section className="pannello">
-      <div className="pannello-testa">
-        <h2>Bibliografia</h2>
-        <span className="nota">
+    <section className="pannello rev-carta">
+      <div className="rev-testa">
+        <h2 className="rev-titolo">
+          <Icona nome="libri" dimensione={20} /> Bibliografia
+        </h2>
+        <Info etichetta="Come la preparo">
+          La faccio con i dati veri delle fonti che citi nel testo (autori, anno, rivista, DOI), in ordine alfabetico.
+        </Info>
+        <span className="nota rev-stile">
           stile {stile === 'note' ? 'note a piè di pagina' : 'autore-anno'} ·{' '}
           <button type="button" className="link" onClick={() => vai('impostazioni')}>
             cambia
           </button>
         </span>
       </div>
-      <p className="nota">La faccio con i dati veri delle fonti che citi nel testo (autori, anno, rivista, DOI), in ordine alfabetico.</p>
       {biblio.mancanti.length > 0 && <p className="allerta">Rimandi a fonti che non sono in biblioteca: {biblio.mancanti.join(', ')}.</p>}
       {biblio.voci.length === 0 ? (
         <p className="nota">Nel testo non citi ancora nessuna fonte.</p>
@@ -360,10 +403,10 @@ function Bibliografia() {
           </ul>
         </>
       )}
-      <div className="riga-editor">
+      <div className="riga-editor rev-azioni">
         <button
           type="button"
-          className="bottone"
+          className="bottone bottone-secondario"
           disabled={biblio.voci.length === 0}
           onClick={async () => {
             try {
@@ -374,11 +417,12 @@ function Bibliografia() {
             }
           }}
         >
+          <Icona nome="copia" dimensione={16} />
           Copia la bibliografia
         </button>
         <button
           type="button"
-          className="bottone bottone-vuoto"
+          className="bottone bottone-secondario"
           disabled={biblio.voci.length === 0}
           onClick={() => {
             const url = URL.createObjectURL(new Blob([testo], { type: 'text/plain;charset=utf-8' }))
@@ -389,6 +433,7 @@ function Bibliografia() {
             setTimeout(() => URL.revokeObjectURL(url), 5000)
           }}
         >
+          <Icona nome="scarica" dimensione={16} />
           Scarica (.txt)
         </button>
         <button
@@ -397,6 +442,7 @@ function Bibliografia() {
           disabled={biblio.voci.length === 0}
           onClick={() => setMessaggio(`${segna()} fonti segnate come usate, con i capitoli in cui compaiono.`)}
         >
+          <Icona nome="spunta" dimensione={16} />
           Segna le fonti come usate
         </button>
       </div>
@@ -406,7 +452,7 @@ function Bibliografia() {
         </p>
       )}
       {biblio.nonCitate.length > 0 && (
-        <details>
+        <details className="rev-dettagli">
           <summary>Fonti che non hai citato ({biblio.nonCitate.length})</summary>
           <ul className="elenco-semplice">
             {biblio.nonCitate.map((f) => (
@@ -431,12 +477,17 @@ function EsportaWord() {
   const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
 
   return (
-    <section className="pannello">
-      <h2>Scarica in Word</h2>
-      <p className="nota">
-        Un file Word da mandare al relatore: titoli già pronti per l'indice automatico, Times New Roman 12, interlinea 1,5,
-        citazioni nello stile che hai scelto ({stile === 'note' ? 'note a piè di pagina' : 'autore-anno nel testo'}) e bibliografia in fondo.
-      </p>
+    <section className="pannello rev-carta rev-word">
+      <div className="rev-testa">
+        <h2 className="rev-titolo">
+          <Icona nome="word" dimensione={20} /> Scarica in Word
+        </h2>
+        <Info etichetta="Com'è fatto il file">
+          Un file Word da mandare al relatore: titoli già pronti per l'indice automatico, Times New Roman 12, interlinea 1,5,
+          citazioni nello stile che hai scelto ({stile === 'note' ? 'note a piè di pagina' : 'autore-anno nel testo'}) e bibliografia in fondo.
+        </Info>
+      </div>
+      <p className="nota">Il file da mandare al relatore, già impaginato: Times 12, interlinea 1,5, indice automatico.</p>
       <label className="campo-blocco">
         <span className="etichetta">Cosa vuoi scaricare</span>
         <select className="campo" value={capitolo} onChange={(e) => setCapitolo(e.target.value)}>
@@ -448,6 +499,7 @@ function EsportaWord() {
           ))}
         </select>
       </label>
+      <div className="rev-opzioni">
       <label className="interruttore">
         <input type="checkbox" checked={conFrontespizio} onChange={(e) => setConFrontespizio(e.target.checked)} />
         <span>Pagina con il titolo</span>
@@ -456,6 +508,7 @@ function EsportaWord() {
         <input type="checkbox" checked={conBibliografia} onChange={(e) => setConBibliografia(e.target.checked)} />
         <span>Bibliografia in fondo</span>
       </label>
+      </div>
       <button
         type="button"
         className="bottone bottone-primario"
@@ -473,6 +526,7 @@ function EsportaWord() {
           }
         }}
       >
+        <Icona nome="scarica" dimensione={18} />
         {lavoro ? 'Preparo il file…' : 'Scarica il file Word'}
       </button>
       {messaggio && (
@@ -480,6 +534,87 @@ function EsportaWord() {
           {messaggio.testo}
         </p>
       )}
+    </section>
+  )
+}
+
+const ICONA_SCHEDA: Record<Scheda, string> = { osservazioni: 'nota', controllo: 'lente', bibliografia: 'libri', word: 'word' }
+
+/** In alto: note aperte, cosa ha trovato l'ultimo controllo e il file Word in un tocco. */
+function Riepilogo({ vai }: { vai: (s: Scheda) => void }) {
+  const progetto = useStudio((s) => s.progetto)
+  const aperte = progetto.osservazioni.filter((o) => o.stato === 'aperta').length
+  const rosse = useMemo(
+    () => progetto.capitoli.flatMap((c) => c.sezioni).flatMap((s) => s.citazioni).filter((c) => coloreCitazione(c) === 'rosso').length,
+    [progetto.capitoli],
+  )
+  const controllo = progetto.controllo
+  const [lavoro, setLavoro] = useState(false)
+  const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
+
+  return (
+    <section className="rev-riepilogo" aria-label="Riepilogo della revisione">
+      <button type="button" className={`rev-dato ${aperte ? 'rev-dato-attenzione' : 'rev-dato-ok'}`} onClick={() => vai('osservazioni')}>
+        <span className="rev-dato-icona" aria-hidden>
+          <Icona nome="nota" dimensione={20} />
+        </span>
+        <span className="rev-dato-testi">
+          <strong>{aperte}</strong>
+          <span>{aperte === 1 ? 'nota aperta' : 'note aperte'}</span>
+        </span>
+      </button>
+      <button type="button" className={`rev-dato ${rosse ? 'rev-dato-rosso' : 'rev-dato-ok'}`} onClick={() => vai('controllo')}>
+        <span className="rev-dato-icona" aria-hidden>
+          <Icona nome="avviso" dimensione={20} />
+        </span>
+        <span className="rev-dato-testi">
+          <strong>{rosse}</strong>
+          <span>{rosse === 1 ? 'citazione rossa' : 'citazioni rosse'}</span>
+        </span>
+      </button>
+      <button type="button" className={`rev-dato ${controllo?.rilievi.length ? 'rev-dato-attenzione' : controllo ? 'rev-dato-ok' : ''}`} onClick={() => vai('controllo')}>
+        <span className="rev-dato-icona" aria-hidden>
+          <Icona nome="lente" dimensione={20} />
+        </span>
+        <span className="rev-dato-testi">
+          <strong>{controllo ? controllo.rilievi.length : '–'}</strong>
+          <span>
+            {controllo ? 'cose da guardare' : 'nessun controllo ancora'}
+            {controllo && <small className="rev-dato-data"> · controllo del {new Date(controllo.data).toLocaleDateString('it-IT')}</small>}
+          </span>
+        </span>
+      </button>
+      <div className="rev-scarica">
+        <button
+          type="button"
+          className="bottone bottone-primario"
+          disabled={lavoro}
+          onClick={async () => {
+            setLavoro(true)
+            setMessaggio(null)
+            try {
+              const nome = await esportaWord({ capitoloId: null, conBibliografia: true, conFrontespizio: true })
+              setMessaggio({ tono: 'ok', testo: `Scaricato "${nome}".` })
+            } catch (err) {
+              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Non sono riuscito a creare il file.' })
+            } finally {
+              setLavoro(false)
+            }
+          }}
+        >
+          <Icona nome="word" dimensione={18} />
+          {lavoro ? 'Preparo il file…' : 'Scarica la tesi in Word'}
+        </button>
+        {messaggio ? (
+          <span className={messaggio.tono === 'ok' ? 'nota nota-ok' : 'nota rev-errore'} role="status">
+            {messaggio.testo}
+          </span>
+        ) : (
+          <button type="button" className="link rev-scarica-altro" onClick={() => vai('word')}>
+            altre opzioni
+          </button>
+        )}
+      </div>
     </section>
   )
 }
@@ -494,25 +629,29 @@ export function Revisione() {
     { id: 'word', nome: 'Scarica in Word' },
   ]
   return (
-    <div className="colonna-unica">
-      <div className="schede-rev" role="tablist">
+    <div className="rev">
+      <Riepilogo vai={setScheda} />
+      <div className="schede-rev rev-schede" role="tablist">
         {voci.map((v) => (
           <button
             key={v.id}
             type="button"
             role="tab"
             aria-selected={scheda === v.id}
-            className={`bottone ${scheda === v.id ? 'bottone-primario' : ''}`}
+            className={`rev-scheda ${scheda === v.id ? 'rev-scheda-attiva' : ''}`}
             onClick={() => setScheda(v.id)}
           >
-            {v.nome}
+            <Icona nome={ICONA_SCHEDA[v.id]} dimensione={18} />
+            <span>{v.nome}</span>
           </button>
         ))}
       </div>
-      {scheda === 'osservazioni' && <Osservazioni />}
-      {scheda === 'controllo' && <Controllo />}
-      {scheda === 'bibliografia' && <Bibliografia />}
-      {scheda === 'word' && <EsportaWord />}
+      <div className="rev-corpo" key={scheda}>
+        {scheda === 'osservazioni' && <Osservazioni />}
+        {scheda === 'controllo' && <Controllo />}
+        {scheda === 'bibliografia' && <Bibliografia />}
+        {scheda === 'word' && <EsportaWord />}
+      </div>
     </div>
   )
 }

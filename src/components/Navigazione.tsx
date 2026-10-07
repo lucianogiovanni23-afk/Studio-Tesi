@@ -3,6 +3,7 @@ import { useStudio } from '../store'
 import { AGENTE } from '../agents/agenti'
 import type { AgentKey, Schermata } from '../types'
 import { Ritratto } from './Ritratto'
+import { Illustrazione, type TipoIllustrazione } from '../ui/Illustrazione'
 
 /**
  * Navigazione a percorso: Inizio, i quattro passi del lavoro, Chiedi.
@@ -109,20 +110,21 @@ interface Intro {
   frase: string
   /** Il collega dell'ufficio che si occupa di questa pagina. */
   agente?: AgentKey
+  illustrazione?: TipoIllustrazione
 }
 
 const INTRO: Record<Schermata, Intro | null> = {
   cruscotto: null,
   ufficio: null,
-  corso: { passo: 1, titolo: 'Corso', agente: 'lettore', frase: "Carica le lezioni: la lettrice trova i concetti e le parole del corso da usare in tutta la tesi." },
-  glossario: { passo: 1, titolo: 'Corso', agente: 'lettore', frase: 'Le parole tecniche come le usa il corso: lo scrittore deve usare proprio queste.' },
-  biblioteca: { passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Le fonti che hai raccolto: leggi i riassunti e scegli quali usare in ogni paragrafo.' },
-  ricerca: { passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Cerca articoli negli archivi delle università: in biblioteca entra solo quello che scegli tu.' },
-  copertura: { passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Quali paragrafi hanno abbastanza fonti e a quali ne servono altre.' },
-  scrittura: { passo: 3, titolo: 'Scrittura', agente: 'scrittore', frase: "Un paragrafo alla volta: scegli le fonti, dai l'ok alla scaletta, poi la bozza. Ogni citazione viene controllata sulla fonte." },
-  revisione: { passo: 4, titolo: 'Revisione', agente: 'revisore', frase: 'Note del relatore, controllo di tutta la tesi, bibliografia e file Word.' },
-  chat: { titolo: 'Chiedi', frase: "Chiedi quello che vuoi sulla tesi: l'assistente conosce capitoli, fonti e note del relatore." },
-  impostazioni: { titolo: 'Impostazioni', frase: 'Chiave API (se vuoi), sincronizzazione tra dispositivi, file del progetto, quante pagine vuoi scrivere e il ripristino.' },
+  corso: { illustrazione: 'uliveto', passo: 1, titolo: 'Corso', agente: 'lettore', frase: "Carica le lezioni: la lettrice trova i concetti e le parole del corso da usare in tutta la tesi." },
+  glossario: { illustrazione: 'uliveto', passo: 1, titolo: 'Corso', agente: 'lettore', frase: 'Le parole tecniche come le usa il corso: lo scrittore deve usare proprio queste.' },
+  biblioteca: { illustrazione: 'scaffali', passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Le fonti che hai raccolto: leggi i riassunti e scegli quali usare in ogni paragrafo.' },
+  ricerca: { illustrazione: 'scaffali', passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Cerca articoli negli archivi delle università: in biblioteca entra solo quello che scegli tu.' },
+  copertura: { illustrazione: 'scaffali', passo: 2, titolo: 'Fonti', agente: 'bibliotecario', frase: 'Quali paragrafi hanno abbastanza fonti e a quali ne servono altre.' },
+  scrittura: { illustrazione: 'scrivania', passo: 3, titolo: 'Scrittura', agente: 'scrittore', frase: "Un paragrafo alla volta: scegli le fonti, dai l'ok alla scaletta, poi la bozza. Ogni citazione viene controllata sulla fonte." },
+  revisione: { illustrazione: 'lente', passo: 4, titolo: 'Revisione', agente: 'revisore', frase: 'Note del relatore, controllo di tutta la tesi, bibliografia e file Word.' },
+  chat: { illustrazione: 'chat', titolo: 'Chiedi', frase: "Chiedi quello che vuoi sulla tesi: l'assistente conosce capitoli, fonti e note del relatore." },
+  impostazioni: { illustrazione: 'ingranaggi', titolo: 'Impostazioni', frase: 'Chiave API (se vuoi), sincronizzazione tra dispositivi, file del progetto, quante pagine vuoi scrivere e il ripristino.' },
 }
 
 /** Titolo del passo, una frase su a cosa serve la pagina e, se ci sono, le sue schede. */
@@ -141,6 +143,7 @@ export function TestaSchermata() {
         <h1>{intro.titolo}</h1>
         <p>{intro.frase}</p>
       </div>
+      {intro.illustrazione && <Illustrazione tipo={intro.illustrazione} />}
       {def && (
         <button type="button" className="testa-agente" onClick={() => scegliAgente(def.key)} title={`Vai nell'ufficio a parlare con ${def.persona.femminile ? 'la' : 'il'} ${def.persona.nome.toLowerCase()}`}>
           <Ritratto k={def.key} dimensione={44} />

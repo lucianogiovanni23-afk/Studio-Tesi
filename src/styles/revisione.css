@@ -1,0 +1,484 @@
+/* ================================================================== */
+/* Revisione: riepilogo in alto, schede a pillola, card ordinate.      */
+/* ================================================================== */
+
+.rev {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* --- riepilogo ----------------------------------------------------- */
+.rev-riepilogo {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.15fr);
+  gap: 12px;
+  padding: 12px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--terracotta) 18%, var(--bordo));
+  background:
+    radial-gradient(360px 160px at 100% 0%, color-mix(in srgb, var(--terracotta) 12%, transparent), transparent 70%),
+    color-mix(in srgb, var(--carta) 85%, transparent);
+  box-shadow: var(--ombra);
+}
+
+.rev-dato {
+  --tono: var(--inchiostro-3);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--bordo) 80%, transparent);
+  border-radius: 16px;
+  background: var(--carta);
+  color: var(--inchiostro);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.rev-dato:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--tono) 45%, var(--bordo));
+  box-shadow: var(--ombra);
+}
+
+.rev-dato-ok {
+  --tono: var(--verde-ok);
+}
+
+.rev-dato-attenzione {
+  --tono: var(--ambra);
+}
+
+.rev-dato-rosso {
+  --tono: var(--rosso);
+}
+
+.rev-dato-icona {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  color: var(--tono);
+  background: color-mix(in srgb, var(--tono) 14%, var(--carta));
+}
+
+.rev-dato-testi {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.rev-dato-testi strong {
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--inchiostro);
+  font-variant-numeric: tabular-nums;
+}
+
+.rev-dato-testi span {
+  font-size: 0.8rem;
+  color: var(--inchiostro-2);
+}
+
+.rev-scarica {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 8px 4px;
+}
+
+.rev-scarica .bottone {
+  min-height: 50px;
+  font-size: 1rem;
+}
+
+.rev-scarica .ico {
+  margin-right: 2px;
+}
+
+.rev-scarica-altro {
+  align-self: center;
+  font-size: 0.85rem;
+  color: var(--inchiostro-2);
+}
+
+.rev-scarica .nota {
+  margin: 0;
+  text-align: center;
+}
+
+.rev-errore {
+  color: var(--rosso);
+}
+
+/* --- schede --------------------------------------------------------- */
+.rev-schede {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-self: flex-start;
+  max-width: 100%;
+  gap: 4px;
+  padding: 5px;
+  overflow-x: auto;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--bordo) 70%, transparent);
+  background: var(--crema-2);
+  scrollbar-width: none;
+}
+
+.rev-schede::-webkit-scrollbar {
+  display: none;
+}
+
+.rev-scheda {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--inchiostro-2);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.rev-scheda:hover {
+  color: var(--inchiostro);
+}
+
+.rev-scheda-attiva {
+  background: var(--terracotta);
+  color: #fff;
+  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--terracotta) 80%, transparent);
+}
+
+.rev-scheda-attiva:hover {
+  color: #fff;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rev-corpo {
+    animation: entra 0.3s ease both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rev-dato,
+  .rev-scheda {
+    transition: none;
+  }
+}
+
+/* --- card ------------------------------------------------------------ */
+.rev-griglia {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.rev-carta {
+  border-radius: 22px;
+  padding: 24px;
+}
+
+.rev-testa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 4px;
+  margin-bottom: 14px;
+}
+
+.rev-titolo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.rev-carta > .rev-titolo {
+  margin-bottom: 14px;
+}
+
+.rev-titolo .ico {
+  box-sizing: content-box;
+  padding: 8px;
+  border-radius: 12px;
+  color: var(--terracotta);
+  background: var(--terracotta-chiaro);
+}
+
+.rev-stile {
+  margin-left: auto;
+}
+
+.rev-nuova {
+  position: sticky;
+  top: 84px;
+}
+
+.rev-nuova .bottone-primario {
+  width: 100%;
+}
+
+.rev-vuoto {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  border: 1px dashed var(--bordo);
+  border-radius: 16px;
+  text-align: center;
+  color: var(--inchiostro-3);
+}
+
+.rev-vuoto p {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--inchiostro-2);
+}
+
+/* controllo: due scelte affiancate */
+.rev-scelte {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.rev-scelta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  align-items: start;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--bordo);
+  background: color-mix(in srgb, var(--crema) 45%, var(--carta));
+}
+
+.rev-scelta-forte {
+  border-color: color-mix(in srgb, var(--oliva) 35%, var(--bordo));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--oliva) 9%, var(--carta)), var(--carta));
+}
+
+.rev-scelta strong {
+  display: block;
+  margin-top: 2px;
+}
+
+.rev-scelta .nota {
+  margin: 2px 0 0;
+}
+
+.rev-scelta > .bottone,
+.rev-scelta > .in-corso,
+.rev-scelta > .conferma-in-linea {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.rev-scelta-icona {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--oliva);
+  background: var(--oliva-chiaro);
+}
+
+.rev-ultimo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--crema-2);
+}
+
+.rev-azioni {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rev-azioni .ico {
+  margin-right: 2px;
+}
+
+.rev-dettagli {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--crema-2);
+}
+
+.rev-dettagli summary {
+  min-height: 32px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* word */
+.rev-word {
+  max-width: 720px;
+  background:
+    radial-gradient(360px 200px at 100% 0%, color-mix(in srgb, var(--cielo) 14%, transparent), transparent 70%),
+    var(--carta);
+}
+
+.rev-opzioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin: 4px 0 16px;
+}
+
+.rev-word .bottone-primario {
+  min-height: 48px;
+  padding: 0 24px;
+}
+
+/* --- tablet e telefono ------------------------------------------- */
+@media (max-width: 1099px) {
+  .rev-riepilogo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .rev-scarica {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 2px;
+  }
+  .rev-scarica .bottone {
+    flex: 1 1 240px;
+  }
+}
+
+@media (max-width: 900px) {
+  .rev-griglia {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rev-nuova {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .rev {
+    gap: 14px;
+  }
+  .rev-riepilogo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 8px;
+    border-radius: 18px;
+  }
+  .rev-dato {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px;
+  }
+  .rev-dato-icona {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+  .rev-dato-testi strong {
+    font-size: 1.35rem;
+  }
+  .rev-dato-testi span {
+    font-size: 0.72rem;
+  }
+  .rev-scarica {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .rev-scarica .bottone {
+    flex: none;
+  }
+  .rev-schede {
+    align-self: stretch;
+  }
+  .rev-scheda {
+    padding: 0 14px;
+  }
+  .rev-carta {
+    padding: 18px 16px;
+  }
+  .rev-scelte {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* rilievi del controllo come piccole card */
+.rev-carta .elenco-rilievi {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.rev-carta .elenco-rilievi > li {
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--bordo) 80%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--crema) 40%, var(--carta));
+}
+
+.rev-carta .elenco-rilievi > li p {
+  margin: 6px 0 0;
+}
+
+.rev-dato-data {
+  font-size: inherit;
+}
+
+@media (max-width: 640px) {
+  .rev-dato-data {
+    display: none;
+  }
+  .rev-schede {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 20px;
+    overflow: visible;
+  }
+  .rev-scheda {
+    justify-content: center;
+    padding: 0 10px;
+    font-size: 0.88rem;
+    white-space: normal;
+    line-height: 1.15;
+    text-align: center;
+  }
+}

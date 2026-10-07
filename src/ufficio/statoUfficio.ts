@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { toApiError } from '../agents/api'
 import { AGENTE } from '../agents/agenti'
 import { useStudio } from '../store'
+import { suonoRisposta } from '../ui/suoni'
 import type { AgentKey } from '../types'
 
 /** Che cosa sta facendo ogni persona dell'ufficio in questo momento (non si salva). */
@@ -28,6 +29,7 @@ export async function eseguiAzione(k: AgentKey, etichetta: string, lavoro: strin
     if (risposta) {
       st().aggiungiBattuta(k, { da: 'agente', testo: risposta, tono: 'ok' })
       st().faiParlare(Math.min(6000, 1200 + risposta.length * 22))
+      suonoRisposta()
     }
   } catch (err) {
     const annullato = err instanceof DOMException && err.name === 'AbortError'

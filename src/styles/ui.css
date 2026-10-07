@@ -1,0 +1,280 @@
+/* Kit comune: icone, "i", fisarmonica, cassetto, coriandoli. */
+
+.ico {
+  flex: none;
+  vertical-align: -0.2em;
+}
+
+.bottone .ico,
+.risposta .ico {
+  margin-right: 6px;
+}
+
+/* --- "i" con fumetto --------------------------------------------- */
+.info {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.info-bottone {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--inchiostro-3);
+  cursor: help;
+}
+
+.info-bottone:hover,
+.info-bottone[aria-expanded='true'] {
+  color: var(--oliva);
+  background: color-mix(in srgb, var(--oliva) 12%, transparent);
+}
+
+.info-fumetto {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--inchiostro);
+  color: var(--carta);
+  font-size: 0.85rem;
+  font-weight: 450;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+  box-shadow: var(--ombra-su);
+  animation: entra 0.18s ease both;
+}
+
+/* --- fisarmonica --------------------------------------------------- */
+.fisarmonica {
+  padding: 0;
+  overflow: hidden;
+}
+
+.fisarmonica-testa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 16px;
+}
+
+.fisarmonica-interruttore {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 14px 20px;
+  border: 0;
+  background: none;
+  color: var(--inchiostro);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fisarmonica-icona {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: var(--colore-agente, var(--oliva));
+  background: color-mix(in srgb, var(--colore-agente, var(--oliva)) 13%, var(--carta));
+}
+
+.fisarmonica-titoli {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fisarmonica-titolo {
+  font-weight: 650;
+  font-size: 1.05rem;
+}
+
+.fisarmonica-riassunto {
+  color: var(--inchiostro-2);
+  font-size: 0.86rem;
+}
+
+.fisarmonica-freccia {
+  color: var(--inchiostro-3);
+  transition: transform 0.25s ease;
+}
+
+.fisarmonica-aperta .fisarmonica-freccia {
+  transform: rotate(180deg);
+}
+
+.fisarmonica-corpo {
+  padding: 0 20px 20px;
+  animation: entra 0.25s ease both;
+}
+
+/* --- cassetto ------------------------------------------------------ */
+.cassetto-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: color-mix(in srgb, #10130a 38%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: dissolvi 0.2s ease both;
+}
+
+.cassetto {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(var(--larghezza-cassetto, 520px), 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--carta);
+  border-left: 1px solid var(--bordo);
+  box-shadow: -24px 0 60px -20px rgba(0, 0, 0, 0.35);
+  animation: scorri 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.cassetto-testa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(14px + env(safe-area-inset-top)) 20px 14px;
+  border-bottom: 1px solid var(--bordo);
+}
+
+.cassetto-testa h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.cassetto-corpo {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.bottone-icona {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--bordo);
+  border-radius: 50%;
+  background: var(--carta);
+  color: var(--inchiostro);
+  cursor: pointer;
+}
+
+.bottone-icona:hover {
+  background: var(--crema-2);
+}
+
+@keyframes scorri {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes dissolvi {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cassetto,
+  .cassetto-velo,
+  .fisarmonica-corpo,
+  .info-fumetto {
+    animation: none;
+  }
+}
+
+.coriandoli {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+
+/* --- regola dei pulsanti: uno solo verde per pagina, gli altri tenui --- */
+.bottone-secondario {
+  background: color-mix(in srgb, var(--inchiostro) 5%, var(--carta));
+  border-color: transparent;
+  color: var(--inchiostro);
+}
+
+.bottone-secondario:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--inchiostro) 9%, var(--carta));
+}
+
+/* menu a tendina semplice (es. "Chiedi allo scrittore ▾") */
+.menu-tendina {
+  position: relative;
+  display: inline-block;
+}
+
+.menu-tendina-elenco {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 240px;
+  padding: 6px;
+  border: 1px solid var(--bordo);
+  border-radius: 14px;
+  background: var(--carta);
+  box-shadow: var(--ombra-su);
+  animation: entra 0.15s ease both;
+}
+
+.menu-tendina-elenco button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--inchiostro);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-tendina-elenco button:hover:not(:disabled) {
+  background: var(--crema-2);
+}
+
+.menu-tendina-elenco button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

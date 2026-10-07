@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
 import { selezionaParagrafo } from '../../agents/scrittore'
-import { analizzaStile, type Segnalazione, type TipoSegnalazione } from '../../domain/stileTesto'
-import { useStudio } from '../../store'
+import { type Segnalazione, type TipoSegnalazione } from '../../domain/stileTesto'
 import type { Sezione } from '../../types'
+import { scegliVoce } from './statoPagina'
+import { useStile } from './stile'
 
 const NOME: Record<TipoSegnalazione, string> = {
   formula: 'frase da IA',
@@ -13,25 +13,10 @@ const NOME: Record<TipoSegnalazione, string> = {
   lessico: 'parole del corso',
 }
 
-/** Rilevatore di frasi tipiche dell'IA e di termini diversi dal lessico del corso, calcolato in codice. */
-export function PannelloStile({ sez }: { sez: Sezione }) {
-  const glossario = useStudio((s) => s.progetto.glossario)
-  const [aperto, setAperto] = useState(false)
-  const segnalazioni = useMemo(() => analizzaStile(sez.testo, glossario), [sez.testo, glossario])
+/** Elenco delle segnalazioni, aperto dalla barra sotto il foglio. */
+export function DettaglioStile({ sez }: { sez: Sezione }) {
+  const { segnalazioni } = useStile(sez)
   const parole = sez.testo.split(/\s+/).filter(Boolean).length
-  const lessico = segnalazioni.filter((s) => s.tipo === 'lessico').length
-  const ia = segnalazioni.length - lessico
-
-  // Il pannello resta sempre al suo posto: comparire al primo salvataggio sposterebbe i bottoni sottostanti.
-  if (!sez.testo.trim()) {
-    return (
-      <section className="pannello-stile">
-        <button type="button" className="bottone bottone-piccolo" disabled>
-          Frasi da IA: —
-        </button>
-      </section>
-    )
-  }
 
   const prepara = (s: Segnalazione) => {
     const delParagrafo = segnalazioni.filter((x) => x.paragrafo === s.paragrafo)
@@ -41,38 +26,33 @@ export function PannelloStile({ sez }: { sez: Sezione }) {
       ),
     ].join('; ')
     selezionaParagrafo(sez.id, s.paragrafo, `Scrivi in modo diretto, senza formule da IA: ${indicazione}. Non cambiare il contenuto né le citazioni.`)
+    // Si apre subito la conferma di "Riscrivi questo paragrafo", con l'indicazione già scritta.
+    scegliVoce('riscrivi')
     document.querySelector('.comandi-scrittore-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   return (
-    <section className={`pannello-stile ${segnalazioni.length ? 'con-segnalazioni' : 'pulito'}`}>
-      <button type="button" className="bottone bottone-piccolo" onClick={() => setAperto((a) => !a)} aria-expanded={aperto}>
-        Frasi da IA: {ia} · parole del corso: {lessico === 0 ? 'ok' : `${lessico} da sistemare`}
-      </button>
-      {aperto && (
-        <div className="stile-dettaglio">
-          {segnalazioni.length === 0 ? (
-            <p className="nota nota-ok">Tutto a posto: in {parole} parole niente frasi da IA e i termini del corso sono giusti.</p>
-          ) : (
-            <>
-              <p className="nota">
-                Controllo veloce e gratis. Da sole non sono errori, ma tutte insieme fanno sembrare il testo scritto da un'IA. Premi
-                "Sistema questo paragrafo", poi "Riscrivi questo paragrafo" fra i comandi dello Scrittore. Oppure correggi tu.
-              </p>
-              <ul className="elenco-stile">
-                {segnalazioni.map((s, i) => (
-                  <li key={i} className={`stile-${s.tipo}`}>
-                    <span className="pastiglia-origine">{NOME[s.tipo]}</span> <strong>§{s.paragrafo + 1}</strong> «{s.testo}» — {s.spiegazione}.
-                    <span className="nota"> {s.suggerimento}</span>
-                    <button type="button" className="bottone bottone-piccolo bottone-vuoto" onClick={() => prepara(s)}>
-                      Sistema questo paragrafo
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
+    <section className={`pannello-stile stile-dettaglio ${segnalazioni.length ? 'con-segnalazioni' : 'pulito'}`}>
+      {segnalazioni.length === 0 ? (
+        <p className="nota nota-ok">Tutto a posto: in {parole} parole niente frasi da IA e i termini del corso sono giusti.</p>
+      ) : (
+        <>
+          <p className="nota">
+            Controllo veloce e gratis. Da sole non sono errori, ma tutte insieme fanno sembrare il testo scritto da un'IA. Premi "Sistema questo
+            paragrafo": si apre "Riscrivi questo paragrafo" con l'indicazione già pronta. Oppure correggi tu.
+          </p>
+          <ul className="elenco-stile">
+            {segnalazioni.map((s, i) => (
+              <li key={i} className={`stile-${s.tipo}`}>
+                <span className="pastiglia-origine">{NOME[s.tipo]}</span> <strong>§{s.paragrafo + 1}</strong> «{s.testo}» — {s.spiegazione}.
+                <span className="nota"> {s.suggerimento}</span>
+                <button type="button" className="bottone bottone-piccolo bottone-vuoto" onClick={() => prepara(s)}>
+                  Sistema questo paragrafo
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   )

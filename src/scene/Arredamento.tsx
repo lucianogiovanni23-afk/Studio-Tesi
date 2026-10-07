@@ -1,10 +1,12 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
-import { Html, RoundedBox } from '@react-three/drei'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { avanzamento } from '../domain/avanzamento'
 import { useStudio } from '../store'
-import { ALTEZZA_SALA as H, COLORI, COLORE_STATO } from './layout'
-import { useQualita } from './qualita'
+import { ALTEZZA_SALA as H, COLORI, COLORE_STATO, PARETE_FONDO_Z, PORTA } from './layout'
+import { useNotte, useQualita } from './qualita'
+import { Etichetta } from './Etichetta'
+import { disegnaPanoramaNotte, textureAlone } from './notte'
 
 /**
  * Arredamento dell'open space: vetrata a tutta parete sulla campagna
@@ -13,14 +15,20 @@ import { useQualita } from './qualita'
  */
 
 /** Panorama oltre la vetrata: cielo, mare all'orizzonte, colline e uliveti. */
-function usePanorama(): THREE.CanvasTexture | null {
-  return useMemo(() => {
+function usePanorama(notte: boolean): THREE.CanvasTexture | null {
+  const tex = useMemo(() => {
     if (typeof document === 'undefined') return null
     const c = document.createElement('canvas')
     c.width = 1024
     c.height = 384
     const g = c.getContext('2d')
     if (!g) return null
+    if (notte) {
+      disegnaPanoramaNotte(g, 1024, 384)
+      const t = new THREE.CanvasTexture(c)
+      t.colorSpace = THREE.SRGBColorSpace
+      return t
+    }
     const cielo = g.createLinearGradient(0, 0, 0, 230)
     cielo.addColorStop(0, '#7fb2d8')
     cielo.addColorStop(0.7, '#cfe2ec')
@@ -61,11 +69,14 @@ function usePanorama(): THREE.CanvasTexture | null {
     const t = new THREE.CanvasTexture(c)
     t.colorSpace = THREE.SRGBColorSpace
     return t
-  }, [])
+  }, [notte])
+  useEffect(() => () => tex?.dispose(), [tex])
+  return tex
 }
 
 function Vetrata() {
-  const panorama = usePanorama()
+  const notte = useNotte()
+  const panorama = usePanorama(notte)
   const montanti = [-5.5, -3.67, -1.83, 0, 1.83, 3.67, 5.5]
   return (
     <group>
@@ -76,7 +87,7 @@ function Vetrata() {
       {/* vetro leggermente riflettente */}
       <mesh position={[0, H / 2, -6.02]}>
         <planeGeometry args={[11, H]} />
-        <meshStandardMaterial color="#dfeaf0" transparent opacity={0.08} roughness={0.05} metalness={0.2} />
+        <meshStandardMaterial color={notte ? '#8ea2d8' : '#dfeaf0'} transparent opacity={notte ? 0.12 : 0.08} roughness={0.05} metalness={0.2} />
       </mesh>
       {montanti.map((x) => (
         <mesh key={x} position={[x, H / 2, -6]}>
@@ -193,12 +204,12 @@ function Libreria({ etichetta }: { etichetta: boolean }) {
         </mesh>
       ))}
       {etichetta && (
-      <Html position={[0, 2.85, 0]} center distanceFactor={11} zIndexRange={[20, 10]}>
+      <Etichetta position={[0, 2.85, 0]} distanceFactor={11} zIndexRange={[20, 10]}>
         <button type="button" className="etichetta-scena etichetta-arredo" onClick={() => vai('biblioteca')}>
           <strong>Biblioteca</strong>
           <span>{fonti.length} fonti</span>
         </button>
-      </Html>
+      </Etichetta>
       )}
     </group>
   )
@@ -210,6 +221,7 @@ function Schermo({ etichetta }: { etichetta: boolean }) {
   const vai = useStudio((s) => s.vai)
   const a = useMemo(() => avanzamento(progetto), [progetto])
   const righe = a.capitoli.slice(0, 8)
+  const notte = useNotte()
   return (
     <group position={[8.4, 2.25, -5.92]}>
       <RoundedBox args={[3.4, 2.0, 0.08]} radius={0.04} smoothness={3}>
@@ -217,7 +229,7 @@ function Schermo({ etichetta }: { etichetta: boolean }) {
       </RoundedBox>
       <mesh position={[0, 0, 0.045]}>
         <planeGeometry args={[3.24, 1.84]} />
-        <meshStandardMaterial color="#20252b" emissive="#1b2a33" emissiveIntensity={0.6} />
+        <meshStandardMaterial color="#20252b" emissive="#1b2a33" emissiveIntensity={notte ? 1.6 : 0.6} />
       </mesh>
       {righe.map((c, i) => {
         const quota = Math.min(1, c.pagine / Math.max(1, c.obiettivoMin))
@@ -238,14 +250,14 @@ function Schermo({ etichetta }: { etichetta: boolean }) {
         )
       })}
       {etichetta && (
-      <Html position={[0, 1.3, 0.1]} center distanceFactor={11} zIndexRange={[20, 10]}>
+      <Etichetta position={[0, 1.3, 0.1]} distanceFactor={11} zIndexRange={[20, 10]}>
         <button type="button" className="etichetta-scena etichetta-arredo" onClick={() => vai('cruscotto')}>
           <strong>La tesi</strong>
           <span>
             {a.pagine.toLocaleString('it-IT', { maximumFractionDigits: 1 })} di {a.pagineMin}–{a.pagineMax} pagine
           </span>
         </button>
-      </Html>
+      </Etichetta>
       )}
     </group>
   )
@@ -336,6 +348,7 @@ function Riunioni() {
  * girando la visuale.
  */
 function Soffitto() {
+  const notte = useNotte()
   const lamelle = useRef<THREE.InstancedMesh>(null)
   const posizioni = useMemo(() => Array.from({ length: 64 }, (_, i) => -12.2 + i * 0.385), [])
   useLayoutEffect(() => {
@@ -362,7 +375,7 @@ function Soffitto() {
       {[-7.5, -2.5, 2.5, 7.5].map((x) => (
         <mesh key={x} position={[x, H - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <planeGeometry args={[0.16, 16]} />
-          <meshStandardMaterial color="#fffaf0" emissive="#fff6e4" emissiveIntensity={2} side={THREE.DoubleSide} />
+          <meshStandardMaterial color="#fffaf0" emissive={notte ? '#ffd9a0' : '#fff6e4'} emissiveIntensity={notte ? 4.5 : 2} side={THREE.DoubleSide} />
         </mesh>
       ))}
       {/* fascia scura sopra la vetrata */}
@@ -377,6 +390,7 @@ function Soffitto() {
 /** Luci lineari sospese sopra le scrivanie. */
 function LuciLineari() {
   const completa = useQualita() === 'completa'
+  const notte = useNotte()
   return (
     <group>
       {[
@@ -390,7 +404,7 @@ function LuciLineari() {
           </mesh>
           <mesh position={[0, -0.03, 0]} rotation={[Math.PI / 2, 0, 0]}>
             <planeGeometry args={[3.5, 0.08]} />
-            <meshStandardMaterial color="#fff6e3" emissive="#fff1d2" emissiveIntensity={2} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#fff6e3" emissive={notte ? '#ffd29a' : '#fff1d2'} emissiveIntensity={notte ? 5 : 2} side={THREE.DoubleSide} />
           </mesh>
           {[-1.6, 1.6].map((dx) => (
             <mesh key={dx} position={[dx, (H - 3.5) / 2, 0]}>
@@ -398,9 +412,121 @@ function LuciLineari() {
               <meshStandardMaterial color="#444" />
             </mesh>
           ))}
-          {completa && <pointLight position={[0, -0.25, 0]} intensity={2.4} distance={6} decay={1.5} color="#fff1d8" />}
+          {completa && <pointLight position={[0, -0.25, 0]} intensity={notte ? 3.2 : 2.4} distance={notte ? 7 : 6} decay={1.5} color={notte ? '#ffcf8f' : '#fff1d8'} />}
+          {notte && (
+            <mesh position={[0, -0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[4.4, 0.7]} />
+              <meshBasicMaterial map={textureAlone() ?? undefined} color="#ffb860" transparent opacity={0.45} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} side={THREE.DoubleSide} />
+            </mesh>
+          )}
         </group>
       ))}
+    </group>
+  )
+}
+
+/** Insegna sopra la porta, disegnata una volta. */
+function useInsegna(): THREE.CanvasTexture | null {
+  const tex = useMemo(() => {
+    if (typeof document === 'undefined') return null
+    const c = document.createElement('canvas')
+    c.width = 512
+    c.height = 128
+    const g = c.getContext('2d')
+    if (!g) return null
+    g.fillStyle = '#1d1f22'
+    g.fillRect(0, 0, 512, 128)
+    g.fillStyle = '#f1ead8'
+    g.font = '600 54px Georgia, serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText('Studio tesi', 256, 58)
+    g.fillStyle = '#9db04c'
+    g.fillRect(196, 96, 120, 4)
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }, [])
+  useEffect(() => () => tex?.dispose(), [tex])
+  return tex
+}
+
+/**
+ * Parete di fondo con la porta a vetri: non si vede dalla vista d'insieme,
+ * ma è da lì che entra la telecamera alla prima visita.
+ */
+function PareteIngresso() {
+  const notte = useNotte()
+  const insegna = useInsegna()
+  const Z = PARETE_FONDO_Z
+  const { larghezza: LP, altezza: HP } = PORTA
+  const lato = (25 - LP) / 2
+  const listelli = useMemo(() => {
+    const l: number[] = []
+    for (let x = LP / 2 + 0.35; x < LP / 2 + 3.2; x += 0.19) l.push(x, -x)
+    return l
+  }, [LP])
+  return (
+    <group>
+      {/* due pezzi di parete ai lati della porta e l'architrave */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (LP / 2 + lato / 2), H / 2, Z]}>
+          <boxGeometry args={[lato, H, 0.2]} />
+          <meshStandardMaterial color={COLORI.parete} roughness={0.92} />
+        </mesh>
+      ))}
+      <mesh position={[0, (H + HP) / 2, Z]}>
+        <boxGeometry args={[LP, H - HP, 0.2]} />
+        <meshStandardMaterial color={COLORI.parete} roughness={0.92} />
+      </mesh>
+      {/* telaio nero */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (LP / 2 + 0.03), HP / 2, Z]}>
+          <boxGeometry args={[0.06, HP, 0.26]} />
+          <meshStandardMaterial color={COLORI.nero} roughness={0.4} metalness={0.5} />
+        </mesh>
+      ))}
+      <mesh position={[0, HP + 0.03, Z]}>
+        <boxGeometry args={[LP + 0.12, 0.06, 0.26]} />
+        <meshStandardMaterial color={COLORI.nero} roughness={0.4} metalness={0.5} />
+      </mesh>
+      {/* ante a vetro aperte, scivolate dietro la parete */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (LP / 2 + LP / 4 + 0.05), HP / 2, Z + 0.16]}>
+          <boxGeometry args={[LP / 2, HP - 0.05, 0.03]} />
+          <meshStandardMaterial color="#cfe0ea" transparent opacity={0.25} roughness={0.05} metalness={0.3} />
+        </mesh>
+      ))}
+      {/* insegna sul lato esterno */}
+      <mesh position={[0, HP + 0.55, Z + 0.11]}>
+        <planeGeometry args={[2.0, 0.5]} />
+        <meshBasicMaterial map={insegna ?? undefined} color={notte ? '#ffffff' : '#f4f1ea'} toneMapped={false} />
+      </mesh>
+      {/* faretti accanto alla porta, fuori */}
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (LP / 2 + 0.45), 2.4, Z + 0.19]}>
+          <boxGeometry args={[0.12, 0.3, 0.04]} />
+          <meshStandardMaterial color="#2a2c30" emissive="#ffcf8a" emissiveIntensity={notte ? 2.4 : 0.6} />
+        </mesh>
+      ))}
+      {/* corridoio fuori dalla sala */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, Z + 4.5]}>
+        <planeGeometry args={[25, 9]} />
+        <meshStandardMaterial color={notte ? '#9a948a' : '#cfc8bc'} roughness={0.6} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, Z + 0.75]}>
+        <planeGeometry args={[LP - 0.3, 0.9]} />
+        <meshStandardMaterial color={COLORI.olivaScuro} roughness={0.95} />
+      </mesh>
+      {/* facciata esterna: listelli in rovere ai lati della porta e due piante */}
+      {listelli.map((x) => (
+        <mesh key={x} position={[x, (HP + 0.9) / 2, Z + 0.13]}>
+          <boxGeometry args={[0.08, HP + 0.9, 0.06]} />
+          <meshStandardMaterial color={COLORI.rovere} roughness={0.7} />
+        </mesh>
+      ))}
+      <Pianta posizione={[-2.05, 0, Z + 0.75]} alta scala={0.85} />
+      <Pianta posizione={[2.05, 0, Z + 0.75]} alta scala={0.85} />
     </group>
   )
 }
@@ -411,8 +537,8 @@ export function Sala({ etichette = true }: { etichette?: boolean }) {
   return (
     <group>
       {/* pavimento in resina chiara */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[30, 22]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.6]} receiveShadow>
+        <planeGeometry args={[30, 23.2]} />
         <meshStandardMaterial color={COLORI.pavimento} roughness={0.42} metalness={0.02} />
       </mesh>
       {/* tappeto della zona di lavoro */}
@@ -427,6 +553,7 @@ export function Sala({ etichette = true }: { etichette?: boolean }) {
           <meshStandardMaterial color={COLORI.parete} roughness={0.92} />
         </mesh>
       ))}
+      <PareteIngresso />
       <Soffitto />
       <Vetrata />
       <Listelli />

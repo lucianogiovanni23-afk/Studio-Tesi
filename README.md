@@ -261,13 +261,33 @@ l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
   prima di cancellare fa una copia di sicurezza ("Prima del ripristino"), recuperabile dallo
   stesso pannello delle copie. Chiave API, collegamento fra dispositivi e preferenze restano.
 
-## Grafica
+## Grafica e pagine riordinate
 
-- Sfondo con bagliori morbidi, card più ariose, pulsanti con profondità, testata in vetro.
-- Ogni pagina ha un'intestazione colorata con il collega che se ne occupa ("Chiedi a lui/lei"
-  porta nell'ufficio da quella persona), il passo del percorso e le sue schede.
-- Panoramica: la tesi come copertina scura, anello di avanzamento verso il minimo di pagine,
-  numeri in riquadri. Entrata morbida delle pagine (disattivata con movimento ridotto).
+- **Barra laterale** sul computer e sull'iPad: icone sempre visibili, nomi al passaggio del mouse
+  (sull'iPad il nome sta sotto l'icona). Sul telefono resta la barra in basso.
+- **Intestazioni di pagina** con illustrazione disegnata (uliveto, scaffali, scrivania, lente,
+  ingranaggi), il passo del percorso e il collega che se ne occupa ("Chiedi a lui/lei").
+- **Kit comune** (`src/ui/`): icone, "i" con la spiegazione lunga, sezioni a fisarmonica,
+  cassetti che scorrono da destra, menu a tendina, coriandoli per i traguardi, suoni leggeri
+  (spenti di default, pulsante in testata e in Impostazioni). Un solo pulsante verde per sezione.
+- **Panoramica**: in alto copertina della tesi, anello delle pagine che si riempie e "Cosa fare
+  adesso"; i quattro passi in fila con percentuali; indice compatto, e l'indice completo si
+  modifica in un cassetto. La guida "Come funziona" si apre da sola solo al primo avvio, poi dal "?".
+- **Corso**: una colonna sola con ricerca in cima e tre sezioni a fisarmonica (file, idee
+  principali, parole del corso).
+- **Fonti**: biblioteca a copertine con pallino di stato, filtri dietro "Filtra", dettagli della
+  fonte in un cassetto; Copertura come mappa a colori dei paragrafi (Elenco e Griglia restano).
+- **Scrittura**: due colonne (indice e foglio), barra a tre tappe Fonti → Scaletta → Testo,
+  comandi raccolti in "Chiedi allo scrittore", fonti e appunti in un cassetto, versioni e frasi da
+  IA in una barretta sotto il foglio.
+- **Revisione**: riepilogo in cima (note aperte, citazioni rosse, problemi) con "Scarica la tesi
+  in Word".
+- **Impostazioni** in quattro schede: Account e dispositivi, La tesi, Sicurezza, Avanzate.
+- **Tema scuro** nero caldo con dettagli oro; caratteri più ariosi.
+- **Ufficio**: interruttore giorno/notte (di notte cielo stellato, luna sul mare, luci del paese,
+  RGB più vivi; in automatico di notte dalle 20 alle 7), entrata in sala dalla porta di vetro al
+  primo avvio, colleghi che salutano con la mano quando finiscono un lavoro e monitor con il testo
+  che scorre mentre lavorano.
 
 ## Interfaccia: un percorso in quattro passi
 

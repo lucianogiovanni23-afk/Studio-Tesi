@@ -7,6 +7,7 @@ import { PonteClaude } from './components/PonteClaude'
 import { useModoUso } from './hooks/useModoUso'
 import { BottoneGuida, GuidaFinestra } from './components/Guida'
 import { BottoneCerca, CercaOvunque } from './components/CercaOvunque'
+import { BottoneSuoni } from './ui/BottoneSuoni'
 import { NavigazionePrincipale, TestaSchermata } from './components/Navigazione'
 import { avviaCopieAutomatiche } from './io/copie'
 import { avviaSincronizzazione } from './io/sincronizzazione'
@@ -118,10 +119,10 @@ export default function App() {
             </span>
           </span>
         </button>
-        <NavigazionePrincipale />
         <div className="testata-azioni">
           <ChipSincronizzazione onApri={() => vai('impostazioni')} />
           <BottoneCerca />
+          <BottoneSuoni />
           <BottoneGuida />
           <button
             type="button"
@@ -137,6 +138,9 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Sul computer e sull'iPad è una barra laterale; sul telefono una barra in basso. */}
+      <NavigazionePrincipale />
 
       <AvvisoSincronizzazione />
 

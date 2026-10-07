@@ -1,0 +1,593 @@
+/* Corso e Glossario: una colonna pulita, ricerca in cima, parti a fisarmonica. */
+
+.corso,
+.glossario-pagina {
+  --colore-agente: var(--oliva);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+/* --- barra di ricerca ------------------------------------------- */
+.corso-ricerca {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.corso-cerca {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--colore-agente) 22%, var(--bordo));
+  background: var(--campo);
+  box-shadow:
+    0 1px 2px rgba(60, 50, 20, 0.05),
+    0 10px 30px -18px color-mix(in srgb, var(--colore-agente) 70%, transparent);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.corso-cerca:focus-within {
+  border-color: var(--colore-agente);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--colore-agente) 16%, transparent),
+    0 10px 30px -18px color-mix(in srgb, var(--colore-agente) 70%, transparent);
+}
+
+.corso-cerca-lente {
+  color: var(--colore-agente);
+}
+
+.corso-cerca-campo {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--inchiostro);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.corso-cerca-campo::placeholder {
+  color: var(--inchiostro-3);
+}
+
+.corso-cerca-campo::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.corso-cerca .bottone {
+  flex: none;
+  min-height: 44px;
+  padding: 0 20px;
+}
+
+.corso-risultati {
+  padding: 14px 20px 6px;
+  animation: entra 0.2s ease both;
+}
+
+.corso-risultati-testa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.corso-risultati-testa .bottone-icona {
+  width: 32px;
+  height: 32px;
+}
+
+.corso-passaggi li:last-child {
+  border-bottom: 0;
+}
+
+.corso-passaggi cite {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--colore-agente);
+  font-weight: 600;
+}
+
+.corso-passaggi p {
+  margin: 4px 0 0;
+  font-family: var(--serif);
+  line-height: 1.55;
+}
+
+/* --- pastiglia di stato nella testa della fisarmonica ------------- */
+.corso-stato {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.corso-stato .ico {
+  margin: 0;
+}
+
+.corso-stato-fatto {
+  background: var(--verde-chiaro);
+  color: var(--verde-ok);
+}
+
+.corso-stato-dafare {
+  background: var(--ambra-chiaro);
+  color: var(--testo-ambra);
+}
+
+.corso .fisarmonica-azioni,
+.glossario-pagina .fisarmonica-azioni {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.corso .fisarmonica-aperta {
+  box-shadow: var(--ombra-su, var(--ombra));
+}
+
+.corso .fisarmonica-corpo {
+  padding: 2px 20px 22px;
+}
+
+/* --- file del corso ---------------------------------------------- */
+.corso-rilascio {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 14px;
+  padding: 18px 20px;
+  text-align: left;
+  border-radius: 16px;
+  border: 2px dashed color-mix(in srgb, var(--colore-agente) 30%, var(--bordo));
+  background:
+    radial-gradient(260px 120px at 0% 0%, color-mix(in srgb, var(--colore-agente) 10%, transparent), transparent 70%),
+    var(--crema);
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.corso-rilascio.zona-attiva {
+  border-color: var(--colore-agente);
+  background: var(--oliva-chiaro);
+}
+
+.corso-rilascio-icona {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  color: var(--colore-agente);
+  background: var(--carta);
+  box-shadow: var(--ombra);
+}
+
+.corso-rilascio-testo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.corso-rilascio-testo .nota {
+  margin: 0;
+}
+
+.corso-progresso {
+  margin: 4px 0 6px;
+}
+
+.corso-progresso .progresso {
+  height: 8px;
+  border-radius: 999px;
+}
+
+.corso-progresso .progresso-barra {
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--oliva), var(--oro));
+}
+
+.corso-file {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.corso-file-riga {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px 10px 12px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--bordo) 70%, transparent);
+  background: var(--carta);
+}
+
+.corso-file-icona {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  color: var(--testo-ambra);
+  background: var(--ambra-chiaro);
+}
+
+.riga-pronto .corso-file-icona {
+  color: var(--verde-ok);
+  background: var(--verde-chiaro);
+}
+
+.riga-errore .corso-file-icona {
+  color: var(--rosso);
+  background: var(--rosso-chiaro);
+}
+
+.corso-file-riga.riga-errore {
+  color: inherit;
+  border-color: var(--bordo-rosso);
+}
+
+.corso-file-testo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.corso-file-testo .nome-file {
+  font-weight: 600;
+}
+
+.corso-file-testo .nota {
+  font-size: 0.8rem;
+}
+
+/* --- azioni e stati vuoti ---------------------------------------- */
+.corso-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 2px 0 14px;
+}
+
+.corso-vuoto {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--crema);
+}
+
+.corso-vuoto .ico {
+  margin: 0;
+  color: var(--inchiostro-3);
+}
+
+.corso .allerta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.corso .allerta .ico {
+  margin: 0;
+}
+
+/* --- idee principali: schede ------------------------------------- */
+.corso-concetti {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+}
+
+.corso-concetto {
+  position: relative;
+  padding: 14px 16px 14px 18px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--bordo) 80%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--colore-agente) 6%, var(--carta)), var(--carta) 60%);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.corso-concetto::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--oliva), var(--oro));
+}
+
+.corso-concetto:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ombra);
+}
+
+.corso-concetto strong {
+  font-family: var(--serif);
+  font-size: 1.12rem;
+  font-weight: 600;
+}
+
+.corso-concetto p {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.corso-concetto .estratto {
+  font-size: 0.92rem;
+}
+
+.corso-concetto .estratto cite {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-style: normal;
+  color: var(--inchiostro-3);
+}
+
+.corso-sotto {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.corso-sotto-blocco {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--crema);
+}
+
+.corso-sotto-blocco h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.corso-sotto-blocco h3 .ico {
+  margin: 0;
+  color: var(--colore-agente);
+}
+
+.corso-collegamenti,
+.corso-lacune {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: 0.92rem;
+}
+
+.corso-collegamenti li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.corso-collegamenti strong {
+  color: var(--oliva-scuro);
+}
+
+.corso-lacune li {
+  position: relative;
+  padding-left: 16px;
+}
+
+.corso-lacune li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--terracotta);
+}
+
+/* --- parole del corso -------------------------------------------- */
+.corso-parole {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+
+.corso-parole li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--bordo) 80%, transparent);
+  background: var(--carta);
+}
+
+.corso-parole strong {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.corso-parole small {
+  font-size: 0.78rem;
+}
+
+.corso-varianti {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--terracotta);
+}
+
+/* --- glossario --------------------------------------------------- */
+.glossario-cerca {
+  margin: 0;
+}
+
+.glossario-voci {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  gap: 12px;
+}
+
+.glossario-voce {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--bordo);
+  background: var(--carta);
+  box-shadow: var(--ombra);
+}
+
+.glossario-voce-testa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.glossario-voce-testa .campo-termine {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-color: transparent;
+  background: transparent;
+  padding-left: 4px;
+}
+
+.glossario-voce-testa .campo-termine:hover,
+.glossario-voce-testa .campo-termine:focus {
+  border-color: var(--bordo);
+  background: var(--campo);
+}
+
+.glossario-voce .campo-blocco {
+  margin: 0;
+}
+
+.glossario-nuova {
+  display: grid;
+  gap: 10px;
+}
+
+.glossario-nuova h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.glossario-nuova .bottone {
+  justify-self: start;
+}
+
+.glossario-testa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.glossario-testa h2 {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+}
+
+.glossario-testa .nota {
+  margin: 0;
+}
+
+@media (max-width: 700px) {
+  .corso,
+  .glossario-pagina {
+    gap: 12px;
+  }
+  .corso-rilascio {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+  .corso-rilascio .bottone {
+    width: 100%;
+  }
+  .corso .fisarmonica-interruttore {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .corso .fisarmonica-testa {
+    padding-right: 10px;
+  }
+  .corso .fisarmonica-corpo {
+    padding: 2px 14px 16px;
+  }
+  .corso-cerca {
+    padding-left: 14px;
+  }
+  .corso .corso-stato {
+    display: none;
+  }
+  .corso-cerca .bottone {
+    padding: 0 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .corso-risultati {
+    animation: none;
+  }
+  .corso-concetto,
+  .corso-concetto:hover {
+    transition: none;
+    transform: none;
+  }
+}

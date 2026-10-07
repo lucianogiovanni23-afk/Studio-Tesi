@@ -1,3 +1,4 @@
+import '../styles/fonti.css'
 import { useMemo, useRef, useState } from 'react'
 import { costoStimato, modalitaGratuita } from '../agents/api'
 import { fontiSenzaScheda, gruppiSchede, preparaScheda, preparaSchedeInBlocco, stimaScheda, stimaSchedeInBlocco, testoPerScheda, verificaFrasi } from '../agents/schede'
@@ -7,11 +8,13 @@ import { Esito } from '../components/Esito'
 import { TemiChips } from '../components/TemiChips'
 import { ETICHETTA_ORIGINE, ETICHETTA_STATO_FONTE, autoreAnno } from '../domain/bibliografia'
 import { ETICHETTA_TEMA } from '../domain/dominio'
-import { useLargo } from '../hooks/useLayoutMode'
 import { testoDaPdf } from '../io/pdfPaper'
 import { aggiungiPdfInBiblioteca } from '../io/aggiungiPdf'
 import { useStudio } from '../store'
 import type { Fonte, SchedaLettura, StatoFonte, TemaFonte } from '../types'
+import { Cassetto } from '../ui/Cassetto'
+import { Icona } from '../ui/Icona'
+import { Info } from '../ui/Info'
 
 type Vista = 'schede' | 'tabella'
 
@@ -52,7 +55,12 @@ function Scheda({ f }: { f: Fonte }) {
   const bottone = (
     <Conferma
       classe={f.scheda ? 'bottone bottone-vuoto bottone-piccolo' : 'bottone bottone-primario'}
-      etichetta={f.scheda ? 'Rifai il riassunto' : 'Fai il riassunto'}
+      etichetta={
+        <>
+          <Icona nome={f.scheda ? 'aggiorna' : 'scintille'} />
+          {f.scheda ? 'Rifai il riassunto' : 'Fai il riassunto'}
+        </>
+      }
       domanda={`${f.scheda ? 'Il riassunto di adesso verrà sostituito. ' : ''}${costoStimato(stima)}. Procedo?`}
       conferma="Vai"
       disabilitato={lavoro}
@@ -63,14 +71,17 @@ function Scheda({ f }: { f: Fonte }) {
   const modifica = (patch: Partial<SchedaLettura>) => f.scheda && aggiorna(f.id, { scheda: { ...f.scheda, ...patch } })
 
   return (
-    <section className="scheda">
-      <h3>Riassunto della fonte</h3>
-      {base === 'abstract' && (
-        <p className="nota">
-          Di questa fonte ho solo {f.abstract ? 'il riassunto degli autori' : 'qualche pezzo'}, quindi il riassunto sarà incompleto.
-          Se aggiungi il PDF lo faccio su tutto il testo.
-        </p>
-      )}
+    <section className="scheda fd-sezione">
+      <h3>
+        <Icona nome="nota" /> Riassunto della fonte
+        {base === 'abstract' && (
+          <Info>
+            Di questa fonte ho solo {f.abstract ? 'il riassunto degli autori' : 'qualche pezzo'}, quindi il riassunto sarà incompleto. Se aggiungi il PDF
+            lo faccio su tutto il testo.
+          </Info>
+        )}
+      </h3>
+      {base === 'abstract' && !f.scheda && <p className="nota">Ho solo {f.abstract ? 'il riassunto degli autori' : 'qualche pezzo'}: con il PDF viene meglio.</p>}
       {lavoro && <p className="in-corso">Il Bibliotecario sta leggendo…</p>}
       {messaggio && <p className={messaggio.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'}>{messaggio.testo}</p>}
 
@@ -126,11 +137,11 @@ function Scheda({ f }: { f: Fonte }) {
               onChange={(e) => setNuovaFrase(e.target.value)}
               aria-label="Nuova frase chiave"
             />
-            <button type="submit" className="bottone">
+            <button type="submit" className="bottone bottone-secondario">
               Aggiungi e controlla
             </button>
           </form>
-          <div className="riga-editor">
+          <div className="riga-editor fd-piede-scheda">
             <label className="interruttore">
               <input type="checkbox" checked={f.scheda.corretta} onChange={(e) => modifica({ corretta: e.target.checked })} />
               <span>L'ho controllato io</span>
@@ -155,8 +166,8 @@ function TestoCompleto({ f }: { f: Fonte }) {
   const [indirizzo, setIndirizzo] = useState<string | null>(null)
   if (f.testoCompleto) {
     return (
-      <p className="nota nota-ok">
-        Ho tutto il testo{f.pagine?.length ? `: ${f.pagine.length} pagine, quindi nelle citazioni metto anche la pagina` : ''}.
+      <p className="nota nota-ok fd-ok">
+        <Icona nome="spunta" /> Ho tutto il testo{f.pagine?.length ? `: ${f.pagine.length} pagine, quindi nelle citazioni metto anche la pagina` : ''}.
       </p>
     )
   }
@@ -192,21 +203,22 @@ function TestoCompleto({ f }: { f: Fonte }) {
   }
 
   return (
-    <section className="testo-completo">
-      <h3>Tutto il testo</h3>
-      <p className="nota">
-        {f.oaUrl ? 'Questo articolo si può leggere gratis online. ' : 'Guardo su OpenAlex se c\'è una versione gratis di questo articolo. '}
-        Con tutto il testo il riassunto e le citazioni si basano sull'articolo intero e hanno il numero di pagina.
-      </p>
+    <section className="testo-completo fd-sezione">
+      <h3>
+        <Icona nome="libro" /> Tutto il testo
+        <Info>Con tutto il testo il riassunto e le citazioni si basano sull'articolo intero e hanno il numero di pagina.</Info>
+      </h3>
+      <p className="nota">{f.oaUrl ? 'Questo articolo si può leggere gratis online.' : 'Guardo su OpenAlex se c\'è una versione gratis di questo articolo.'}</p>
       {stato !== 'fermo' ? (
         <p className="in-corso">{stato === 'browser' ? 'Provo a scaricarlo…' : 'Lo leggo con la chiave API…'}</p>
       ) : (
         <div className="riga-editor">
-          <button type="button" className="bottone" onClick={() => void prova(false)}>
+          <button type="button" className="bottone bottone-secondario" onClick={() => void prova(false)}>
+            <Icona nome="cerca" />
             Cerca tutto il testo
           </button>
           {bloccato && indirizzo && !haChiave && (
-            <a className="bottone" href={indirizzo} target="_blank" rel="noreferrer">
+            <a className="bottone bottone-secondario" href={indirizzo} target="_blank" rel="noreferrer">
               Apri la versione gratis
             </a>
           )}
@@ -251,8 +263,13 @@ function SchedeInBlocco() {
       ) : (
         senza.length >= 2 && (
           <Conferma
-            classe="bottone bottone-piccolo"
-            etichetta={`Riassumi ${senza.length} fonti insieme`}
+            classe="bottone bottone-piccolo bottone-secondario"
+            etichetta={
+              <>
+                <Icona nome="scintille" />
+                {`Riassumi ${senza.length} fonti insieme`}
+              </>
+            }
             domanda={`${senza.length} fonti in ${passaggi}. ${costoStimato(stima)}. Procedo?`}
             conferma="Vai"
             disabilitato={lavoro}
@@ -296,7 +313,7 @@ function TestoCompletoPerTutte() {
         candidate > 0 && (
           <button
             type="button"
-            className="bottone bottone-piccolo"
+            className="bottone bottone-piccolo bottone-secondario"
             onClick={async () => {
               setEsito(null)
               const r = await recuperaTuttiNelBrowser((fatte, totale) => setAvanzamento(`Cerco i testi: ${fatte} di ${totale}…`))
@@ -305,6 +322,7 @@ function TestoCompletoPerTutte() {
               setEsito(`Ho scaricato gratis ${r.riusciti} testi.${r.daApi.length ? ` Altri ${r.daApi.length} sono gratis ma il sito non me li fa scaricare.` : ''}`)
             }}
           >
+            <Icona nome="libro" />
             Cerca il testo di {candidate} {candidate === 1 ? 'fonte' : 'fonti'}
           </button>
         )
@@ -336,12 +354,43 @@ function TestoCompletoPerTutte() {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Pallino di stato
+// ---------------------------------------------------------------------------
+
+type ColorePunto = 'verde' | 'giallo' | 'rosso' | 'grigio'
+
+const LEGENDA_PUNTI: { colore: ColorePunto; testo: string }[] = [
+  { colore: 'verde', testo: 'la usi nella tesi' },
+  { colore: 'giallo', testo: 'letta o con riassunto' },
+  { colore: 'rosso', testo: 'da leggere, senza riassunto' },
+  { colore: 'grigio', testo: 'solo i dati, niente testo' },
+]
+
+/** Verde: usata. Giallo: letta o col riassunto. Rosso: da fare. Grigio: non c'è testo da leggere. */
+function puntoFonte(f: Fonte): { colore: ColorePunto; etichetta: string } {
+  if (f.stato === 'usata') return { colore: 'verde', etichetta: 'usata' }
+  if (f.stato === 'letta') return { colore: 'giallo', etichetta: f.scheda ? 'letta · riassunto' : 'letta' }
+  if (f.scheda) return { colore: 'giallo', etichetta: f.scheda.corretta ? 'riassunto controllato' : 'riassunto pronto' }
+  if (!f.testoCompleto && !f.abstract.trim() && !f.testo.trim()) return { colore: 'grigio', etichetta: 'solo i dati' }
+  return { colore: 'rosso', etichetta: 'da leggere' }
+}
+
+function Punto({ colore }: { colore: ColorePunto }) {
+  return <span className={`fonte-punto punto-${colore}`} aria-hidden />
+}
+
+// ---------------------------------------------------------------------------
+// Dettaglio di una fonte (nel cassetto)
+// ---------------------------------------------------------------------------
+
 function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
   const aggiorna = useStudio((s) => s.aggiornaFonte)
   const rimuovi = useStudio((s) => s.rimuoviFonte)
   const capitoli = useStudio((s) => s.progetto.capitoli)
   const input = useRef<HTMLInputElement>(null)
   const [allegato, setAllegato] = useState<string | null>(null)
+  const punto = puntoFonte(f)
 
   const campo = (k: 'titolo' | 'rivista' | 'doi' | 'url', etichetta: string) => (
     <label className="campo-blocco">
@@ -356,118 +405,37 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
   }
 
   return (
-    <article className="pannello dettaglio-fonte">
-      <div className="pannello-testa">
-        <h2>{autoreAnno(f)}</h2>
-        <button type="button" className="bottone bottone-vuoto bottone-piccolo" onClick={onChiudi}>
-          Chiudi
-        </button>
-      </div>
-      <p className="nota">
-        {ETICHETTA_ORIGINE[f.origine]} · aggiunta il {new Date(f.aggiuntaIl).toLocaleDateString('it-IT')} ·{' '}
-        {f.testoCompleto ? `c'è tutto il testo (${f.testo.length < 1000 ? `${f.testo.length} caratteri` : `${Math.round(f.testo.length / 1000)} mila caratteri`})` : 'solo il riassunto degli autori'}
-        {f.url && (
-          <>
-            {' · '}
-            <a href={f.url} target="_blank" rel="noopener noreferrer">
-              apri la fonte
-            </a>
-          </>
-        )}
-      </p>
+    <article className="dettaglio-fonte fd">
+      <header className={`fd-copertina ${f.temi[0] ? `tema-${f.temi[0]}` : ''}`}>
+        <span className="fd-numero" aria-hidden>
+          F{f.numero}
+        </span>
+        <span className={`fc-stato punto-${punto.colore}`}>
+          <Punto colore={punto.colore} /> {punto.etichetta}
+        </span>
+        <h3 className="fd-titolo">{f.titolo || 'Senza titolo'}</h3>
+        <p className="fd-autori">
+          {f.autori.join(', ') || 'Autore non indicato'}
+          {f.anno ? ` · ${f.anno}` : ''}
+          {f.rivista ? ` · ${f.rivista}` : ''}
+        </p>
+        <p className="nota fd-meta">
+          {ETICHETTA_ORIGINE[f.origine]} · aggiunta il {new Date(f.aggiuntaIl).toLocaleDateString('it-IT')} ·{' '}
+          {f.testoCompleto ? `c'è tutto il testo (${f.testo.length < 1000 ? `${f.testo.length} caratteri` : `${Math.round(f.testo.length / 1000)} mila caratteri`})` : 'solo il riassunto degli autori'}
+          {f.url && (
+            <>
+              {' · '}
+              <a href={f.url} target="_blank" rel="noopener noreferrer">
+                apri la fonte
+              </a>
+            </>
+          )}
+        </p>
+      </header>
 
-      <label className="campo-blocco">
-        <span className="etichetta">Stato</span>
-        <select className="campo" value={f.stato} onChange={(e) => aggiorna(f.id, { stato: e.target.value as StatoFonte })}>
-          {(Object.keys(ETICHETTA_STATO_FONTE) as StatoFonte[]).map((s) => (
-            <option key={s} value={s}>
-              {ETICHETTA_STATO_FONTE[s]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <span className="etichetta">Temi</span>
-      <TemiChips temi={f.temi} onCambia={(temi) => aggiorna(f.id, { temi })} />
-
-      <details className="dettagli-capitoli">
-        <summary>In quali capitoli la usi ({f.usataIn.length})</summary>
-        {capitoli.map((c, i) => (
-          <label key={c.id} className="interruttore">
-            <input type="checkbox" checked={f.usataIn.includes(c.id)} onChange={(e) => usataIn(c.id, e.target.checked)} />
-            <span>
-              {i + 1}. {c.titolo}
-            </span>
-          </label>
-        ))}
-      </details>
-
-      <details>
-        <summary>Dati della fonte</summary>
-        {campo('titolo', 'Titolo')}
-        <label className="campo-blocco">
-          <span className="etichetta">Autori o ente (separati da una virgola)</span>
-          <input
-            className="campo"
-            defaultValue={f.autori.join(', ')}
-            onBlur={(e) => aggiorna(f.id, { autori: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })}
-          />
-        </label>
-        <label className="campo-blocco">
-          <span className="etichetta">Anno</span>
-          <input
-            className="campo"
-            inputMode="numeric"
-            value={f.anno ?? ''}
-            onChange={(e) => {
-              const n = Number.parseInt(e.target.value, 10)
-              aggiorna(f.id, { anno: Number.isFinite(n) ? n : null })
-            }}
-          />
-        </label>
-        {campo('rivista', 'Rivista o editore')}
-        {f.pagine?.length ? (
-          <label className="campo-blocco">
-            <span className="etichetta">Numero di pagina con cui inizia l'articolo</span>
-            <input
-              className="campo"
-              inputMode="numeric"
-              value={f.paginaIniziale ?? 1}
-              onChange={(e) => {
-                const n = Number.parseInt(e.target.value, 10)
-                aggiorna(f.id, { paginaIniziale: Number.isFinite(n) && n > 0 ? n : 1 })
-              }}
-            />
-            <span className="nota">
-              Serve per citare la pagina giusta della rivista: se l'articolo inizia a p. 245, la prima pagina del PDF diventa "p. 245".
-              Se lo cambi, usa "Verifica le citazioni" nella scrittura per aggiornare le pagine.
-            </span>
-          </label>
-        ) : null}
-        {campo('doi', 'DOI')}
-        {campo('url', 'URL')}
-      </details>
-
-      {f.abstract && (
-        <details>
-          <summary>Riassunto degli autori</summary>
-          <p className="abstract">{f.abstract}</p>
-        </details>
-      )}
-      {f.estratti.length > 0 && (
-        <details open>
-          <summary>Frasi controllate sulla pagina</summary>
-          <ul className="frasi-chiave">
-            {f.estratti.map((e, i) => (
-              <li key={i}>
-                <Esito esito={e.esito} /> «{e.testo}»
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      <div className="riga-editor">
-        <button type="button" className="bottone bottone-piccolo" onClick={() => input.current?.click()}>
+      <div className="fd-azioni">
+        <button type="button" className="bottone bottone-secondario bottone-piccolo" onClick={() => input.current?.click()}>
+          <Icona nome="carica" />
           {f.tipo === 'pdf' ? 'Cambia il PDF' : 'Aggiungi il PDF'}
         </button>
         <input
@@ -489,9 +457,133 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
             }
           }}
         />
+        {f.url && (
+          <a className="bottone bottone-vuoto bottone-piccolo" href={f.url} target="_blank" rel="noopener noreferrer">
+            <Icona nome="link" />
+            Apri online
+          </a>
+        )}
+      </div>
+      {allegato && <p className="nota">{allegato}</p>}
+
+      <div className="fd-sezione fd-classifica">
+        <label className="campo-blocco">
+          <span className="etichetta">Stato</span>
+          <select className="campo" value={f.stato} onChange={(e) => aggiorna(f.id, { stato: e.target.value as StatoFonte })}>
+            {(Object.keys(ETICHETTA_STATO_FONTE) as StatoFonte[]).map((s) => (
+              <option key={s} value={s}>
+                {ETICHETTA_STATO_FONTE[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div>
+          <span className="etichetta">Temi</span>
+          <TemiChips temi={f.temi} onCambia={(temi) => aggiorna(f.id, { temi })} />
+        </div>
+      </div>
+
+      <Scheda f={f} />
+
+      <TestoCompleto f={f} />
+
+      <div className="fd-dettagli">
+        {f.estratti.length > 0 && (
+          <details open>
+            <summary>
+              <Icona nome="spunta" /> Frasi controllate sulla pagina
+            </summary>
+            <ul className="frasi-chiave">
+              {f.estratti.map((e, i) => (
+                <li key={i}>
+                  <Esito esito={e.esito} /> «{e.testo}»
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        <details className="dettagli-capitoli">
+          <summary>
+            <Icona nome="libri" /> In quali capitoli la usi ({f.usataIn.length})
+          </summary>
+          {capitoli.map((c, i) => (
+            <label key={c.id} className="interruttore">
+              <input type="checkbox" checked={f.usataIn.includes(c.id)} onChange={(e) => usataIn(c.id, e.target.checked)} />
+              <span>
+                {i + 1}. {c.titolo}
+              </span>
+            </label>
+          ))}
+        </details>
+
+        <details>
+          <summary>
+            <Icona nome="matita" /> Dati della fonte
+          </summary>
+          {campo('titolo', 'Titolo')}
+          <label className="campo-blocco">
+            <span className="etichetta">Autori o ente (separati da una virgola)</span>
+            <input
+              className="campo"
+              defaultValue={f.autori.join(', ')}
+              onBlur={(e) => aggiorna(f.id, { autori: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })}
+            />
+          </label>
+          <label className="campo-blocco">
+            <span className="etichetta">Anno</span>
+            <input
+              className="campo"
+              inputMode="numeric"
+              value={f.anno ?? ''}
+              onChange={(e) => {
+                const n = Number.parseInt(e.target.value, 10)
+                aggiorna(f.id, { anno: Number.isFinite(n) ? n : null })
+              }}
+            />
+          </label>
+          {campo('rivista', 'Rivista o editore')}
+          {f.pagine?.length ? (
+            <label className="campo-blocco">
+              <span className="etichetta">Numero di pagina con cui inizia l'articolo</span>
+              <input
+                className="campo"
+                inputMode="numeric"
+                value={f.paginaIniziale ?? 1}
+                onChange={(e) => {
+                  const n = Number.parseInt(e.target.value, 10)
+                  aggiorna(f.id, { paginaIniziale: Number.isFinite(n) && n > 0 ? n : 1 })
+                }}
+              />
+              <span className="nota">
+                Serve per citare la pagina giusta della rivista: se l'articolo inizia a p. 245, la prima pagina del PDF diventa "p. 245". Se lo cambi,
+                usa "Verifica le citazioni" nella scrittura per aggiornare le pagine.
+              </span>
+            </label>
+          ) : null}
+          {campo('doi', 'DOI')}
+          {campo('url', 'URL')}
+        </details>
+
+        {f.abstract && (
+          <details>
+            <summary>
+              <Icona nome="file" /> Riassunto degli autori
+            </summary>
+            <p className="abstract">{f.abstract}</p>
+          </details>
+        )}
+      </div>
+
+      <div className="fd-fondo">
         <Conferma
-          classe="bottone bottone-vuoto bottone-piccolo"
-          etichetta="Togli dalla biblioteca"
+          classe="bottone bottone-vuoto bottone-piccolo fd-togli"
+          etichetta={
+            <>
+              <Icona nome="cestino" />
+              Togli dalla biblioteca
+            </>
+          }
           domanda="Tolgo questa fonte?"
           conferma="Togli"
           pericolosa
@@ -501,11 +593,6 @@ function Dettaglio({ f, onChiudi }: { f: Fonte; onChiudi: () => void }) {
           }}
         />
       </div>
-      {allegato && <p className="nota">{allegato}</p>}
-
-      <TestoCompleto f={f} />
-
-      <Scheda f={f} />
     </article>
   )
 }
@@ -537,12 +624,14 @@ function csv(fonti: Fonte[]): string {
 
 function Tabella({ fonti, onApri }: { fonti: Fonte[]; onApri: (id: string) => void }) {
   return (
-    <section className="pannello">
+    <section className="pannello bib-tabella">
       <div className="pannello-testa">
-        <h2>Tabella delle fonti</h2>
+        <h2>
+          <Icona nome="elenco" /> Tabella delle fonti
+        </h2>
         <button
           type="button"
-          className="bottone bottone-piccolo"
+          className="bottone bottone-piccolo bottone-secondario"
           onClick={() => {
             const url = URL.createObjectURL(new Blob([csv(fonti)], { type: 'text/csv;charset=utf-8' }))
             const a = document.createElement('a')
@@ -552,6 +641,7 @@ function Tabella({ fonti, onApri }: { fonti: Fonte[]; onApri: (id: string) => vo
             setTimeout(() => URL.revokeObjectURL(url), 5000)
           }}
         >
+          <Icona nome="scarica" />
           Scarica per Excel
         </button>
       </div>
@@ -593,16 +683,48 @@ function Tabella({ fonti, onApri }: { fonti: Fonte[]; onApri: (id: string) => vo
 // Schermata
 // ---------------------------------------------------------------------------
 
+function CartaFonte({ f, onApri }: { f: Fonte; onApri: (id: string) => void }) {
+  const punto = puntoFonte(f)
+  return (
+    <li>
+      <button type="button" className={`fonte-carta fonte-voce ${f.temi[0] ? `tema-${f.temi[0]}` : 'senza-tema'}`} onClick={() => onApri(f.id)}>
+        <span className="fc-copertina">
+          <span className="fc-numero" aria-hidden>
+            F{f.numero}
+          </span>
+          <span className={`fc-stato punto-${punto.colore}`} title={`Stato: ${ETICHETTA_STATO_FONTE[f.stato]} · ${statoScheda(f)}`}>
+            <Punto colore={punto.colore} /> {punto.etichetta}
+          </span>
+        </span>
+        <span className="fc-corpo">
+          <span className="fonte-rimando">{autoreAnno(f, false)}</span>
+          <span className="fonte-titolo">{f.titolo}</span>
+          <span className="fc-tag">
+            {f.testoCompleto ? (
+              <span className="fc-pill fc-pill-ok">tutto il testo{f.pagine?.length ? ' con pagine' : ''}</span>
+            ) : puòAvereTestoCompleto(f) && f.oaUrl ? (
+              <span className="fc-pill fc-pill-oa">gratis online</span>
+            ) : null}
+            {f.scheda && <span className="fc-pill">{f.scheda.corretta ? 'riassunto controllato' : 'riassunto'}</span>}
+            <span className="fc-pill fc-pill-origine">{ETICHETTA_ORIGINE[f.origine]}</span>
+          </span>
+          {f.temi.length > 0 && <TemiChips temi={f.temi} sola />}
+        </span>
+      </button>
+    </li>
+  )
+}
+
 export function Biblioteca() {
   const fonti = useStudio((s) => s.progetto.fonti)
   const inAttesa = useStudio((s) => s.progetto.inAttesa.length)
   const vai = useStudio((s) => s.vai)
-  const largo = useLargo(1100)
   const input = useRef<HTMLInputElement>(null)
   const [vista, setVista] = useState<Vista>('schede')
   const [testo, setTesto] = useState('')
-  const [tema, setTema] = useState<TemaFonte | ''>('')
-  const [stato, setStato] = useState<StatoFonte | ''>('')
+  const [temi, setTemi] = useState<TemaFonte[]>([])
+  const [stati, setStati] = useState<StatoFonte[]>([])
+  const [filtriAperti, setFiltriAperti] = useState(false)
   const scelta = useStudio((s) => s.fonteAperta)
   const setScelta = useStudio((s) => s.apriFonte)
   const [caricamento, setCaricamento] = useState<string | null>(null)
@@ -610,11 +732,12 @@ export function Biblioteca() {
   const visibili = useMemo(() => {
     const t = testo.trim().toLowerCase()
     return [...fonti]
-      .filter((f) => (!tema || f.temi.includes(tema)) && (!stato || f.stato === stato))
+      .filter((f) => (temi.length === 0 || f.temi.some((x) => temi.includes(x))) && (stati.length === 0 || stati.includes(f.stato)))
       .filter((f) => !t || `${f.titolo} ${f.autori.join(' ')} ${f.abstract} ${f.rivista}`.toLowerCase().includes(t))
       .sort((a, b) => autoreAnno(a, false).localeCompare(autoreAnno(b, false), 'it'))
-  }, [fonti, testo, tema, stato])
+  }, [fonti, testo, temi, stati])
   const fonte = fonti.find((f) => f.id === scelta) ?? null
+  const attivi = temi.length + stati.length
 
   const caricaPdf = async (files: FileList | null) => {
     if (!files?.length) return
@@ -623,114 +746,166 @@ export function Biblioteca() {
     setCaricamento(note.join(' ') || null)
   }
 
-  const elenco = (
-    <section className="pannello">
-      <div className="pannello-testa">
-        <h2>Biblioteca ({fonti.length})</h2>
-        <div className="riga-editor">
-          <button type="button" className={`bottone bottone-piccolo ${vista === 'schede' ? 'bottone-primario' : ''}`} onClick={() => setVista('schede')}>
+  const conteggi = useMemo(() => {
+    const c: Record<ColorePunto, number> = { verde: 0, giallo: 0, rosso: 0, grigio: 0 }
+    for (const f of fonti) c[puntoFonte(f).colore] += 1
+    return c
+  }, [fonti])
+
+  return (
+    <div className="biblioteca">
+      <div className="bib-barra">
+        <div className="bib-cerca">
+          <Icona nome="cerca" dimensione={18} />
+          <input
+            className="bib-cerca-campo"
+            type="search"
+            placeholder="Cerca titolo, autore o parola"
+            value={testo}
+            onChange={(e) => setTesto(e.target.value)}
+            aria-label="Cerca in biblioteca"
+          />
+        </div>
+        <button
+          type="button"
+          className={`bottone bottone-secondario bib-filtra ${attivi ? 'bib-filtra-attivo' : ''}`}
+          aria-expanded={filtriAperti}
+          aria-controls="bib-filtri"
+          onClick={() => setFiltriAperti((a) => !a)}
+        >
+          <Icona nome="filtro" />
+          Filtra
+          {attivi > 0 && <span className="bib-conta">{attivi}</span>}
+        </button>
+        <div className="bib-azioni">
+          <button type="button" className="bottone bottone-primario" onClick={() => input.current?.click()}>
+            <Icona nome="piu" />
+            Aggiungi PDF
+          </button>
+          <input
+            ref={input}
+            type="file"
+            accept=".pdf,application/pdf"
+            multiple
+            hidden
+            onChange={(e) => {
+              void caricaPdf(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <button type="button" className="bottone bottone-secondario" onClick={() => vai('ricerca')}>
+            <Icona nome="lente" />
+            Nuova ricerca
+          </button>
+        </div>
+        <div className="bib-vista" role="group" aria-label="Vista">
+          <button type="button" aria-pressed={vista === 'schede'} className={vista === 'schede' ? 'bib-vista-attiva' : ''} onClick={() => setVista('schede')}>
+            <Icona nome="griglia" dimensione={16} />
             Fonti
           </button>
-          <button type="button" className={`bottone bottone-piccolo ${vista === 'tabella' ? 'bottone-primario' : ''}`} onClick={() => setVista('tabella')}>
+          <button type="button" aria-pressed={vista === 'tabella'} className={vista === 'tabella' ? 'bib-vista-attiva' : ''} onClick={() => setVista('tabella')}>
+            <Icona nome="elenco" dimensione={16} />
             Tabella
           </button>
         </div>
       </div>
 
+      {filtriAperti && (
+        <div id="bib-filtri" className="bib-filtri pannello">
+          <div className="bib-filtri-gruppo">
+            <span className="etichetta">Temi</span>
+            <TemiChips temi={temi} onCambia={setTemi} />
+          </div>
+          <div className="bib-filtri-gruppo">
+            <span className="etichetta">Stato</span>
+            <span className="temi" role="group" aria-label="Filtra per stato">
+              {(Object.keys(ETICHETTA_STATO_FONTE) as StatoFonte[]).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`bib-chip ${stati.includes(s) ? 'bib-chip-attivo' : ''}`}
+                  aria-pressed={stati.includes(s)}
+                  onClick={() => setStati(stati.includes(s) ? stati.filter((x) => x !== s) : [...stati, s])}
+                >
+                  {ETICHETTA_STATO_FONTE[s]}
+                </button>
+              ))}
+            </span>
+          </div>
+          <div className="bib-filtri-piede">
+            <ul className="bib-legenda" aria-label="Cosa vogliono dire i colori">
+              {LEGENDA_PUNTI.map((l) => (
+                <li key={l.colore}>
+                  <Punto colore={l.colore} /> {l.testo} <strong>{conteggi[l.colore]}</strong>
+                </li>
+              ))}
+            </ul>
+            {attivi > 0 && (
+              <button
+                type="button"
+                className="bottone bottone-vuoto bottone-piccolo"
+                onClick={() => {
+                  setTemi([])
+                  setStati([])
+                }}
+              >
+                <Icona nome="chiudi" />
+                Togli i filtri
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {inAttesa > 0 && (
-        <p className="allerta">
-          Hai {inAttesa} risultati da controllare.{' '}
+        <p className="bib-avviso">
+          <Icona nome="bandiera" />
+          <span>Hai {inAttesa} risultati da controllare.</span>
           <button type="button" className="link" onClick={() => vai('ricerca')}>
             Vai alla ricerca
           </button>
         </p>
       )}
+      {caricamento && <p className="nota bib-caricamento">{caricamento}</p>}
 
-      <div className="filtri">
-        <input className="campo" placeholder="Cerca titolo, autore o parola" value={testo} onChange={(e) => setTesto(e.target.value)} aria-label="Cerca in biblioteca" />
-        <select className="campo" value={tema} onChange={(e) => setTema(e.target.value as TemaFonte | '')} aria-label="Filtra per tema">
-          <option value="">tutti i temi</option>
-          {(Object.keys(ETICHETTA_TEMA) as TemaFonte[]).map((t) => (
-            <option key={t} value={t}>
-              {ETICHETTA_TEMA[t]}
-            </option>
-          ))}
-        </select>
-        <select className="campo" value={stato} onChange={(e) => setStato(e.target.value as StatoFonte | '')} aria-label="Filtra per stato">
-          <option value="">tutti gli stati</option>
-          {(Object.keys(ETICHETTA_STATO_FONTE) as StatoFonte[]).map((s) => (
-            <option key={s} value={s}>
-              {ETICHETTA_STATO_FONTE[s]}
-            </option>
-          ))}
-        </select>
+      <div className="bib-strumenti">
+        <TestoCompletoPerTutte />
+        <SchedeInBlocco />
       </div>
 
-      <div className="riga-editor">
-        <button type="button" className="bottone" onClick={() => input.current?.click()}>
-          Aggiungi PDF
-        </button>
-        <input ref={input} type="file" accept=".pdf,application/pdf" multiple hidden onChange={(e) => {
-          void caricaPdf(e.target.files)
-          e.target.value = ''
-        }} />
-        <button type="button" className="bottone bottone-vuoto" onClick={() => vai('ricerca')}>
-          Nuova ricerca
-        </button>
+      <div className="bib-titolo">
+        <h2>Biblioteca ({fonti.length})</h2>
+        {fonti.length > 0 && visibili.length !== fonti.length && (
+          <span className="nota">
+            ne vedi {visibili.length} di {fonti.length}
+          </span>
+        )}
       </div>
-      {caricamento && <p className="nota">{caricamento}</p>}
-      <TestoCompletoPerTutte />
-      <SchedeInBlocco />
 
       {fonti.length === 0 ? (
-        <p className="nota">
-          La biblioteca si riempie un po' alla volta: con le fonti che tieni dalle ricerche e con i PDF che carichi tu. Non si svuota a ogni ricerca.
-        </p>
+        <div className="bib-vuota pannello">
+          <span className="bib-vuota-icona" aria-hidden>
+            <Icona nome="libri" dimensione={30} />
+          </span>
+          <p>
+            La biblioteca si riempie un po' alla volta: con le fonti che tieni dalle ricerche e con i PDF che carichi tu. Non si svuota a ogni ricerca.
+          </p>
+        </div>
       ) : visibili.length === 0 ? (
-        <p className="nota">Nessuna fonte con questi filtri. Prova a toglierne qualcuno.</p>
+        <p className="nota bib-nessuna">Nessuna fonte con questi filtri. Prova a toglierne qualcuno.</p>
+      ) : vista === 'tabella' ? (
+        <Tabella fonti={visibili} onApri={setScelta} />
       ) : (
-        <ul className="elenco-fonti">
+        <ul className="bib-griglia elenco-fonti">
           {visibili.map((f) => (
-            <li key={f.id}>
-              <button type="button" className={`fonte-voce ${scelta === f.id ? 'fonte-scelta' : ''}`} onClick={() => setScelta(f.id)}>
-                <span className="fonte-rimando">{autoreAnno(f, false)}</span>
-                <span className="fonte-titolo">{f.titolo}</span>
-                <span className="fonte-meta">
-                  <span className={`stato-fonte stato-fonte-${f.stato}`}>{ETICHETTA_STATO_FONTE[f.stato]}</span>
-                  <span>{ETICHETTA_ORIGINE[f.origine]}</span>
-                  <span>{statoScheda(f)}</span>
-                  {f.testoCompleto ? <span className="nota-ok">tutto il testo{f.pagine?.length ? ' con pagine' : ''}</span> : puòAvereTestoCompleto(f) && f.oaUrl ? <span className="oa">gratis online</span> : null}
-                </span>
-                {f.temi.length > 0 && <TemiChips temi={f.temi} sola />}
-              </button>
-            </li>
+            <CartaFonte key={f.id} f={f} onApri={setScelta} />
           ))}
         </ul>
       )}
-    </section>
-  )
 
-  const dettaglio = fonte && <Dettaglio key={fonte.id} f={fonte} onChiudi={() => setScelta(null)} />
-
-  if (vista === 'tabella') {
-    return (
-      <div className="colonna-unica">
-        {elenco}
-        {dettaglio}
-        <Tabella fonti={visibili} onApri={setScelta} />
-      </div>
-    )
-  }
-
-  return largo ? (
-    <div className="griglia-due">
-      <div>{elenco}</div>
-      <div>{dettaglio ?? <section className="pannello nota">Scegli una fonte per vederla qui.</section>}</div>
-    </div>
-  ) : (
-    <div className="colonna-unica">
-      {dettaglio}
-      {elenco}
+      <Cassetto aperto={Boolean(fonte)} onChiudi={() => setScelta(null)} titolo={fonte ? autoreAnno(fonte) : 'Fonte'} larghezza={600}>
+        {fonte && <Dettaglio key={fonte.id} f={fonte} onChiudi={() => setScelta(null)} />}
+      </Cassetto>
     </div>
   )
 }

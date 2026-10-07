@@ -31,3 +31,20 @@ export function useQualitaScena(): QualitaScena {
   if (modalita !== 'auto') return modalita
   return modo === 'ipad' || ridotto || dispositivoModesto() ? 'ridotta' : 'completa'
 }
+
+/** Di notte la sala cambia luci, cielo e bagliori. */
+export const ContestoNotte = createContext(false)
+
+export function useNotte() {
+  return useContext(ContestoNotte)
+}
+
+/**
+ * Larghezza in pixel coperta dal pannello della conversazione sul lato
+ * destro del canvas, e se le etichette vanno nascoste (intro in corso).
+ */
+export const ContestoEtichette = createContext<{ spazioDestra: number; nascoste: boolean }>({ spazioDestra: 0, nascoste: false })
+
+export function useContestoEtichette() {
+  return useContext(ContestoEtichette)
+}

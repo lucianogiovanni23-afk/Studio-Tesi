@@ -1,6 +1,9 @@
+import '../styles/corso.css'
 import { useMemo, useState } from 'react'
 import { Conferma } from '../components/Conferma'
 import { useStudio } from '../store'
+import { Icona } from '../ui/Icona'
+import { Info } from '../ui/Info'
 
 /** Glossario condiviso da tutti gli agenti: entra nei loro prompt. */
 export function Glossario() {
@@ -16,21 +19,36 @@ export function Glossario() {
   }, [voci, filtro])
 
   return (
-    <section className="pannello glossario">
-      <div className="pannello-testa">
-        <h2>Glossario</h2>
+    <div className="glossario-pagina glossario">
+      <div className="glossario-testa">
+        <h2>
+          Glossario
+          <Info>
+            Gli assistenti usano queste parole e non i sinonimi. Se un capitolo usa una parola in modo diverso, il revisore te lo segnala. Le
+            spiegazioni restano sulla finanza.
+          </Info>
+        </h2>
         <span className="nota">{voci.length} parole · lo usano tutti gli assistenti</span>
       </div>
-      <p className="nota">
-        Gli assistenti usano queste parole e non i sinonimi. Se un capitolo usa una parola in modo diverso, il revisore te lo
-        segnala. Le spiegazioni restano sulla finanza.
-      </p>
-      <input className="campo" placeholder="Cerca una parola" value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Cerca nel glossario" />
 
-      <ul className="elenco-glossario">
+      <div className="corso-cerca glossario-cerca" role="search">
+        <Icona nome="cerca" dimensione={20} className="corso-cerca-lente" />
+        <input
+          className="corso-cerca-campo"
+          type="search"
+          placeholder="Cerca una parola"
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          aria-label="Cerca nel glossario"
+        />
+      </div>
+
+      {visibili.length === 0 && <p className="nota corso-vuoto">Nessuna parola trovata.</p>}
+
+      <ul className="glossario-voci elenco-glossario">
         {visibili.map((v) => (
-          <li key={v.id}>
-            <div className="riga-editor">
+          <li key={v.id} className="glossario-voce">
+            <div className="glossario-voce-testa">
               <input
                 className="campo campo-termine"
                 value={v.termine}
@@ -71,7 +89,7 @@ export function Glossario() {
       </ul>
 
       <form
-        className="nuova-voce"
+        className="pannello glossario-nuova nuova-voce"
         onSubmit={(e) => {
           e.preventDefault()
           if (!nuovo.termine.trim()) return
@@ -79,7 +97,9 @@ export function Glossario() {
           setNuovo({ termine: '', definizione: '' })
         }}
       >
-        <h3>Aggiungi una parola</h3>
+        <h3 className="glossario-nuova-titolo">
+          <Icona nome="piu" /> Aggiungi una parola
+        </h3>
         <input className="campo" placeholder="Parola" value={nuovo.termine} onChange={(e) => setNuovo({ ...nuovo, termine: e.target.value })} aria-label="Nuovo termine" />
         <textarea
           className="campo"
@@ -89,10 +109,10 @@ export function Glossario() {
           onChange={(e) => setNuovo({ ...nuovo, definizione: e.target.value })}
           aria-label="Definizione del nuovo termine"
         />
-        <button type="submit" className="bottone">
+        <button type="submit" className="bottone bottone-primario">
           Aggiungi al glossario
         </button>
       </form>
-    </section>
+    </div>
   )
 }
