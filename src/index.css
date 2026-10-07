@@ -2525,3 +2525,83 @@ code {
 .modo-ipad .testo-dopo p {
   font-size: 15px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Lessico, rilevatore di stile, diagnostica, copie                   */
+/* ------------------------------------------------------------------ */
+
+.elenco-lessico,
+.elenco-stile,
+.elenco-diagnosi,
+.elenco-copie {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+}
+
+.elenco-lessico li,
+.elenco-diagnosi li {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--crema-2);
+}
+
+.pannello-stile {
+  margin-top: 10px;
+}
+
+.pannello-stile.con-segnalazioni > .bottone {
+  border-color: var(--ambra);
+  background: #fbf3dc;
+}
+
+.pannello-stile.pulito > .bottone {
+  border-color: #b9d39c;
+}
+
+.stile-dettaglio {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--crema);
+  border-radius: var(--raggio-piccolo);
+}
+
+.elenco-stile li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--crema-2);
+}
+
+.elenco-stile .nota {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.stile-lessico .pastiglia-origine {
+  background: var(--cielo-chiaro);
+}
+
+.stile-proposta {
+  margin: 0 0 8px;
+}
+
+.elenco-copie li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--crema-2);
+}
+
+.budget {
+  align-items: flex-end;
+}
+
+.budget .campo-blocco {
+  flex: 1 1 220px;
+  margin: 0;
+}

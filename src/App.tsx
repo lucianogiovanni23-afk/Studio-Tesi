@@ -4,6 +4,7 @@ import { installaHookControllore, logAvviso } from './agents/supervisor'
 import { AgentiBar } from './components/AgentiBar'
 import { ModalitaCarta } from './components/ModalitaCarta'
 import { useModoUso } from './hooks/useModoUso'
+import { avviaCopieAutomatiche } from './io/copie'
 import { Corso } from './screens/Corso'
 import { Cruscotto } from './screens/Cruscotto'
 import { Glossario } from './screens/Glossario'
@@ -102,6 +103,7 @@ export default function App() {
   useEffect(() => installaHookControllore(), [])
   useEffect(() => {
     void sincronizzaCorpus()
+    avviaCopieAutomatiche()
   }, [])
   useEffect(() => {
     window.scrollTo({ top: 0 })

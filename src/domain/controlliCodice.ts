@@ -1,7 +1,8 @@
 import { normalizza } from '../agents/citations'
 import { segnalaSconfinamenti } from '../agents/supervisor'
 import type { Progetto, RilievoTesi } from '../types'
-import { coloreCitazione, marcatoriDi } from './citazioniTesto'
+import { coloreCitazione, marcatoriDi, paragrafi } from './citazioniTesto'
+import { analizzaStile, variantiUsate } from './stileTesto'
 import { nuovoId } from './progettoIniziale'
 
 /** Frasi del testo, senza marcatori. */
@@ -16,10 +17,6 @@ function frasi(testo: string): string[] {
 function fraseCon(testo: string, parola: string): string {
   const minuscola = parola.toLowerCase()
   return frasi(testo).find((f) => f.toLowerCase().includes(minuscola)) ?? parola
-}
-
-function escape(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 const MAX_PER_TIPO = 40
@@ -37,25 +34,21 @@ export function controlliInCodice(p: Progetto): RilievoTesi[] {
     c.sezioni.map((s, j) => ({ cap: c, sez: s, etichetta: `${i + 1}.${j + 1}` })),
   )
 
-  // Terminologia
+  // Terminologia: varianti del glossario e del lessico del corso
   const terminologia: RilievoTesi[] = []
-  for (const v of p.glossario) {
-    for (const variante of v.varianti) {
-      if (variante.trim().length < 3 || variante.toLowerCase() === v.termine.toLowerCase()) continue
-      const re = new RegExp(`(^|[^\\p{L}])${escape(variante)}(?=$|[^\\p{L}])`, 'iu')
-      for (const { cap, sez, etichetta } of sezioni) {
-        if (!re.test(sez.testo)) continue
-        terminologia.push({
-          id: nuovoId('ril'),
-          tipo: 'terminologia',
-          origine: 'codice',
-          capitoloId: cap.id,
-          sezioneId: sez.id,
-          passo: fraseCon(sez.testo, variante),
-          problema: `Nella sezione ${etichetta} compare «${variante}», variante di «${v.termine}» nel glossario.`,
-          suggerimento: `Usa «${v.termine}» in tutta la tesi.`,
-        })
-      }
+  for (const { cap, sez, etichetta } of sezioni) {
+    const pars = paragrafi(sez.testo)
+    for (const u of variantiUsate(sez.testo, p.glossario)) {
+      terminologia.push({
+        id: nuovoId('ril'),
+        tipo: 'terminologia',
+        origine: 'codice',
+        capitoloId: cap.id,
+        sezioneId: sez.id,
+        passo: fraseCon(pars[u.paragrafo] ?? sez.testo, u.variante),
+        problema: `Nella sezione ${etichetta} compare «${u.variante}», variante di «${u.termine}» nel glossario.`,
+        suggerimento: `Usa «${u.termine}» in tutta la tesi.`,
+      })
     }
   }
   rilievi.push(...terminologia.slice(0, MAX_PER_TIPO))
@@ -85,6 +78,24 @@ export function controlliInCodice(p: Progetto): RilievoTesi[] {
     }
   }
   rilievi.push(...ripetizioni.slice(0, MAX_PER_TIPO))
+
+  // Frasi tipiche dei testi generati dall'IA
+  const stile: RilievoTesi[] = []
+  for (const { cap, sez, etichetta } of sezioni) {
+    for (const x of analizzaStile(sez.testo).filter((y) => y.tipo !== 'lessico')) {
+      stile.push({
+        id: nuovoId('ril'),
+        tipo: 'stile_ia',
+        origine: 'codice',
+        capitoloId: cap.id,
+        sezioneId: sez.id,
+        passo: x.testo,
+        problema: `Sezione ${etichetta}, paragrafo ${x.paragrafo + 1}: ${x.spiegazione}.`,
+        suggerimento: x.suggerimento,
+      })
+    }
+  }
+  rilievi.push(...stile.slice(0, MAX_PER_TIPO * 2))
 
   // Materia
   for (const { cap, sez, etichetta } of sezioni) {

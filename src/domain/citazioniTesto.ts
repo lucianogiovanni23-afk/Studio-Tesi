@@ -147,6 +147,33 @@ export function esportaTesto(testo: string, citazioni: Citazione[], fonti: Fonte
   return convertito
 }
 
+export type Parte = { tipo: 'testo'; testo: string } | { tipo: 'nota'; testo: string }
+
+/**
+ * Un paragrafo diviso in testo e note, per l'esportazione in Word: in stile
+ * autore-anno i rimandi restano nel testo; in stile note ogni gruppo di
+ * marcatori diventa una nota a piè di pagina vera.
+ */
+export function partiParagrafo(paragrafo: string, citazioni: Citazione[], fonti: Fonte[], stile: StileCitazione): Parte[] {
+  if (stile === 'autore-anno') return [{ tipo: 'testo', testo: esportaTesto(paragrafo, citazioni, fonti, 'autore-anno') }]
+  const parti: Parte[] = []
+  const gruppo = /(?:\s*\[[FC]\d+\])+/g
+  let ultimo = 0
+  for (const m of paragrafo.matchAll(gruppo)) {
+    if (m.index > ultimo) parti.push({ tipo: 'testo', testo: paragrafo.slice(ultimo, m.index) })
+    const rifs = [...m[0].matchAll(MARCATORE)].map((x) => x[1].toUpperCase())
+    const testi = rifs.map((r) => {
+      if (r.startsWith('C')) return `Materiale del corso: ${rimandoCorso(r, citazioni)}.`
+      const f = fonteDiRif(r, fonti)
+      return f ? riferimentoCompleto(f) : `Fonte ${r} non trovata in biblioteca.`
+    })
+    parti.push({ tipo: 'nota', testo: testi.join(' ') })
+    ultimo = m.index + m[0].length
+  }
+  if (ultimo < paragrafo.length) parti.push({ tipo: 'testo', testo: paragrafo.slice(ultimo) })
+  return parti
+}
+
 /** Testo leggibile per la modalità carta: marcatori convertiti nello stile, senza note in fondo. */
 export function testoPerLettura(testo: string, citazioni: Citazione[], fonti: Fonte[]): string {
   return esportaTesto(testo, citazioni, fonti, 'autore-anno')

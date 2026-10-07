@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { nomeChi } from '../agents/agenti'
 import { formattaDollari } from '../agents/costs'
-import { useStudio } from '../store'
+import { costoDelMese, useStudio } from '../store'
 import type { VoceUso } from '../types'
 import { Conferma } from './Conferma'
 
@@ -73,6 +73,10 @@ function Tabella({ titolo, righe }: { titolo: string; righe: Riga[] }) {
 export function Costi() {
   const usi = useStudio((s) => s.progetto.usi)
   const azzera = useStudio((s) => s.azzeraUsi)
+  const budget = useStudio((s) => s.progetto.budgetMensile)
+  const setBudget = useStudio((s) => s.setBudget)
+  const [bozzaBudget, setBozzaBudget] = useState(budget === null ? '' : String(budget))
+  const mese = useMemo(() => costoDelMese(usi), [usi])
 
   const perAgente = useMemo(() => raggruppa(usi, (u) => nomeChi(u.chi)), [usi])
   const perAzione = useMemo(() => raggruppa(usi, (u) => u.azione || 'altro'), [usi])
@@ -95,6 +99,26 @@ export function Costi() {
           totale {formattaDollari(totale)} · risparmiati con la cache {formattaDollari(risparmio)}
         </span>
       </div>
+      <form
+        className="riga-editor budget"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const n = Number(bozzaBudget.replace(',', '.'))
+          setBudget(bozzaBudget.trim() === '' || !Number.isFinite(n) || n <= 0 ? null : n)
+        }}
+      >
+        <label className="campo-blocco">
+          <span className="etichetta">Budget mensile in dollari (vuoto = nessun tetto)</span>
+          <input className="campo" inputMode="decimal" value={bozzaBudget} onChange={(e) => setBozzaBudget(e.target.value)} placeholder="per esempio 15" />
+        </label>
+        <button type="submit" className="bottone">
+          Salva il budget
+        </button>
+      </form>
+      <p className="nota">
+        Questo mese: {formattaDollari(mese)}
+        {budget !== null && ` su ${formattaDollari(budget)} (${Math.min(100, Math.round((mese / budget) * 100))}%). Raggiunto il tetto, nessuna chiamata parte finché non lo alzi.`}
+      </p>
       {usi.length === 0 ? (
         <p className="nota">Nessuna chiamata registrata finora.</p>
       ) : (

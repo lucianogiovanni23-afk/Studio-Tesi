@@ -7,6 +7,8 @@ import { PassoFonti } from '../components/scrittura/PassoFonti'
 import { PassoScaletta } from '../components/scrittura/PassoScaletta'
 import { fontiPertinenti } from '../components/scrittura/pertinenza'
 import { esaminaCitazioni } from '../agents/citations'
+import { selezionaParagrafo, useScrittore } from '../agents/scrittore'
+import { PannelloStile } from '../components/scrittura/PannelloStile'
 import { esportaTesto, paragrafoAlCursore } from '../domain/citazioniTesto'
 import { Esito } from '../components/Esito'
 import { autoreAnno } from '../domain/bibliografia'
@@ -333,7 +335,7 @@ export function Scrittura() {
   const modo = useModoUso()
   const largo = useLargo(1100)
   const tre = modo === 'computer' && largo
-  const [paragrafo, setParagrafo] = useState<{ sez: string; n: number } | null>(null)
+  const selezione = useScrittore((s) => s.selezione)
 
   const cap = capitoli.find((c) => c.id === capId) ?? capitoli[0]
   const sez = cap?.sezioni.find((s) => s.id === sezId) ?? cap?.sezioni[0]
@@ -398,10 +400,11 @@ export function Scrittura() {
               <h3>
                 <span className="passo-numero">3</span> Testo della sezione
               </h3>
-              <ComandiScrittore cap={cap} sez={sez} paragrafo={paragrafo?.sez === sez.id ? paragrafo.n : null} />
-              <Editor cap={cap} sez={sez} onCursore={(n) => setParagrafo({ sez: sez.id, n })} />
+              <ComandiScrittore cap={cap} sez={sez} paragrafo={selezione?.sezioneId === sez.id ? selezione.n : null} />
+              <Editor cap={cap} sez={sez} onCursore={(n) => selezionaParagrafo(sez.id, n)} />
               <p className="nota conteggio">{contaParoleTesto(sez.testo)} parole · ultima modifica {dataBreve(sez.aggiornataIl)}</p>
               <ConCitazioni sez={sez} />
+              <PannelloStile sez={sez} />
             </section>
             <Versioni cap={cap} sez={sez} />
           </>

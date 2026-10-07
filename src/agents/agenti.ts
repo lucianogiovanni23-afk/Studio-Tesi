@@ -49,6 +49,7 @@ export const AGENT_KEYS: AgentKey[] = AGENTI.map((a) => a.key)
 
 export function nomeChi(chi: Chi): string {
   if (chi === 'chat') return 'Chat'
+  if (chi === 'diagnostica') return 'Diagnostica'
   if (chi === 'selezione') return 'Bibliotecario (selezione)'
   return AGENTE[chi].nome
 }

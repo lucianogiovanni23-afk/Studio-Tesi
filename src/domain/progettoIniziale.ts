@@ -30,7 +30,7 @@ export function nuovoCapitolo(titolo: string): Capitolo {
 }
 
 export function glossarioIniziale(): VoceGlossario[] {
-  return GLOSSARIO_INIZIALE.map((v) => ({ id: nuovoId('gl'), ...v, nota: '' }))
+  return GLOSSARIO_INIZIALE.map((v) => ({ id: nuovoId('gl'), ...v, nota: '', origine: 'iniziale' as const }))
 }
 
 export function progettoIniziale(): Progetto {
@@ -55,6 +55,7 @@ export function progettoIniziale(): Progetto {
     courseFiles: [],
     quadro: null,
     usi: [],
+    budgetMensile: null,
     creatoIl: adesso(),
     salvatoSuFileIl: null,
   }
@@ -95,6 +96,7 @@ export function normalizzaProgetto(p: Progetto): Progetto {
     osservazioni: (p.osservazioni ?? []).map((o) => ({ ...o, proposte: o.proposte ?? [], lettura: o.lettura ?? '' })),
     controllo: p.controllo ?? null,
     chat: p.chat ?? [],
+    budgetMensile: p.budgetMensile ?? null,
     capitoli: p.capitoli.map((c) => ({
       ...c,
       sezioni: c.sezioni.map((s) => ({ ...nuovaSezione(s.titolo), ...s, fontiConfermate: s.fontiConfermate ?? false })),

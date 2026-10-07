@@ -9,12 +9,13 @@ import {
   stimaOsservazione,
 } from '../agents/revisore'
 import { Conferma } from '../components/Conferma'
+import { esportaWord } from '../io/esportaWord'
 import { TestoCitato } from '../components/TestoCitato'
 import { bibliografia } from '../domain/bibliografia'
 import { useStudio } from '../store'
 import type { Osservazione, PropostaRevisione, TipoRilievo } from '../types'
 
-type Scheda = 'osservazioni' | 'controllo' | 'bibliografia'
+type Scheda = 'osservazioni' | 'controllo' | 'bibliografia' | 'word'
 
 function useEtichettaSezione() {
   const capitoli = useStudio((s) => s.progetto.capitoli)
@@ -210,6 +211,7 @@ const NOME_TIPO: Record<TipoRilievo, string> = {
   materia: 'Vincolo di materia',
   coerenza: 'Coerenza',
   citazioni: 'Citazioni',
+  stile_ia: 'Frasi da IA',
 }
 
 function Controllo() {
@@ -424,6 +426,69 @@ function Bibliografia() {
   )
 }
 
+function EsportaWord() {
+  const capitoli = useStudio((s) => s.progetto.capitoli)
+  const stile = useStudio((s) => s.progetto.stileCitazione)
+  const [capitolo, setCapitolo] = useState('')
+  const [conBibliografia, setConBibliografia] = useState(true)
+  const [conFrontespizio, setConFrontespizio] = useState(true)
+  const [lavoro, setLavoro] = useState(false)
+  const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
+
+  return (
+    <section className="pannello">
+      <h2>Esporta in Word</h2>
+      <p className="nota">
+        Un file .docx da mandare al relatore: titoli con gli stili di Word (da cui Word genera l'indice), Times New Roman 12 con interlinea 1,5,
+        citazioni nello stile scelto ({stile === 'note' ? 'note a piè di pagina vere' : 'autore-anno nel testo'}) e bibliografia in fondo.
+      </p>
+      <label className="campo-blocco">
+        <span className="etichetta">Che cosa esportare</span>
+        <select className="campo" value={capitolo} onChange={(e) => setCapitolo(e.target.value)}>
+          <option value="">tutta la tesi</option>
+          {capitoli.map((c, i) => (
+            <option key={c.id} value={c.id}>
+              Capitolo {i + 1}: {c.titolo}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="interruttore">
+        <input type="checkbox" checked={conFrontespizio} onChange={(e) => setConFrontespizio(e.target.checked)} />
+        <span>Pagina con il titolo</span>
+      </label>
+      <label className="interruttore">
+        <input type="checkbox" checked={conBibliografia} onChange={(e) => setConBibliografia(e.target.checked)} />
+        <span>Bibliografia in fondo</span>
+      </label>
+      <button
+        type="button"
+        className="bottone bottone-primario"
+        disabled={lavoro}
+        onClick={async () => {
+          setLavoro(true)
+          setMessaggio(null)
+          try {
+            const nome = await esportaWord({ capitoloId: capitolo || null, conBibliografia, conFrontespizio })
+            setMessaggio({ tono: 'ok', testo: `Scaricato "${nome}".` })
+          } catch (err) {
+            setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Esportazione non riuscita.' })
+          } finally {
+            setLavoro(false)
+          }
+        }}
+      >
+        {lavoro ? 'Preparo il file…' : 'Scarica il file Word'}
+      </button>
+      {messaggio && (
+        <p className={messaggio.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'} role="status">
+          {messaggio.testo}
+        </p>
+      )}
+    </section>
+  )
+}
+
 export function Revisione() {
   const [scheda, setScheda] = useState<Scheda>('osservazioni')
   const aperte = useStudio((s) => s.progetto.osservazioni.filter((o) => o.stato === 'aperta').length)
@@ -431,6 +496,7 @@ export function Revisione() {
     { id: 'osservazioni', nome: `Osservazioni del relatore${aperte ? ` (${aperte})` : ''}` },
     { id: 'controllo', nome: 'Controllo della tesi' },
     { id: 'bibliografia', nome: 'Bibliografia' },
+    { id: 'word', nome: 'Esporta in Word' },
   ]
   return (
     <div className="colonna-unica">
@@ -451,6 +517,7 @@ export function Revisione() {
       {scheda === 'osservazioni' && <Osservazioni />}
       {scheda === 'controllo' && <Controllo />}
       {scheda === 'bibliografia' && <Bibliografia />}
+      {scheda === 'word' && <EsportaWord />}
     </div>
   )
 }

@@ -1,6 +1,8 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ETICHETTE_SLOT } from '../agents/agenti'
 import { MODELLI_DISPONIBILI } from '../agents/api'
+import { eseguiDiagnosi, type EsitoDiagnosi } from '../agents/diagnostica'
+import { creaCopia, elencoCopie, ripristinaCopia, type CopiaSicurezza } from '../io/copie'
 import { AvvisoChiave } from '../components/AvvisoChiave'
 import { Conferma } from '../components/Conferma'
 import { Costi } from '../components/Costi'
@@ -259,6 +261,109 @@ function Modelli() {
   )
 }
 
+function Diagnostica() {
+  const haChiave = useStudio((s) => s.apiKey.length > 0)
+  const [conWeb, setConWeb] = useState(true)
+  const [esiti, setEsiti] = useState<EsitoDiagnosi[]>([])
+  const [lavoro, setLavoro] = useState(false)
+  return (
+    <section className="pannello">
+      <h2>Diagnostica con la tua chiave</h2>
+      <p className="nota">
+        Prova reale, con l'API vera, di ciò che usa l'app: ogni modello configurato risponde con un output strutturato minimo (lo Scrittore anche
+        in streaming), la ricerca web fa una sola ricerca e i cataloghi una query dal browser. Costa pochi centesimi.
+      </p>
+      <label className="interruttore">
+        <input type="checkbox" checked={conWeb} onChange={(e) => setConWeb(e.target.checked)} />
+        <span>Prova anche la ricerca web (1 ricerca, 1 centesimo)</span>
+      </label>
+      <button
+        type="button"
+        className="bottone bottone-primario"
+        disabled={!haChiave || lavoro}
+        onClick={async () => {
+          setLavoro(true)
+          setEsiti([])
+          await eseguiDiagnosi(conWeb, (e) => setEsiti((x) => [...x, e]))
+          setLavoro(false)
+        }}
+      >
+        {lavoro ? 'Prova in corso…' : 'Avvia la diagnostica'}
+      </button>
+      {!haChiave && <p className="nota">Prima salva la chiave API.</p>}
+      {esiti.length > 0 && (
+        <ul className="elenco-diagnosi">
+          {esiti.map((e) => (
+            <li key={e.voce} className={e.ok ? 'nota-ok' : 'testo-errore'}>
+              {e.ok ? '✓' : '✕'} <strong>{e.voce}</strong>: {e.messaggio}
+              {e.millisecondi > 0 && <small className="nota"> · {(e.millisecondi / 1000).toFixed(1)} s</small>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
+function CopieSicurezza() {
+  const [copie, setCopie] = useState<CopiaSicurezza[] | null>(null)
+  const [messaggio, setMessaggio] = useState<string | null>(null)
+  const aggiorna = async () => setCopie(await elencoCopie())
+  useEffect(() => {
+    // Lettura asincrona da IndexedDB: lo stato si aggiorna quando arriva la risposta.
+    let attivo = true
+    elencoCopie().then((c) => attivo && setCopie(c))
+    return () => {
+      attivo = false
+    }
+  }, [])
+
+  return (
+    <section className="pannello">
+      <h2>Copie di sicurezza automatiche</h2>
+      <p className="nota">
+        Il browser conserva le ultime 10 istantanee del progetto: una all'avvio e una ogni 15 minuti se qualcosa è cambiato. Servono a tornare
+        indietro dopo un errore; per spostare il progetto o proteggerlo davvero resta il file su iCloud o Drive.
+      </p>
+      <button
+        type="button"
+        className="bottone"
+        onClick={async () => {
+          const fatta = await creaCopia('Creata da te', true)
+          setMessaggio(fatta ? 'Copia creata.' : 'Nessuna modifica dall\'ultima copia.')
+          await aggiorna()
+        }}
+      >
+        Crea una copia adesso
+      </button>
+      {messaggio && <p className="nota nota-ok">{messaggio}</p>}
+      {copie && copie.length === 0 && <p className="nota">Ancora nessuna copia.</p>}
+      {copie && copie.length > 0 && (
+        <ul className="elenco-copie">
+          {copie.map((c) => (
+            <li key={c.id}>
+              <span>
+                <strong>{new Date(c.data).toLocaleString('it-IT')}</strong> · {c.motivo} · {c.parole} parole · {c.fonti} fonti
+              </span>
+              <Conferma
+                classe="bottone bottone-piccolo bottone-vuoto"
+                etichetta="Ripristina"
+                domanda="Tornare a questa copia? Lo stato attuale viene salvato prima come copia."
+                conferma="Ripristina"
+                onConferma={async () => {
+                  await ripristinaCopia(c.id)
+                  setMessaggio('Copia ripristinata. Lo stato precedente è fra le copie.')
+                  await aggiorna()
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 function Registro() {
   const log = useStudio((s) => s.log)
   return (
@@ -287,8 +392,10 @@ export function Impostazioni() {
       </div>
       <div>
         <Dispositivo />
+        <Diagnostica />
         <Modelli />
         <Costi />
+        <CopieSicurezza />
         <Registro />
       </div>
     </div>

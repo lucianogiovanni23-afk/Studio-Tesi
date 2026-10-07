@@ -15,6 +15,22 @@ const GIORNI_SENZA_COPIA = 7
 export function suggerimenti(p: Progetto, haChiave: boolean): Suggerimento[] {
   const fuori: Suggerimento[] = []
 
+  if (p.budgetMensile !== null) {
+    const mese = new Date().toISOString().slice(0, 7)
+    const speso = p.usi.filter((u) => u.data.startsWith(mese)).reduce((s, u) => s + u.costo, 0)
+    if (speso >= p.budgetMensile * 0.8) {
+      fuori.push({
+        id: 'budget',
+        testo:
+          speso >= p.budgetMensile
+            ? 'Budget del mese esaurito: gli agenti sono fermi finché non lo alzi.'
+            : `Hai usato l'${Math.round((speso / p.budgetMensile) * 100)}% del budget di questo mese.`,
+        tono: speso >= p.budgetMensile ? 'urgente' : 'normale',
+        vai: 'impostazioni',
+        etichetta: 'Budget',
+      })
+    }
+  }
   if (!haChiave) {
     fuori.push({
       id: 'chiave',

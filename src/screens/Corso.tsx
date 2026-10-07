@@ -10,6 +10,7 @@ import {
 } from '../agents/corpus'
 import { formattaDollari } from '../agents/costs'
 import { annullaQuadro, generaQuadro, stimaQuadro } from '../agents/lettoreCorso'
+import { ricavaLessico, stimaLessico } from '../agents/lessico'
 import { logAvviso, logOk } from '../agents/supervisor'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
@@ -358,6 +359,70 @@ function CercaNelCorso() {
   )
 }
 
+function Lessico() {
+  const glossario = useStudio((s) => s.progetto.glossario)
+  const pronti = useStudio((s) => s.progetto.courseFiles.filter((f) => f.status === 'pronto').length)
+  const occupato = useStudio((s) => estrazioneInCorso(s.progetto))
+  const haChiave = useStudio((s) => s.apiKey.length > 0)
+  const modello = useStudio((s) => s.preferenze.modelli.lettore)
+  const lettore = useStudio((s) => s.agenti.lettore)
+  const vai = useStudio((s) => s.vai)
+  const [messaggio, setMessaggio] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
+  const delCorso = useMemo(() => glossario.filter((v) => v.origine === 'corso').sort((a, b) => (b.occorrenze ?? 0) - (a.occorrenze ?? 0)), [glossario])
+  const stima = useMemo(() => (pronti > 0 ? stimaLessico(modello) : null), [pronti, modello])
+
+  return (
+    <section className="pannello">
+      <h2>Lessico del corso</h2>
+      <p className="nota">
+        Il Lettore ricava dalle lezioni i termini tecnici come li scrive il tuo corso e li mette nel glossario. Lo Scrittore e il Revisore devono
+        usare quelli e non le loro varianti; il rilevatore della scrittura segnala ogni variante. In codice si tengono solo i termini che compaiono
+        davvero nei tuoi file.
+      </p>
+      {lettore.status === 'lavoro' && lettore.etichetta.includes('lessico') ? (
+        <p className="in-corso">Il Lettore sta ricavando il lessico…</p>
+      ) : (
+        <Conferma
+          classe="bottone bottone-primario"
+          etichetta={delCorso.length ? 'Aggiorna il lessico del corso' : 'Ricava il lessico del corso'}
+          disabilitato={!haChiave || pronti === 0 || occupato}
+          domanda={stima ? `Costo stimato ${formattaDollari(stima.minimo)} – ${formattaDollari(stima.massimo)}. Procedo?` : 'Procedo?'}
+          conferma="Ricava"
+          onConferma={async () => {
+            setMessaggio(null)
+            try {
+              const e = await ricavaLessico()
+              setMessaggio({
+                tono: 'ok',
+                testo: `${e.nuove} termini nuovi e ${e.aggiornate} aggiornati nel glossario.${e.scartati.length ? ` Scartati perché non compaiono nei tuoi file: ${e.scartati.join(', ')}.` : ''}${e.variantiTolte ? ` ${e.variantiTolte} varianti non vietate perché le usa anche il corso.` : ''}`,
+              })
+            } catch (err) {
+              setMessaggio({ tono: 'errore', testo: err instanceof Error ? err.message : 'Errore.' })
+            }
+          }}
+        />
+      )}
+      {!haChiave && <p className="nota">Serve la chiave API.</p>}
+      {messaggio && <p className={messaggio.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'}>{messaggio.testo}</p>}
+      {delCorso.length > 0 && (
+        <>
+          <ul className="elenco-lessico">
+            {delCorso.map((v) => (
+              <li key={v.id}>
+                <strong>{v.termine}</strong> <small className="nota">{v.occorrenze} volte nei file{v.collocazione ? ` · ${v.collocazione}` : ''}</small>
+                {v.varianti.length > 0 && <span className="nota"> — non usare: {v.varianti.join(', ')}</span>}
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="link" onClick={() => vai('glossario')}>
+            Modifica nel glossario
+          </button>
+        </>
+      )}
+    </section>
+  )
+}
+
 export function Corso() {
   return (
     <div className="griglia-due">
@@ -365,7 +430,10 @@ export function Corso() {
         <Caricamento />
         <CercaNelCorso />
       </div>
-      <Quadro />
+      <div>
+        <Quadro />
+        <Lessico />
+      </div>
     </div>
   )
 }

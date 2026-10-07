@@ -24,7 +24,7 @@ export interface AgentRuntime {
 }
 
 /** Chi ha consumato token: un agente, la sua fase di selezione o la chat. */
-export type Chi = AgentKey | 'selezione' | 'chat'
+export type Chi = AgentKey | 'selezione' | 'chat' | 'diagnostica'
 
 // ---------------------------------------------------------------------------
 // Indice, capitoli, sezioni, versioni
@@ -99,6 +99,12 @@ export interface VoceGlossario {
   /** Forme alternative da evitare o da uniformare (servono al controllo di coerenza). */
   varianti: string[]
   nota: string
+  /** Da dove viene: glossario iniziale, lessico ricavato dal corso o aggiunto dallo studente. */
+  origine?: 'iniziale' | 'corso' | 'studente'
+  /** Quante volte il termine compare nel materiale del corso (calcolato in codice). */
+  occorrenze?: number
+  /** File e pagine del corso in cui il termine è definito. */
+  collocazione?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +226,7 @@ export interface Osservazione {
   lettura: string
 }
 
-export type TipoRilievo = 'terminologia' | 'ripetizione' | 'materia' | 'coerenza' | 'citazioni'
+export type TipoRilievo = 'terminologia' | 'ripetizione' | 'materia' | 'coerenza' | 'citazioni' | 'stile_ia'
 
 export interface RilievoTesi {
   id: string
@@ -348,6 +354,8 @@ export interface Progetto {
   courseFiles: CourseFile[]
   quadro: QuadroTeorico | null
   usi: VoceUso[]
+  /** Tetto di spesa mensile in dollari; null = nessun tetto. */
+  budgetMensile: number | null
   creatoIl: string
   salvatoSuFileIl: string | null
 }

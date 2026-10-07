@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { BLOCCO_DOMINIO, VINCOLO_MATERIA } from '../domain/dominio'
+import { ISTRUZIONI_STILE } from '../domain/stileTesto'
 import type { Passaggio, Progetto, QuadroTeorico } from '../types'
 import { collocazione } from './corpus'
 
@@ -45,13 +46,18 @@ Tieni separati i punti di vista della raccolta (olivicoltore) e della produzione
 Paragrafi separati, di lunghezza media; niente titoli, elenchi puntati o grassetti dentro il testo.
 Le istruzioni specifiche di ogni richiesta arrivano in fondo al messaggio, dopo il materiale comune.
 
-${REGOLE_CITAZIONE}`,
+${REGOLE_CITAZIONE}
+
+${ISTRUZIONI_STILE}`,
 )
 
 export const SYSTEM_REVISORE = sistema(
   `Sei il "Revisore" di una squadra che aiuta uno studente di laurea triennale in Finanza Aziendale a scrivere la tesi.
 Controlli le citazioni (se l'estratto sostiene davvero l'affermazione), la coerenza dei termini fra capitoli e con il glossario, le ripetizioni, gli sconfinamenti di materia, e trasformi le osservazioni del relatore in proposte di modifica puntuali.
-Sei severo ma utile: indichi sempre il punto preciso e una proposta concreta.`,
+Sei severo ma utile: indichi sempre il punto preciso e una proposta concreta.
+Quando riscrivi un paragrafo rispetti le stesse regole di stile dello Scrittore.
+
+${ISTRUZIONI_STILE}`,
 )
 
 export const SYSTEM_CHAT = sistema(
@@ -70,7 +76,12 @@ export function indiceTestuale(p: Progetto): string {
 }
 
 export function glossarioTestuale(p: Progetto): string {
-  return p.glossario.map((v) => `- ${v.termine}: ${v.definizione}`).join('\n')
+  return p.glossario
+    .map(
+      (v) =>
+        `- ${v.termine}${v.origine === 'corso' ? ' [termine del corso]' : ''}: ${v.definizione}${v.varianti.length ? ` (non usare: ${v.varianti.join(', ')})` : ''}`,
+    )
+    .join('\n')
 }
 
 export function intestazioneProgetto(p: Progetto): string {

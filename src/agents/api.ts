@@ -58,6 +58,7 @@ export type ErrorKind =
   | 'sovraccarico'
   | 'errore_server'
   | 'rete'
+  | 'budget_superato'
   | 'sconosciuto'
 
 export class ApiError extends Error {
@@ -212,6 +213,24 @@ function registra(chi: Chi | undefined, azione: string | undefined, modello: str
 }
 
 // ---------------------------------------------------------------------------
+// Budget mensile
+// ---------------------------------------------------------------------------
+
+type ControlloBudget = () => string | null
+let controlloBudget: ControlloBudget | null = null
+
+/** Lo store indica qui se il budget del mese è esaurito (restituisce il messaggio da mostrare). */
+export function impostaControlloBudget(fn: ControlloBudget) {
+  controlloBudget = fn
+}
+
+/** Ogni chiamata passa da qui prima di partire: nessun comando può aggirare il budget. */
+function verificaBudget() {
+  const messaggio = controlloBudget?.()
+  if (messaggio) throw new ApiError('budget_superato', messaggio, null, false)
+}
+
+// ---------------------------------------------------------------------------
 // Chiamate
 // ---------------------------------------------------------------------------
 
@@ -275,6 +294,7 @@ function leggiJson<T>(risposta: Anthropic.Message): T {
 
 /** Output strutturato: la risposta è JSON conforme allo schema, senza parsing di etichette. */
 export async function chiamataStrutturata<T>(opts: ChiamataBase & { schema: JsonSchema }): Promise<T> {
+  verificaBudget()
   const risposta = await opts.client.messages.create(
     {
       model: opts.model,
@@ -298,6 +318,7 @@ export async function chiamataStrutturata<T>(opts: ChiamataBase & { schema: Json
 export async function chiamataStrutturataStream<T>(
   opts: ChiamataBase & { schema: JsonSchema; onAvvio?: () => void },
 ): Promise<T> {
+  verificaBudget()
   const stream = opts.client.messages.stream(
     {
       model: opts.model,
@@ -358,7 +379,8 @@ export async function chiamataConStrumenti(
 
   try {
     for (let giro = 0; giro < MAX_CONTINUAZIONI; giro++) {
-      const risposta = await opts.client.messages.create(
+      verificaBudget()
+  const risposta = await opts.client.messages.create(
         {
           model: opts.model,
           max_tokens: opts.maxTokens,
@@ -396,6 +418,7 @@ export async function chiamataConStrumenti(
 
 /** Chat in streaming: invoca `onTesto` a ogni frammento ricevuto. */
 export async function chiamataChatStream(opts: ChiamataBase & { onTesto: (frammento: string) => void }): Promise<string> {
+  verificaBudget()
   const stream = opts.client.messages.stream(
     {
       model: opts.model,

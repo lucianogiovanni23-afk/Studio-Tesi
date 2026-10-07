@@ -141,9 +141,16 @@ interface StatoScrittore {
   proposte: Record<string, Proposta | undefined>
   inCorso: { sezioneId: string; comando: Comando } | null
   lacune: Record<string, string[] | undefined>
+  /** Paragrafo su cui si lavora (dove sta il cursore) e indicazione per la riscrittura. */
+  selezione: { sezioneId: string; n: number } | null
+  richiesta: string
 }
 
-export const useScrittore = create<StatoScrittore>(() => ({ proposte: {}, inCorso: null, lacune: {} }))
+export const useScrittore = create<StatoScrittore>(() => ({ proposte: {}, inCorso: null, lacune: {}, selezione: null, richiesta: '' }))
+
+export function selezionaParagrafo(sezioneId: string, n: number, richiesta?: string) {
+  useScrittore.setState((s) => ({ selezione: { sezioneId, n }, richiesta: richiesta ?? s.richiesta }))
+}
 
 export function scartaProposta(sezioneId: string) {
   useScrittore.setState((s) => ({ proposte: { ...s.proposte, [sezioneId]: undefined } }))

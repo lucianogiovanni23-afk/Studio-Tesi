@@ -241,3 +241,19 @@ export const SCHEMA_CONTROLLO = consegna(
     },
   }),
 )
+
+export const SCHEMA_LESSICO = consegna(
+  oggetto({
+    termini: {
+      type: 'array',
+      minItems: 1,
+      items: oggetto({
+        termine: { type: 'string', description: 'Il termine ESATTAMENTE come lo scrive il materiale del corso (minuscolo, al singolare).' },
+        definizione: { type: 'string', description: 'Definizione breve, con le parole del corso.' },
+        varianti_da_evitare: elenco(0, 'Sinonimi o formule generiche che un testo potrebbe usare al posto del termine del corso.'),
+        rif: { type: 'string', description: 'Passaggio del corso in cui il termine è definito, per esempio "C4".' },
+        estratto: { type: 'string', description: 'Frase COPIATA ALLA LETTERA da quel passaggio, che contiene il termine.' },
+      }),
+    },
+  }),
+)

@@ -1,5 +1,4 @@
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
-import urlWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
+import type * as PdfJs from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { del, get, set as idbSet } from 'idb-keyval'
 import type { Passaggio } from '../types'
 
@@ -13,15 +12,31 @@ import type { Passaggio } from '../types'
  * compatibile con i Safari di iPad meno recenti.
  */
 
-pdfjs.GlobalWorkerOptions.workerSrc = urlWorker
+/**
+ * pdf.js pesa: si scarica solo quando serve leggere un PDF, non all'avvio
+ * dell'app (conta soprattutto su iPad).
+ */
+let modulo: Promise<typeof PdfJs> | null = null
+function pdfjs(): Promise<typeof PdfJs> {
+  if (!modulo) {
+    modulo = Promise.all([
+      import('pdfjs-dist/legacy/build/pdf.mjs'),
+      import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'),
+    ]).then(([m, w]) => {
+      m.GlobalWorkerOptions.workerSrc = w.default
+      return m
+    })
+  }
+  return modulo
+}
 
 /**
  * Un solo worker per tutta la sessione: se ogni documento ne creasse e
  * distruggesse uno, con molti PDF in fila l'estrazione può bloccarsi.
  */
-let workerCondiviso: pdfjs.PDFWorker | null = null
-function worker(): pdfjs.PDFWorker {
-  if (!workerCondiviso || workerCondiviso.destroyed) workerCondiviso = new pdfjs.PDFWorker()
+let workerCondiviso: PdfJs.PDFWorker | null = null
+function worker(m: typeof PdfJs): PdfJs.PDFWorker {
+  if (!workerCondiviso || workerCondiviso.destroyed) workerCondiviso = new m.PDFWorker()
   return workerCondiviso
 }
 
@@ -50,7 +65,8 @@ export async function estraiPdf(
   maxPagine = Infinity,
 ): Promise<EsitoEstrazione> {
   // pdf.js trasferisce il buffer al worker: si passa una copia.
-  const caricamento = pdfjs.getDocument({ data: new Uint8Array(dati.slice(0)), worker: worker() })
+  const m = await pdfjs()
+  const caricamento = m.getDocument({ data: new Uint8Array(dati.slice(0)), worker: worker(m) })
   const documento = await caricamento.promise
   const totale = Math.min(documento.numPages, maxPagine)
   const pagine: string[] = []
@@ -202,6 +218,14 @@ export async function importaCorpus(dati: Record<string, Passaggio[]>) {
 /** Passaggi di un file, per l'anteprima e le citazioni dal corso. */
 export function passaggiDi(fileId: string): Passaggio[] {
   return corpus.get(fileId) ?? []
+}
+
+/** Testo normalizzato di tutto il corpus, per contare le occorrenze dei termini. */
+export function testoCorpusNormalizzato(normalizza: (t: string) => string): string {
+  return [...corpus.values()]
+    .flat()
+    .map((p) => normalizza(p.testo))
+    .join(' \n ')
 }
 
 export function haFile(fileId: string): boolean {

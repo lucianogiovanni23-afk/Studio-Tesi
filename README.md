@@ -161,6 +161,35 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
   biblioteca) è in cache e resta identica fra i messaggi; quella che cambia spesso (osservazioni,
   agenti, costi) sta dopo. La conversazione è salvata nel progetto; stima del costo per messaggio.
 
+## Miglioramenti dopo la fase 4
+
+**Stesura meno "da intelligenza artificiale"**
+- **Lessico del corso**: dalla schermata Corso il Lettore ricava i termini tecnici come li
+  scrivono le lezioni (anche con 25 o più file) e li mette nel glossario, con le varianti da
+  evitare. In codice si tengono solo i termini che compaiono davvero nei file, e non si vietano
+  le varianti che il corso stesso usa spesso. Scrittore e Revisore ricevono il lessico come
+  obbligatorio; il rilevatore segnala ogni variante usata al posto del termine del corso.
+- **Rilevatore di frasi tipiche dell'IA**, in codice e gratuito: formule di enfasi vuota ("è
+  fondamentale sottolineare"), metafore logore ("gioca un ruolo cruciale"), aperture generiche,
+  parole enfatiche ripetute, connettivi ripetuti a inizio frase, chiusure riassuntive di
+  paragrafo, ritmo monotono, trattino lungo. Compare sotto il testo di ogni sezione (con
+  "Sistema questo paragrafo", che prepara la riscrittura), su ogni proposta dello Scrittore prima
+  di accettarla e nel controllo di tutta la tesi. Le stesse regole sono nelle istruzioni dello
+  Scrittore e del Revisore.
+
+**Affidabilità e uso quotidiano**
+- **Diagnostica con la tua chiave** (Impostazioni): una prova reale e quasi gratuita di ogni
+  modello configurato, dello streaming dello Scrittore, della ricerca web e dei cataloghi.
+- **Budget mensile**: raggiunto il tetto, nessuna chiamata parte (il controllo è nel punto unico
+  da cui partono tutte le chiamate); il cruscotto avvisa all'80%.
+- **Copie di sicurezza automatiche** nel browser: all'avvio e ogni 15 minuti se qualcosa è
+  cambiato, le ultime 10, ripristinabili (lo stato attuale viene conservato prima).
+- **Esportazione in Word** (Revisione → Esporta in Word): tutta la tesi o un capitolo, titoli con
+  gli stili di Word, Times New Roman 12 e interlinea 1,5, note a piè di pagina vere nello stile
+  note o rimandi autore-anno, bibliografia in fondo.
+- **Avvio più leggero**: le librerie per i PDF e per Word si scaricano solo quando servono; il
+  file principale passa da 916 a 577 KB.
+
 ## Computer e iPad: una sola app con due modi
 
 Ho scelto **una sola app che si adatta**, con due modi rilevati in automatico e modificabili a mano:

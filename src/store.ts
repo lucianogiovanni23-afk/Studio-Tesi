@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 import { del, get, set as idbSet } from 'idb-keyval'
 import { AGENT_KEYS } from './agents/agenti'
-import { impostaRegistratoreUso } from './agents/api'
+import { impostaControlloBudget, impostaRegistratoreUso } from './agents/api'
 import { costoUso, risparmioCache } from './agents/costs'
 import {
   adesso,
@@ -166,6 +166,8 @@ export interface StatoStudio {
   aggiungiVoce: (v: Omit<VoceGlossario, 'id'>) => void
   aggiornaVoce: (id: string, patch: Partial<Omit<VoceGlossario, 'id'>>) => void
   rimuoviVoce: (id: string) => void
+  /** Aggiunge o aggiorna i termini ricavati dal corso: hanno la precedenza sulle definizioni iniziali, non su quelle scritte dallo studente. */
+  unisciLessico: (voci: Omit<VoceGlossario, 'id'>[]) => { nuove: number; aggiornate: number }
 
   // biblioteca e ricerca
   registraRicerca: (r: RegistroRicerca, candidati: Candidato[]) => void
@@ -185,6 +187,7 @@ export interface StatoStudio {
   // costi
   registraUso: (v: Omit<VoceUso, 'id' | 'data'>) => void
   azzeraUsi: () => void
+  setBudget: (dollari: number | null) => void
 
   // agenti e registro
   patchAgente: (k: AgentKey, patch: Partial<AgentRuntime>) => void
@@ -414,9 +417,36 @@ export const useStudio = create<StatoStudio>()(
         return segnate
       },
 
-      aggiungiVoce: (v) => conProgetto(set, (p) => ({ glossario: [...p.glossario, { ...v, id: nuovoId('gl') }] })),
+      aggiungiVoce: (v) => conProgetto(set, (p) => ({ glossario: [...p.glossario, { origine: 'studente', ...v, id: nuovoId('gl') }] })),
       aggiornaVoce: (id, patch) =>
         conProgetto(set, (p) => ({ glossario: p.glossario.map((v) => (v.id === id ? { ...v, ...patch } : v)) })),
+      unisciLessico: (voci) => {
+        let nuove = 0
+        let aggiornate = 0
+        conProgetto(set, (p) => {
+          const glossario = [...p.glossario]
+          for (const v of voci) {
+            const i = glossario.findIndex((g) => g.termine.trim().toLowerCase() === v.termine.trim().toLowerCase())
+            if (i < 0) {
+              glossario.push({ ...v, id: nuovoId('gl') })
+              nuove += 1
+              continue
+            }
+            const g = glossario[i]
+            glossario[i] = {
+              ...g,
+              definizione: g.origine === 'studente' ? g.definizione : v.definizione,
+              varianti: [...new Set([...g.varianti, ...v.varianti])],
+              origine: g.origine === 'studente' ? 'studente' : 'corso',
+              occorrenze: v.occorrenze,
+              collocazione: v.collocazione,
+            }
+            aggiornate += 1
+          }
+          return { glossario }
+        })
+        return { nuove, aggiornate }
+      },
       rimuoviVoce: (id) => conProgetto(set, (p) => ({ glossario: p.glossario.filter((v) => v.id !== id) })),
 
       registraRicerca: (r, candidati) =>
@@ -452,6 +482,7 @@ export const useStudio = create<StatoStudio>()(
           usi: [...p.usi, { ...v, id: nuovoId('uso'), data: adesso() }].slice(-MAX_USI),
         })),
       azzeraUsi: () => conProgetto(set, () => ({ usi: [] })),
+      setBudget: (budgetMensile) => conProgetto(set, () => ({ budgetMensile })),
 
       patchAgente: (k, patch) => set((s) => ({ agenti: { ...s.agenti, [k]: { ...s.agenti[k], ...patch } } })),
       aggiungiLog: (kind, agente, messaggio) =>
@@ -498,6 +529,16 @@ export const useStudio = create<StatoStudio>()(
     },
   ),
 )
+
+// Prima di ogni chiamata: se il budget del mese è esaurito, la chiamata non parte.
+impostaControlloBudget(() => {
+  const { budgetMensile, usi } = useStudio.getState().progetto
+  if (budgetMensile === null) return null
+  const speso = costoDelMese(usi)
+  return speso >= budgetMensile
+    ? `Hai raggiunto il budget di questo mese (${speso.toFixed(2).replace('.', ',')} $ su ${budgetMensile.toFixed(2).replace('.', ',')} $). Per continuare alza il budget nelle Impostazioni.`
+    : null
+})
 
 // Ogni risposta dell'API registra i suoi consumi qui.
 impostaRegistratoreUso((chi, azione, modello, uso) => {

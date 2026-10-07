@@ -13,6 +13,7 @@ import {
   type Comando,
 } from '../../agents/scrittore'
 import { coloreCitazione, paragrafi } from '../../domain/citazioniTesto'
+import { analizzaStile } from '../../domain/stileTesto'
 import { useStudio } from '../../store'
 import type { Capitolo, Citazione, Sezione } from '../../types'
 import { Conferma } from '../Conferma'
@@ -47,6 +48,20 @@ function Bollini({ citazioni }: { citazioni: Citazione[] }) {
 }
 
 /** Proposta dello Scrittore: si accetta (il testo attuale resta fra le versioni) o si scarta. */
+function StileProposta({ testo }: { testo: string }) {
+  const glossario = useStudio((s) => s.progetto.glossario)
+  const segnalazioni = analizzaStile(testo, glossario)
+  const lessico = segnalazioni.filter((s) => s.tipo === 'lessico')
+  const ia = segnalazioni.filter((s) => s.tipo !== 'lessico')
+  if (segnalazioni.length === 0) return <span className="esito esito-verde">nessuna formula da IA</span>
+  return (
+    <span className="bollini" title={segnalazioni.map((s) => `«${s.testo}»: ${s.spiegazione}`).join('\n')}>
+      {ia.length > 0 && <span className="esito esito-ambra">{ia.length} formule da IA: {[...new Set(ia.map((s) => s.testo))].slice(0, 3).join(', ')}</span>}
+      {lessico.length > 0 && <span className="esito esito-ambra">lessico: {lessico.map((s) => s.spiegazione).join('; ')}</span>}
+    </span>
+  )
+}
+
 function PannelloProposta({ sez }: { sez: Sezione }) {
   const proposta = useScrittore((s) => s.proposte[sez.id])
   if (!proposta) return null
@@ -68,6 +83,9 @@ function PannelloProposta({ sez }: { sez: Sezione }) {
             <strong>{o.etichetta}</strong>
             <Bollini citazioni={o.citazioni} />
           </div>
+          <div className="stile-proposta">
+            <StileProposta testo={o.paragrafi.join('\n\n')} />
+          </div>
           <TestoCitato testo={o.paragrafi.join('\n\n')} citazioni={o.citazioni} />
           <Conferma
             classe="bottone bottone-primario"
@@ -88,7 +106,8 @@ function PannelloProposta({ sez }: { sez: Sezione }) {
 export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: Sezione; paragrafo: number | null }) {
   const haChiave = useStudio((s) => s.apiKey.length > 0)
   const inCorso = useScrittore((s) => s.inCorso)
-  const [richiesta, setRichiesta] = useState('')
+  const richiesta = useScrittore((s) => s.richiesta)
+  const setRichiesta = (r: string) => useScrittore.setState({ richiesta: r })
   const [errore, setErrore] = useState<string | null>(null)
   const [controllo, setControllo] = useState<EsitoControllo | null>(null)
   const [giudizioInCorso, setGiudizioInCorso] = useState(false)

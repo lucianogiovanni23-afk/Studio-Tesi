@@ -37,6 +37,11 @@ export function Glossario() {
                 onChange={(e) => st().aggiornaVoce(v.id, { termine: e.target.value })}
                 aria-label="Termine"
               />
+              {v.origine === 'corso' && (
+                <span className="pastiglia-origine" title={v.collocazione}>
+                  dal corso · {v.occorrenze} volte
+                </span>
+              )}
               <Conferma
                 classe="icona"
                 etichetta="✕"
