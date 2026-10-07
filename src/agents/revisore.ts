@@ -259,7 +259,7 @@ export async function controlloConRevisore(): Promise<void> {
     const p = useStudio.getState().progetto
     useStudio.getState().setControllo({ data: adesso(), rilievi: [...controlliInCodice(p), ...delRevisore], conRevisore: true, scartati })
     useStudio.getState().patchAgente('revisore', { status: 'fatto', etichetta: 'controllo finito', passaggi: consegna.passaggi, errore: null })
-    logOk('revisore', `Controllo della tesi: la revisora ha trovato ${delRevisore.length} cose da sistemare${scartati ? ` (${scartati} tolte perché la frase indicata non c'è)` : ''}.`)
+    logOk('revisore', `Controllo della tesi: il revisore ha trovato ${delRevisore.length} cose da sistemare${scartati ? ` (${scartati} tolte perché la frase indicata non c'è)` : ''}.`)
   } catch (err) {
     useStudio.getState().patchAgente('revisore', { status: 'errore', etichetta: "c'è stato un problema", errore: err instanceof Error ? err.message : 'Qualcosa è andato storto.' })
     throw err

@@ -26,8 +26,8 @@ const PASSI: { numero: string; titolo: string; testo: string; vai?: Schermata }[
   },
   {
     numero: '4',
-    titolo: 'Revisione · Revisora',
-    testo: 'Le incolli le note del relatore. Lei controlla tutta la tesi e ti prepara il file Word.',
+    titolo: 'Revisione · Revisore',
+    testo: 'Gli incolli le note del relatore. Lui controlla tutta la tesi e ti prepara il file Word.',
   },
 ]
 

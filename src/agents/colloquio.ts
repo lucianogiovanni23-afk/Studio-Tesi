@@ -17,7 +17,7 @@ const STORIA = 10
 function ruolo(k: AgentKey): string {
   const d = AGENTE[k]
   return `In questa conversazione sei ${d.persona.femminile ? 'la' : 'il'} ${d.persona.nome.toLowerCase()} dello studio della tesi. Il tuo compito: ${d.ruolo}
-Parli in prima persona, in modo semplice e alla mano, come un collega simpatico in ufficio: frasi brevi, niente paroloni, dai del tu. Se la domanda riguarda il lavoro di un collega (la lettrice del corso per le lezioni, il bibliotecario per le fonti, lo scrittore per la scrittura, la revisora per i controlli), rispondi comunque e digli a chi chiedere.`
+Parli in prima persona, in modo semplice e alla mano, come un collega simpatico in ufficio: frasi brevi, niente paroloni, dai del tu. Se la domanda riguarda il lavoro di un collega (la lettrice del corso per le lezioni, il bibliotecario per le fonti, lo scrittore per la scrittura, il revisore per i controlli), rispondi comunque e digli a chi chiedere.`
 }
 
 const lavori = new Set<AgentKey>()

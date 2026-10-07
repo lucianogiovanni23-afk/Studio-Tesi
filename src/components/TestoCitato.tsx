@@ -6,9 +6,9 @@ import type { Citazione, Fonte } from '../types'
 import { Esito } from './Esito'
 
 const GIUDIZIO = {
-  supportata: 'per la revisora la fonte lo dice davvero',
-  parziale: 'per la revisora la fonte lo dice solo in parte',
-  non_supportata: 'per la revisora la fonte non lo dice',
+  supportata: 'per il revisore la fonte lo dice davvero',
+  parziale: 'per il revisore la fonte lo dice solo in parte',
+  non_supportata: 'per il revisore la fonte non lo dice',
 }
 
 function etichetta(rif: string, citazioni: Citazione[], fonti: Fonte[], stile: boolean, paragrafo: string): string {

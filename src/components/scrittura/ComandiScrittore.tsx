@@ -201,12 +201,12 @@ export function ComandiScrittore({ cap, sez, paragrafo }: { cap: Capitolo; sez: 
           {sez.citazioni.length > 0 && (
             <div className="riga-editor">
               {giudizioInCorso ? (
-                <span className="in-corso">La revisora sta controllando le citazioni…</span>
+                <span className="in-corso">Il revisore sta controllando le citazioni…</span>
               ) : (
                 <Conferma
                   classe="bottone bottone-piccolo"
-                  etichetta="Chiedi alla revisora"
-                  domanda={stimaG ? `La revisora controlla se ogni pezzo citato dice davvero quello che scrivi. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?'}
+                  etichetta="Chiedi al revisore"
+                  domanda={stimaG ? `Il revisore controlla se ogni pezzo citato dice davvero quello che scrivi. ${costoStimato(stimaG)}. Procedo?` : 'Procedo?'}
                   conferma="Procedi"
                   onConferma={async () => {
                     setGiudizioInCorso(true)

@@ -22,7 +22,7 @@ export function Glossario() {
         <span className="nota">{voci.length} parole · lo usano tutti gli assistenti</span>
       </div>
       <p className="nota">
-        Gli assistenti usano queste parole e non i sinonimi. Se un capitolo usa una parola in modo diverso, la revisora te lo
+        Gli assistenti usano queste parole e non i sinonimi. Se un capitolo usa una parola in modo diverso, il revisore te lo
         segnala. Le spiegazioni restano sulla finanza.
       </p>
       <input className="campo" placeholder="Cerca una parola" value={filtro} onChange={(e) => setFiltro(e.target.value)} aria-label="Cerca nel glossario" />

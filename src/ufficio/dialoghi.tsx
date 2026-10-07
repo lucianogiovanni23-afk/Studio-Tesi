@@ -121,7 +121,7 @@ function turnoLettrice(p: Progetto): Turno {
     lavoro: 'cerco le parole del corso…',
     esegui: async () => {
       const r = await ricavaLessico()
-      return `Fatto: ${r.nuove} parole nuove e ${r.aggiornate} aggiornate nel glossario${r.scartati.length ? `; ne ho tolte ${r.scartati.length} perché nelle lezioni non ci sono` : ''}. Lo scrittore userà queste, e la revisora ti avvisa se ne scrivi una diversa.`
+      return `Fatto: ${r.nuove} parole nuove e ${r.aggiornate} aggiornate nel glossario${r.scartati.length ? `; ne ho tolte ${r.scartati.length} perché nelle lezioni non ci sono` : ''}. Lo scrittore userà queste, e il revisore ti avvisa se ne scrivi una diversa.`
     },
   }
   if (lessico === 0) {
@@ -392,10 +392,10 @@ function turnoScrittore(p: Progetto, capId: string | null, sezId: string | null,
 }
 
 // ---------------------------------------------------------------------------
-// Revisora
+// Revisore
 // ---------------------------------------------------------------------------
 
-function turnoRevisora(p: Progetto): Turno {
+function turnoRevisore(p: Progetto): Turno {
   const aperte = p.osservazioni.filter((o) => o.stato === 'aperta')
   const parole = p.capitoli.reduce((n, c) => n + c.sezioni.reduce((m, s) => m + contaParoleTesto(s.testo), 0), 0)
   const speciale: Turno['speciale'] = {
@@ -485,7 +485,7 @@ export function useTurno(k: AgentKey): Turno {
       return turnoScrittore(p, capId, sezId, Boolean(lavoro && proposte[lavoro.sez.id]), scrive)
     }
     case 'revisore':
-      return turnoRevisora(p)
+      return turnoRevisore(p)
   }
 }
 

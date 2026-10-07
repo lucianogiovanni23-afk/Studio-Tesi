@@ -103,16 +103,16 @@ export function CartaOsservazione({ o }: { o: Osservazione }) {
       <blockquote className="testo-osservazione">{o.testo}</blockquote>
       {o.lettura && (
         <p className="nota">
-          <strong>Come la capisce la revisora:</strong> {o.lettura}
+          <strong>Come la capisce il revisore:</strong> {o.lettura}
         </p>
       )}
       {lavoro ? (
-        <p className="in-corso">La revisora sta preparando le proposte…</p>
+        <p className="in-corso">Il revisore sta preparando le proposte…</p>
       ) : (
         o.stato === 'aperta' && (
           <Conferma
             classe={o.proposte.length ? 'bottone bottone-piccolo' : 'bottone bottone-primario'}
-            etichetta={o.proposte.length ? 'Chiedi nuove proposte' : 'Chiedi alla revisora'}
+            etichetta={o.proposte.length ? 'Chiedi nuove proposte' : 'Chiedi al revisore'}
             domanda={`${costoStimato(stima)}${o.proposte.length ? '; le proposte di adesso verranno sostituite' : ''}. Procedo?`}
             conferma="Procedi"
             onConferma={async () => {
@@ -185,7 +185,7 @@ function Osservazioni() {
       <section className="pannello">
         <h2>Note del relatore ({osservazioni.filter((o) => o.stato === 'aperta').length} da sistemare)</h2>
         {ordinate.length === 0 ? (
-          <p className="nota">Ancora nessuna nota. Quando il relatore ti manda dei commenti, incollali qui: la revisora ti propone cosa cambiare e tu decidi, una cosa alla volta.</p>
+          <p className="nota">Ancora nessuna nota. Quando il relatore ti manda dei commenti, incollali qui: il revisore ti propone cosa cambiare e tu decidi, una cosa alla volta.</p>
         ) : (
           <ul className="elenco-osservazioni">
             {ordinate.map((o) => (
@@ -231,7 +231,7 @@ function Controllo() {
       <h2>Controlla tutta la tesi</h2>
       <p className="nota">
         Il controllo veloce è gratis: trova termini scritti diversi dal glossario, frasi ripetute, parole che portano fuori tema
-        e citazioni rosse. La revisora invece legge tutto e guarda se i capitoli si contraddicono o escono dal tema. Ogni cosa che
+        e citazioni rosse. Il revisore invece legge tutto e guarda se i capitoli si contraddicono o escono dal tema. Ogni cosa che
         segnala deve citare una frase vera della tesi, se no la scarto.
       </p>
       <div className="riga-editor">
@@ -239,11 +239,11 @@ function Controllo() {
           Controllo veloce (gratis)
         </button>
         {lavoro ? (
-          <span className="in-corso">La revisora sta leggendo tutta la tesi…</span>
+          <span className="in-corso">Il revisore sta leggendo tutta la tesi…</span>
         ) : (
           <Conferma
             classe="bottone bottone-primario"
-            etichetta="Fallo leggere alla revisora"
+            etichetta="Fallo leggere al revisore"
             domanda={`${costoStimato(stima)}. Procedo?`}
             conferma="Procedi"
             onConferma={async () => {
@@ -265,9 +265,9 @@ function Controllo() {
       {controllo && (
         <>
           <p className="nota">
-            Ultimo controllo: {new Date(controllo.data).toLocaleString('it-IT')} · {controllo.conRevisore ? 'veloce + revisora' : 'solo veloce'} ·{' '}
+            Ultimo controllo: {new Date(controllo.data).toLocaleString('it-IT')} · {controllo.conRevisore ? 'veloce + revisore' : 'solo veloce'} ·{' '}
             {controllo.rilievi.length} cose da guardare
-            {controllo.scartati > 0 && ` · ${controllo.scartati} segnalazioni della revisora tolte perché citavano frasi che non ci sono`}
+            {controllo.scartati > 0 && ` · ${controllo.scartati} segnalazioni del revisore tolte perché citavano frasi che non ci sono`}
           </p>
           <div className="filtri-tipo" role="group" aria-label="Filtra per tipo">
             <button type="button" className={`tema ${filtro === '' ? 'tema-attivo' : 'tema-spento'}`} onClick={() => setFiltro('')}>
@@ -287,7 +287,7 @@ function Controllo() {
                 <li key={r.id} className={`rilievo rilievo-${r.tipo}`}>
                   <div className="candidato-testa">
                     <span className="pastiglia-origine">{NOME_TIPO[r.tipo]}</span>
-                    <span className="verifica">{r.origine === 'codice' ? 'controllo veloce' : 'revisora'}</span>
+                    <span className="verifica">{r.origine === 'codice' ? 'controllo veloce' : 'revisore'}</span>
                     {r.capitoloId && (
                       <button type="button" className="link" onClick={() => apri(r.capitoloId!, r.sezioneId)}>
                         {etichetta(r.capitoloId, r.sezioneId)}
