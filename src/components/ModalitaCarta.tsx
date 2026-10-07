@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useStudio } from '../store'
+import { TestoCitato } from './TestoCitato'
 
 /** Rilettura a tutto schermo, come su carta: un capitolo intero, senza distrazioni. */
 export function ModalitaCarta() {
@@ -59,10 +60,7 @@ export function ModalitaCarta() {
                 {i + 1}.{j + 1} {s.titolo}
               </h2>
               {s.testo.trim() ? (
-                s.testo
-                  .split(/\n\s*\n/)
-                  .filter((p) => p.trim())
-                  .map((p, k) => <p key={k}>{p}</p>)
+                <TestoCitato testo={s.testo} citazioni={s.citazioni} stile classe="carta-testo" />
               ) : (
                 <p className="carta-vuota">Sezione ancora da scrivere.</p>
               )}

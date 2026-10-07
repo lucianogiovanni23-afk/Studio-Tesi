@@ -56,6 +56,10 @@ export interface Citazione {
   testuale?: EsitoTestuale
   giudizio?: GiudizioCitazione
   motivo?: string
+  /** Fonte della biblioteca citata (marcatori F). */
+  fonteId?: string
+  /** Passaggio del corso citato (marcatori C), conservato con la sua collocazione. */
+  passaggio?: { file: string; pagine: [number, number]; testo: string }
 }
 
 export interface Sezione {
@@ -70,8 +74,10 @@ export interface Sezione {
   /** Scaletta della sezione (fase 3): deve essere approvata prima della stesura. */
   scaletta: string[]
   scalettaApprovata: boolean
-  /** Id delle fonti della biblioteca approvate per questa sezione (fase 3). */
+  /** Id delle fonti della biblioteca scelte per questa sezione. */
   fontiApprovate: string[]
+  /** true quando lo studente ha approvato le fonti della sezione (anche nessuna, solo il corso). */
+  fontiConfermate: boolean
   aggiornataIl: string
 }
 
@@ -127,6 +133,8 @@ export interface EstrattoVerificato {
 
 export interface Fonte {
   id: string
+  /** Numero stabile della fonte: dà il marcatore [F12] nel testo. */
+  numero: number
   tipo: 'pdf' | 'web' | 'catalogo' | 'istituzionale'
   origine: OrigineFonte
   titolo: string

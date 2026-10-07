@@ -34,6 +34,7 @@ export async function fonteDaPdf(file: File, suPagina?: (n: number, tot: number)
   }
   const fonte: Fonte = {
     id: nuovoId('fonte'),
+    numero: 0, // assegnato quando entra in biblioteca
     tipo: 'pdf',
     origine: 'pdf',
     titolo: meta?.titolo || file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' '),

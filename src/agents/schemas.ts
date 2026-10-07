@@ -143,3 +143,68 @@ export const SCHEMA_SCHEDA = consegna(
     frasi_chiave: elenco(0, 'Da 2 a 5 frasi COPIATE ALLA LETTERA dal testo della fonte. Nessuna parafrasi.'),
   }),
 )
+
+const CITAZIONE = oggetto({
+  rif: { type: 'string', description: 'Etichetta del riferimento usata nel testo, per esempio "F12" o "C3".' },
+  affermazione: { type: 'string', description: 'La frase del testo che questa citazione sostiene.' },
+  estratto: {
+    type: 'string',
+    description: 'Passo COPIATO ALLA LETTERA dal testo di quel riferimento, così come appare nel materiale fornito.',
+  },
+})
+
+const PARAGRAFO = oggetto({
+  testo: {
+    type: 'string',
+    description: 'Il paragrafo, con i marcatori [F..] e [C..] subito dopo le affermazioni prese dai riferimenti.',
+  },
+  citazioni: { type: 'array', minItems: 0, items: CITAZIONE },
+})
+
+export const SCHEMA_SCALETTA = consegna(
+  oggetto({
+    punti: {
+      type: 'array',
+      minItems: 1,
+      items: oggetto({
+        titolo: stringa,
+        contenuto: { type: 'string', description: 'Che cosa dice questo punto, in una o due frasi.' },
+        riferimenti: elenco(0, 'Etichette dei riferimenti da usare, per esempio "F12", "C3".'),
+      }),
+    },
+    lacune: elenco(0, 'Che cosa manca nelle fonti approvate per sostenere bene la sezione.'),
+  }),
+)
+
+export const SCHEMA_BOZZA = consegna(
+  oggetto({ paragrafi: { type: 'array', minItems: 1, items: PARAGRAFO } }),
+)
+
+export const SCHEMA_PARAGRAFO = consegna(oggetto({ paragrafo: PARAGRAFO }))
+
+export const SCHEMA_ALTERNATIVE = consegna(
+  oggetto({
+    alternative: {
+      type: 'array',
+      minItems: 1,
+      items: oggetto({
+        approccio: { type: 'string', description: 'In poche parole, che cosa cambia rispetto all\'originale.' },
+        paragrafo: PARAGRAFO,
+      }),
+    },
+  }),
+)
+
+export const SCHEMA_GIUDIZI = consegna(
+  oggetto({
+    giudizi: {
+      type: 'array',
+      minItems: 0,
+      items: oggetto({
+        n: { type: 'string', description: 'Numero della citazione nell\'elenco, per esempio "3".' },
+        giudizio: { type: 'string', enum: ['supportata', 'parziale', 'non_supportata'] },
+        motivo: { type: 'string', description: 'Una frase: perché.' },
+      }),
+    },
+  }),
+)

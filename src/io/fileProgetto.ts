@@ -1,5 +1,5 @@
 import { esportaCorpus, importaCorpus } from '../agents/corpus'
-import { progettoIniziale } from '../domain/progettoIniziale'
+import { normalizzaProgetto, progettoIniziale } from '../domain/progettoIniziale'
 import { useStudio } from '../store'
 import type { Passaggio, Progetto } from '../types'
 
@@ -105,7 +105,7 @@ export async function leggiFileProgetto(file: File): Promise<AnteprimaFile> {
     throw new Error('Il file di progetto è incompleto o danneggiato.')
   }
   // I campi mancanti (file di versioni precedenti) prendono il valore iniziale.
-  const progetto = { ...progettoIniziale(), ...(dati.progetto as Partial<Progetto>) } as Progetto
+  const progetto = normalizzaProgetto({ ...progettoIniziale(), ...(dati.progetto as Partial<Progetto>) } as Progetto)
   const completo: FileProgetto = { ...(dati as unknown as FileProgetto), progetto }
   return {
     titolo: progetto.titolo,

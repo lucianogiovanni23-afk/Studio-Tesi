@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AGENTE } from '../agents/agenti'
 import { Conferma } from '../components/Conferma'
+import { TestoCitato } from '../components/TestoCitato'
+import { ComandiScrittore } from '../components/scrittura/ComandiScrittore'
+import { PassoFonti } from '../components/scrittura/PassoFonti'
+import { PassoScaletta } from '../components/scrittura/PassoScaletta'
+import { fontiPertinenti } from '../components/scrittura/pertinenza'
+import { esaminaCitazioni } from '../agents/citations'
+import { esportaTesto, paragrafoAlCursore } from '../domain/citazioniTesto'
 import { Esito } from '../components/Esito'
 import { autoreAnno } from '../domain/bibliografia'
 import { ETICHETTA_STATO } from '../domain/etichette'
@@ -8,14 +15,6 @@ import { useLargo } from '../hooks/useLayoutMode'
 import { useModoUso } from '../hooks/useModoUso'
 import { contaParoleTesto, useStudio } from '../store'
 import type { Autore, Capitolo, Sezione } from '../types'
-
-const COMANDI = [
-  'Proponi una bozza della sezione',
-  'Riscrivi questo paragrafo',
-  'Dammi due alternative',
-  'Collega al corso',
-  'Verifica le citazioni',
-]
 
 function nomeAutore(a: Autore): string {
   if (a === 'studente') return 'tu'
@@ -61,7 +60,7 @@ function IndiceLaterale({ capitoli, capId, sezId }: { capitoli: Capitolo[]; capI
 }
 
 /** Testo della sezione: modificabile direttamente; si salva nello store con un breve ritardo. */
-function Editor({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
+function Editor({ cap, sez, onCursore }: { cap: Capitolo; sez: Sezione; onCursore: (paragrafo: number) => void }) {
   const setTesto = useStudio((s) => s.setTestoSezione)
   const [testo, setTestoLocale] = useState(sez.testo)
   const [sezioneMostrata, setSezioneMostrata] = useState(sez.id)
@@ -92,7 +91,8 @@ function Editor({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
     <textarea
       className="editor-testo"
       value={testo}
-      placeholder="Scrivi qui il testo della sezione. Dalla fase 3 lo Scrittore potrà proporti una bozza, ma il testo resta sempre modificabile da te."
+      placeholder="Scrivi qui il testo della sezione, oppure chiedi una bozza allo Scrittore dopo aver approvato fonti e scaletta. Il testo resta sempre modificabile da te. I marcatori come [F12] o [C3] collegano un'affermazione alla sua citazione."
+      onSelect={(e) => onCursore(paragrafoAlCursore(e.currentTarget.value, e.currentTarget.selectionStart))}
       onChange={(e) => {
         setTestoLocale(e.target.value)
         inSospeso.current = { cap: cap.id, sez: sez.id, testo: e.target.value }
@@ -177,18 +177,16 @@ function Utili({ sez }: { sez: Sezione }) {
   const testoMinuscolo = (sez.titolo + ' ' + sez.obiettivo).toLowerCase()
 
   // Fonti della biblioteca più vicine al titolo e all'obiettivo della sezione.
-  const utili = useMemo(() => {
-    const parole = testoMinuscolo.split(/[^a-zàèéìòù]+/).filter((w) => w.length > 4)
-    return fonti
-      .map((f) => {
-        const corpo = `${f.titolo} ${f.abstract} ${f.temi.join(' ')} ${f.scheda?.rilevanza ?? ''}`.toLowerCase()
-        return { f, peso: parole.filter((w) => corpo.includes(w.slice(0, -1))).length }
-      })
-      .filter((x) => x.peso > 0)
-      .sort((a, b) => b.peso - a.peso)
-      .slice(0, 6)
-      .map((x) => x.f)
-  }, [fonti, testoMinuscolo])
+  // Prima le fonti approvate per la sezione, poi le più vicine al suo titolo e obiettivo.
+  const approvate = useMemo(() => fonti.filter((f) => sez.fontiApprovate.includes(f.id)), [fonti, sez.fontiApprovate])
+  const utili = useMemo(
+    () =>
+      fontiPertinenti(fonti, sez)
+        .filter((x) => x.peso > 0 && !sez.fontiApprovate.includes(x.f.id))
+        .slice(0, 5)
+        .map((x) => x.f),
+    [fonti, sez],
+  )
 
   const concetti = useMemo(() => {
     if (!quadro) return []
@@ -201,22 +199,40 @@ function Utili({ sez }: { sez: Sezione }) {
 
   return (
     <aside className="colonna-utili" aria-label="Fonti utili per la sezione">
-      <h3>Fonti utili</h3>
+      <h3>Fonti della sezione</h3>
+      {approvate.length === 0 ? (
+        <p className="nota">{sez.fontiConfermate ? 'Solo materiale del corso.' : 'Non ancora approvate.'}</p>
+      ) : (
+        <ul className="elenco-concetti">
+          {approvate.map((f) => (
+            <li key={f.id}>
+              <strong>
+                <code>[F{f.numero}]</code> {autoreAnno(f)}
+              </strong>
+              <span>{f.titolo}</span>
+              {f.scheda && <small>{f.scheda.risultati.slice(0, 160)}</small>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h3>Altre fonti utili</h3>
       {fonti.length === 0 ? (
         <p className="nota">
           La biblioteca è vuota.{' '}
           <button type="button" className="link" onClick={() => vai('ricerca')}>
             Fai una ricerca
           </button>
-          . Dalla fase 3 dovrai approvare le fonti della sezione prima della stesura.
         </p>
       ) : utili.length === 0 ? (
-        <p className="nota">Nessuna fonte della biblioteca sembra legata a questa sezione.</p>
+        <p className="nota">Nessun'altra fonte della biblioteca sembra legata a questa sezione.</p>
       ) : (
         <ul className="elenco-concetti">
           {utili.map((f) => (
             <li key={f.id}>
-              <strong>{autoreAnno(f)}</strong>
+              <strong>
+                <code>[F{f.numero}]</code> {autoreAnno(f)}
+              </strong>
               <span>{f.titolo}</span>
               <small>{f.scheda ? (f.scheda.corretta ? 'scheda rivista' : 'scheda da rivedere') : 'senza scheda'}</small>
             </li>
@@ -258,6 +274,56 @@ function Utili({ sez }: { sez: Sezione }) {
   )
 }
 
+/** Il testo con i marcatori colorati e la copia nello stile di citazione scelto. */
+function ConCitazioni({ sez }: { sez: Sezione }) {
+  const fonti = useStudio((s) => s.progetto.fonti)
+  const stile = useStudio((s) => s.progetto.stileCitazione)
+  const [aperto, setAperto] = useState(false)
+  const [copiato, setCopiato] = useState<string | null>(null)
+  const esame = useMemo(() => esaminaCitazioni(sez.testo, sez.citazioni), [sez.testo, sez.citazioni])
+  // La barra resta sempre al suo posto: se comparisse al primo salvataggio, sposterebbe i bottoni sotto il dito.
+  const vuoto = !sez.testo.trim()
+
+  return (
+    <section className="con-citazioni">
+      <div className="riga-editor">
+        <button type="button" className="bottone bottone-piccolo" onClick={() => setAperto((a) => !a)} aria-expanded={aperto} disabled={vuoto}>
+          {aperto ? 'Nascondi il testo con le citazioni' : `Testo con le citazioni (${esame.totali})`}
+        </button>
+        <button
+          type="button"
+          className="bottone bottone-piccolo"
+          disabled={vuoto}
+          onClick={async () => {
+            const testo = esportaTesto(sez.testo, sez.citazioni, fonti, stile)
+            try {
+              await navigator.clipboard.writeText(testo)
+              setCopiato(`Testo copiato in stile ${stile === 'note' ? 'note a piè di pagina' : 'autore-anno'}.`)
+            } catch {
+              setCopiato(testo)
+            }
+          }}
+        >
+          Copia il testo ({stile === 'note' ? 'note' : 'autore-anno'})
+        </button>
+      </div>
+      {copiato &&
+        (copiato.startsWith('Testo copiato') ? (
+          <p className="nota nota-ok" role="status">
+            {copiato}
+          </p>
+        ) : (
+          <label className="campo-blocco">
+            <span className="etichetta">Copia da qui (il browser non ha permesso la copia automatica)</span>
+            <textarea className="campo" rows={6} readOnly value={copiato} />
+          </label>
+        ))}
+      {esame.incoerenze.length > 0 && <p className="allerta">Da sistemare: {esame.incoerenze.join('; ')}.</p>}
+      {aperto && !vuoto && <TestoCitato testo={sez.testo} citazioni={sez.citazioni} classe="testo-anteprima" />}
+    </section>
+  )
+}
+
 export function Scrittura() {
   const capitoli = useStudio((s) => s.progetto.capitoli)
   const capId = useStudio((s) => s.capitoloAperto)
@@ -267,6 +333,7 @@ export function Scrittura() {
   const modo = useModoUso()
   const largo = useLargo(1100)
   const tre = modo === 'computer' && largo
+  const [paragrafo, setParagrafo] = useState<{ sez: string; n: number } | null>(null)
 
   const cap = capitoli.find((c) => c.id === capId) ?? capitoli[0]
   const sez = cap?.sezioni.find((s) => s.id === sezId) ?? cap?.sezioni[0]
@@ -325,16 +392,17 @@ export function Scrittura() {
 
         {sez ? (
           <>
-            <div className="comandi-scrittore" role="toolbar" aria-label="Comandi dello Scrittore">
-              {COMANDI.map((c) => (
-                <button key={c} type="button" className="bottone bottone-piccolo" disabled title="Disponibile con la fase 3">
-                  {c}
-                </button>
-              ))}
-              <span className="nota">I comandi dello Scrittore arrivano con la fase 3. Intanto puoi scrivere tu.</span>
-            </div>
-            <Editor cap={cap} sez={sez} />
-            <p className="nota conteggio">{contaParoleTesto(sez.testo)} parole · ultima modifica {dataBreve(sez.aggiornataIl)}</p>
+            <PassoFonti cap={cap} sez={sez} />
+            <PassoScaletta cap={cap} sez={sez} />
+            <section className="passo-scrittura passo-testo">
+              <h3>
+                <span className="passo-numero">3</span> Testo della sezione
+              </h3>
+              <ComandiScrittore cap={cap} sez={sez} paragrafo={paragrafo?.sez === sez.id ? paragrafo.n : null} />
+              <Editor cap={cap} sez={sez} onCursore={(n) => setParagrafo({ sez: sez.id, n })} />
+              <p className="nota conteggio">{contaParoleTesto(sez.testo)} parole · ultima modifica {dataBreve(sez.aggiornataIl)}</p>
+              <ConCitazioni sez={sez} />
+            </section>
             <Versioni cap={cap} sez={sez} />
           </>
         ) : (

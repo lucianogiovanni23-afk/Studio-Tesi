@@ -130,6 +130,7 @@ async function pianifica(domanda: string, signal: AbortSignal): Promise<Consegna
 function fonteDaCatalogo(r: RisultatoCatalogo): Fonte {
   return {
     id: nuovoId('fonte'),
+    numero: 0, // assegnato quando entra in biblioteca
     tipo: 'catalogo',
     origine: r.origine,
     titolo: r.titolo,
@@ -314,6 +315,7 @@ async function cercaSulWeb(
     const anno = Number.parseInt(f.anno, 10)
     fonti.push({
       id: nuovoId('fonte'),
+      numero: 0, // assegnato quando entra in biblioteca
       tipo,
       origine: tipo,
       titolo: f.titolo,

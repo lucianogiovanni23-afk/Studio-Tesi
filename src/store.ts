@@ -9,7 +9,9 @@ import {
   firmaCorso,
   nuovaSezione,
   nuovoCapitolo,
+  normalizzaProgetto,
   nuovoId,
+  prossimoNumero,
   preferenzeIniziali,
   progettoIniziale,
 } from './domain/progettoIniziale'
@@ -19,6 +21,7 @@ import type {
   Autore,
   Candidato,
   Capitolo,
+  Citazione,
   CourseFile,
   Fonte,
   ModelSlot,
@@ -133,6 +136,15 @@ export interface StatoStudio {
   setTestoSezione: (capitoloId: string, sezioneId: string, testo: string) => void
   salvaVersione: (capitoloId: string, sezioneId: string, nota: string, autore?: Autore) => boolean
   ripristinaVersione: (capitoloId: string, sezioneId: string, versioneId: string) => void
+
+  // stesura per sezioni
+  setFontiSezione: (capitoloId: string, sezioneId: string, ids: string[]) => void
+  confermaFontiSezione: (capitoloId: string, sezioneId: string, si: boolean) => void
+  setScaletta: (capitoloId: string, sezioneId: string, punti: string[]) => void
+  approvaScaletta: (capitoloId: string, sezioneId: string, si: boolean) => void
+  /** Sostituisce testo e citazioni conservando prima il testo corrente fra le versioni. */
+  applicaTesto: (capitoloId: string, sezioneId: string, testo: string, citazioni: Citazione[], nota: string, autore: Autore) => void
+  setCitazioni: (capitoloId: string, sezioneId: string, citazioni: Citazione[]) => void
 
   // glossario
   aggiungiVoce: (v: Omit<VoceGlossario, 'id'>) => void
@@ -300,6 +312,46 @@ export const useStudio = create<StatoStudio>()(
           ),
         })),
 
+      setFontiSezione: (capitoloId, sezioneId, ids) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) =>
+            mappaSezione(c, sezioneId, (s) => ({ ...s, fontiApprovate: ids, fontiConfermate: false })),
+          ),
+        })),
+      confermaFontiSezione: (capitoloId, sezioneId, si) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) =>
+            mappaSezione(c, sezioneId, (s) => ({ ...s, fontiConfermate: si })),
+          ),
+        })),
+      setScaletta: (capitoloId, sezioneId, punti) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) =>
+            mappaSezione(c, sezioneId, (s) => ({ ...s, scaletta: punti, scalettaApprovata: false })),
+          ),
+        })),
+      approvaScaletta: (capitoloId, sezioneId, si) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) =>
+            mappaSezione(c, sezioneId, (s) => ({ ...s, scalettaApprovata: si })),
+          ),
+        })),
+      applicaTesto: (capitoloId, sezioneId, testo, citazioni, nota, autore) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) => {
+            const aggiornato = mappaSezione(c, sezioneId, (s) => {
+              const ultima = s.versioni[s.versioni.length - 1]
+              const prima = s.testo.trim() && (!ultima || ultima.testo !== s.testo) ? aggiungiVersione(s, `Prima di: ${nota}`, 'studente') : s
+              return aggiungiVersione({ ...prima, testo, citazioni, aggiornataIl: adesso() }, nota, autore)
+            })
+            return { ...aggiornato, stato: c.stato === 'da_fare' && testo.trim() ? 'bozza' : c.stato }
+          }),
+        })),
+      setCitazioni: (capitoloId, sezioneId, citazioni) =>
+        conProgetto(set, (p) => ({
+          capitoli: mappaCapitolo(p.capitoli, capitoloId, (c) => mappaSezione(c, sezioneId, (s) => ({ ...s, citazioni }))),
+        })),
+
       aggiungiVoce: (v) => conProgetto(set, (p) => ({ glossario: [...p.glossario, { ...v, id: nuovoId('gl') }] })),
       aggiornaVoce: (id, patch) =>
         conProgetto(set, (p) => ({ glossario: p.glossario.map((v) => (v.id === id ? { ...v, ...patch } : v)) })),
@@ -315,13 +367,13 @@ export const useStudio = create<StatoStudio>()(
           const c = p.inAttesa.find((x) => x.id === id)
           const inAttesa = p.inAttesa.filter((x) => x.id !== id)
           if (!c || !approva || giàInBiblioteca(p.fonti, c.fonte)) return { inAttesa }
-          return { inAttesa, fonti: [...p.fonti, { ...c.fonte, aggiuntaIl: adesso() }] }
+          return { inAttesa, fonti: [...p.fonti, { ...c.fonte, numero: prossimoNumero(p.fonti), aggiuntaIl: adesso() }] }
         }),
       aggiornaCandidato: (id, patch) =>
         conProgetto(set, (p) => ({
           inAttesa: p.inAttesa.map((c) => (c.id === id ? { ...c, fonte: { ...c.fonte, ...patch } } : c)),
         })),
-      aggiungiFonte: (f) => conProgetto(set, (p) => ({ fonti: [...p.fonti, f] })),
+      aggiungiFonte: (f) => conProgetto(set, (p) => ({ fonti: [...p.fonti, { ...f, numero: prossimoNumero(p.fonti) }] })),
       aggiornaFonte: (id, patch) =>
         conProgetto(set, (p) => ({ fonti: p.fonti.map((f) => (f.id === id ? { ...f, ...patch } : f)) })),
       rimuoviFonte: (id) => conProgetto(set, (p) => ({ fonti: p.fonti.filter((f) => f.id !== id) })),
@@ -371,7 +423,7 @@ export const useStudio = create<StatoStudio>()(
         const dati = (salvato ?? {}) as Partial<StatoStudio>
         return {
           ...attuale,
-          progetto: dati.progetto ? { ...attuale.progetto, ...dati.progetto } : attuale.progetto,
+          progetto: dati.progetto ? normalizzaProgetto({ ...attuale.progetto, ...dati.progetto }) : attuale.progetto,
           preferenze: dati.preferenze
             ? {
                 ...attuale.preferenze,

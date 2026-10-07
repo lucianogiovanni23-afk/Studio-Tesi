@@ -14,7 +14,7 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 |---|---|---|
 | 1. Fondamenta | indice, capitoli, versioni, glossario; dominio olio/Calabria; scena 3D moderna; modi computer/iPad; Salva/Apri progetto; materiale del corso e quadro teorico | **fatta** |
 | 2. Biblioteca e ricerca | cataloghi accademici, fonti istituzionali, web verificato, schede di lettura, tabella della letteratura | **fatta** |
-| 3. Scrittura | scaletta da approvare, bozze, riscritture, alternative, citazioni verificate | da fare |
+| 3. Scrittura | scaletta da approvare, bozze, riscritture, alternative, citazioni verificate | **fatta** |
 | 4. Revisione | osservazioni del relatore, coerenza fra capitoli, bibliografia, chat | da fare |
 | 5. Sincronizzazione | facoltativa, opzioni da proporre prima | da fare |
 
@@ -94,6 +94,45 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
 - Dall'ambiente cloud in cui ho sviluppato, i cataloghi sono bloccati dalla rete: sono stati
   collaudati con risposte simulate. Nel tuo browser usa "Prova i cataloghi" per la verifica reale.
 
+## Cosa c'è nella fase 3
+
+- **Tre passi per ogni sezione**, una sezione alla volta:
+  1. **fonti della sezione**: scegli dalla biblioteca (in cima le più pertinenti) e approvi;
+     si può approvare anche "nessuna fonte, solo il corso". Lo Scrittore potrà citare solo queste;
+  2. **scaletta**: proposta dallo Scrittore (con le lacune delle fonti) o scritta da te,
+     modificabile punto per punto e da approvare;
+  3. **testo**: solo dopo le due approvazioni si può chiedere la bozza.
+- **Comandi dello Scrittore** (Opus 5.5), ciascuno con stima del costo e conferma in linea:
+  proponi una bozza della sezione, riscrivi questo paragrafo (con un'indicazione facoltativa),
+  dammi due alternative, collega al corso. Il paragrafo è quello in cui hai il cursore. Ogni
+  risultato arriva come **proposta**: la leggi con le citazioni colorate e scegli se usarla o
+  scartarla. Il testo resta sempre modificabile da te.
+- **Citazioni controllate in codice**: ogni affermazione presa da una fonte o dal corso ha un
+  marcatore (`[F12]` per la fonte numero 12 della biblioteca, `[C3]` per un passaggio del corso)
+  e un estratto letterale, che il codice cerca nel testo di quel riferimento:
+  verde = verificato, ambra = quasi letterale o sostegno parziale, rosso = non ritrovato, non
+  supportato o fonte non approvata per la sezione. **"Verifica le citazioni"** rifà il controllo in
+  codice (gratuito) e segnala i marcatori senza citazione; poi si può chiedere il **giudizio del
+  Revisore** sul merito di ogni citazione. Toccando un marcatore si vedono estratto, fonte e giudizio.
+- **Copia del testo nello stile scelto**: autore-anno, con i rimandi consecutivi uniti
+  "(Rossi, 2021; Verdi, 2020)", oppure note a piè di pagina numerate con il riferimento completo.
+- **Versioni**: ogni proposta accettata lascia una versione; il testo che sostituisce resta
+  recuperabile. La **modalità carta** mostra le citazioni in stile autore-anno, toccabili.
+- **Prompt caching**: il materiale comune della sezione (progetto, glossario, quadro teorico,
+  scaletta, testo delle fonti approvate, passaggi del corso) è costruito una volta e inviato
+  identico al byte con `cache_control`; le istruzioni variabili stanno in fondo. Le stime lo
+  dicono quando il materiale è già in cache; i costi mostrano il risparmio.
+- Lo Scrittore lavora su una sezione e un comando alla volta.
+
+### Verifiche sulla documentazione (fase 3)
+
+- Lo Scrittore usa gli output strutturati in streaming (`messages.stream` + `output_config.format`)
+  per non incorrere nei timeout con testi lunghi; effort `high` per la bozza, `medium` per il resto
+  (su Opus 5.5 il predefinito è `medium`, quindi va indicato).
+- Il prompt caching è un confronto di prefisso: basta un carattere diverso prima del punto in cache
+  per perderlo. Per questo il materiale comune viene costruito una sola volta per sezione e
+  ricostruito solo quando cambiano fonti, scaletta o corso.
+
 ## Computer e iPad: una sola app con due modi
 
 Ho scelto **una sola app che si adatta**, con due modi rilevati in automatico e modificabili a mano:
@@ -153,6 +192,15 @@ npm run build    # typecheck + build (percorsi relativi, funziona sotto /Studio-
 npm run lint
 ```
 
+Il collaudo della fase 3 aggiunge 38 controlli con lo Scrittore simulato in streaming: blocchi
+prima delle approvazioni, scaletta corretta e approvata, bozza con citazioni verdi e rosse (un
+estratto parafrasato e una fonte non approvata), prefisso identico al byte fra i comandi,
+riscrittura del solo paragrafo con il cursore, due alternative, collegamento al corso con
+rinumerazione dei passaggi, controllo in codice e giudizio del Revisore, copia in autore-anno e in
+note, versioni, modalità carta e iPad. Durante il collaudo sono emersi e sono stati corretti due
+difetti: le citazioni di un paragrafo sostituito restavano nella sezione, e la barra delle
+citazioni compariva al primo salvataggio spostando i bottoni proprio mentre si cliccava.
+
 Il collaudo della fase 2 aggiunge 39 controlli con cataloghi e API simulati: un catalogo che
 risponde 429, una fonte con URL inventato, un estratto che non c'è nella pagina, un turno sospeso
 con `pause_turn`, una consegna dimenticata al primo tentativo, una fonte contabile da scartare,
@@ -171,7 +219,8 @@ ridotto, senza errori in console.
 src/
   domain/      dominio della tesi, progetto iniziale, suggerimenti, etichette
   agents/      api, costi, corpus (pdf.js + BM25), citazioni, verifica URL, supervisore,
-               prompt, schemi, Lettore del corso, cataloghi, Bibliotecario, schede
+               prompt, schemi, Lettore del corso, cataloghi, Bibliotecario, schede,
+               Scrittore, controllo delle citazioni
   io/          Salva/Apri progetto, PDF dei paper
   scene/       scena 3D (ambiente, uliveto, scaffale, capitoli, agenti, telecamera)
   screens/     cruscotto, scrittura, ricerca, biblioteca, corso, glossario, impostazioni, in arrivo

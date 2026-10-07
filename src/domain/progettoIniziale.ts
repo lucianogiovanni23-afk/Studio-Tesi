@@ -20,6 +20,7 @@ export function nuovaSezione(titolo: string, obiettivo = ''): Sezione {
     scaletta: [],
     scalettaApprovata: false,
     fontiApprovate: [],
+    fontiConfermate: false,
     aggiornataIl: adesso(),
   }
 }
@@ -78,4 +79,25 @@ export function firmaCorso(p: Pick<Progetto, 'courseFiles'>): string {
     .map((f) => f.id)
     .sort()
     .join('|')
+}
+
+/**
+ * Completa un progetto salvato con una versione precedente dell'app: campi
+ * nuovi con il valore iniziale e un numero stabile per ogni fonte.
+ */
+export function normalizzaProgetto(p: Progetto): Progetto {
+  let prossimo = Math.max(0, ...p.fonti.map((f) => f.numero ?? 0)) + 1
+  return {
+    ...p,
+    fonti: p.fonti.map((f) => (f.numero ? f : { ...f, numero: prossimo++ })),
+    capitoli: p.capitoli.map((c) => ({
+      ...c,
+      sezioni: c.sezioni.map((s) => ({ ...nuovaSezione(s.titolo), ...s, fontiConfermate: s.fontiConfermate ?? false })),
+    })),
+  }
+}
+
+/** Numero da dare alla prossima fonte. */
+export function prossimoNumero(fonti: { numero: number }[]): number {
+  return Math.max(0, ...fonti.map((f) => f.numero ?? 0)) + 1
 }

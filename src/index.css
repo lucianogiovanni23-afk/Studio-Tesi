@@ -2027,3 +2027,314 @@ button.tema {
 .modo-ipad button.tema {
   min-height: 44px;
 }
+
+/* ------------------------------------------------------------------ */
+/* Scrittura per sezioni (fase 3)                                     */
+/* ------------------------------------------------------------------ */
+
+.passo-scrittura {
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio-piccolo);
+  padding: 12px 14px;
+  margin: 12px 0;
+  background: var(--bianco);
+}
+
+.passo-scrittura h3 {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.passo-testa {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.passo-testa h3 {
+  margin: 0;
+}
+
+.passo-numero {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--crema-2);
+  font-size: 0.85rem;
+  flex: none;
+}
+
+.passo-attivo {
+  border-color: var(--cielo);
+  background: var(--cielo-chiaro);
+}
+
+.passo-attivo .passo-numero {
+  background: var(--cielo);
+  color: var(--bianco);
+}
+
+.passo-fatto .passo-numero {
+  background: var(--oliva);
+  color: var(--bianco);
+}
+
+.passo-bloccato {
+  opacity: 0.65;
+}
+
+.passo-testo {
+  background: var(--carta);
+}
+
+.fonti-approvate,
+.scelta-fonti {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0 10px;
+}
+
+.fonti-approvate li {
+  padding: 3px 0;
+  font-size: 0.9rem;
+}
+
+.scelta-fonti {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.scelta-fonti .interruttore {
+  align-items: flex-start;
+  padding: 4px 0;
+}
+
+.scelta-fonti .temi {
+  display: flex;
+  margin-top: 4px;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  background: var(--crema-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.scaletta-approvata {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.scaletta-approvata li {
+  margin-bottom: 4px;
+}
+
+.scaletta-editor {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+}
+
+.scaletta-editor textarea {
+  flex: 1 1 260px;
+}
+
+.comandi-scrittore-box {
+  margin-bottom: 10px;
+}
+
+.paragrafo-scelto {
+  margin: 4px 0 8px;
+}
+
+.bollini {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.esito-controllo {
+  background: var(--crema);
+  border-radius: var(--raggio-piccolo);
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+
+.proposta {
+  border: 2px solid var(--oro);
+  border-radius: var(--raggio);
+  background: var(--oro-chiaro);
+  padding: 12px 14px;
+  margin: 10px 0;
+}
+
+.proposta h3 {
+  margin-top: 0;
+}
+
+.opzione {
+  background: var(--bianco);
+  border-radius: var(--raggio-piccolo);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.opzione-testa {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.testo-citato p {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin: 0 0 0.8em;
+}
+
+.marcatore-cit {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 6px;
+  margin: 0 2px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+  vertical-align: 1px;
+}
+
+.cit-verde {
+  background: #e4efd8;
+  color: var(--verde-ok);
+  border-color: #b9d39c;
+}
+
+.cit-ambra {
+  background: #f8ecc9;
+  color: #8a6510;
+  border-color: #e6c873;
+}
+
+.cit-rosso,
+.cit-senza {
+  background: #f6dcd6;
+  color: var(--rosso);
+  border-color: #e3a89c;
+}
+
+.marcatore-stile {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 0.95em;
+  padding: 0 3px;
+}
+
+.carta-foglio .marcatore-stile {
+  background: transparent;
+  border-color: transparent;
+  border-bottom: 2px solid currentColor;
+  border-radius: 0;
+  color: inherit;
+}
+
+.carta-foglio .marcatore-stile.cit-ambra {
+  border-bottom-color: var(--ambra);
+}
+
+.carta-foglio .marcatore-stile.cit-rosso,
+.carta-foglio .marcatore-stile.cit-senza {
+  border-bottom-color: var(--rosso);
+}
+
+.carta-foglio .marcatore-stile.cit-verde {
+  border-bottom-color: #9cc27a;
+}
+
+.carta-testo p {
+  font-size: 1.15rem;
+  line-height: 1.8;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.dettaglio-citazione {
+  font-family: var(--sans);
+  background: var(--bianco);
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio-piccolo);
+  padding: 10px 12px;
+  margin: -0.4em 0 1em;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  box-shadow: var(--ombra);
+}
+
+.dettaglio-fonte-titolo {
+  margin-bottom: 6px;
+}
+
+.citazione-voce {
+  border-left: 4px solid var(--bordo);
+  padding-left: 10px;
+  margin-bottom: 8px;
+}
+
+.citazione-voce.colore-verde {
+  border-left-color: #9cc27a;
+}
+.citazione-voce.colore-ambra {
+  border-left-color: var(--ambra);
+}
+.citazione-voce.colore-rosso {
+  border-left-color: var(--rosso);
+}
+
+.affermazione {
+  font-weight: 550;
+  margin-bottom: 4px;
+}
+
+.con-citazioni {
+  margin-top: 10px;
+}
+
+.testo-anteprima {
+  background: var(--bianco);
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio-piccolo);
+  padding: 14px 18px;
+  margin-top: 8px;
+}
+
+.modo-ipad .marcatore-cit {
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  font-size: 15px;
+}
+
+.modo-ipad .fonti-approvate li,
+.modo-ipad .dettaglio-citazione,
+.modo-ipad .passo-numero {
+  font-size: 15px;
+}
+
+.modo-ipad .link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
