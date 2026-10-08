@@ -1,12 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { RoundedBox } from '@react-three/drei'
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { MeshReflectorMaterial, RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { avanzamento } from '../domain/avanzamento'
 import { useStudio } from '../store'
 import { ALTEZZA_SALA as H, COLORI, COLORE_STATO, PARETE_FONDO_Z, PORTA } from './layout'
 import { useNotte, useQualita } from './qualita'
 import { Etichetta } from './Etichetta'
-import { disegnaPanoramaNotte, textureAlone } from './notte'
+import { textureAlone } from './notte'
+import { uvMetriche, useMateriali } from './materiali'
 
 /**
  * Arredamento dell'open space: vetrata a tutta parete sulla campagna
@@ -14,76 +15,18 @@ import { disegnaPanoramaNotte, textureAlone } from './notte'
  * libreria divisoria, schermo con l'avanzamento, zona relax e luci lineari.
  */
 
-/** Panorama oltre la vetrata: cielo, mare all'orizzonte, colline e uliveti. */
-function usePanorama(notte: boolean): THREE.CanvasTexture | null {
-  const tex = useMemo(() => {
-    if (typeof document === 'undefined') return null
-    const c = document.createElement('canvas')
-    c.width = 1024
-    c.height = 384
-    const g = c.getContext('2d')
-    if (!g) return null
-    if (notte) {
-      disegnaPanoramaNotte(g, 1024, 384)
-      const t = new THREE.CanvasTexture(c)
-      t.colorSpace = THREE.SRGBColorSpace
-      return t
-    }
-    const cielo = g.createLinearGradient(0, 0, 0, 230)
-    cielo.addColorStop(0, '#7fb2d8')
-    cielo.addColorStop(0.7, '#cfe2ec')
-    cielo.addColorStop(1, '#eef2ec')
-    g.fillStyle = cielo
-    g.fillRect(0, 0, 1024, 384)
-    // nuvole leggere
-    g.fillStyle = 'rgba(255,255,255,0.55)'
-    for (const [x, y, r] of [[160, 60, 34], [200, 66, 26], [610, 44, 40], [660, 52, 28], [880, 80, 24]]) {
-      g.beginPath()
-      g.ellipse(x, y, r * 2.2, r * 0.6, 0, 0, Math.PI * 2)
-      g.fill()
-    }
-    // mare
-    g.fillStyle = '#6f9fbf'
-    g.fillRect(0, 200, 1024, 18)
-    // colline
-    const collina = (base: number, ampiezza: number, colore: string, fase: number) => {
-      g.fillStyle = colore
-      g.beginPath()
-      g.moveTo(0, 384)
-      for (let x = 0; x <= 1024; x += 8) g.lineTo(x, base + Math.sin(x / 140 + fase) * ampiezza + Math.sin(x / 47 + fase) * (ampiezza / 4))
-      g.lineTo(1024, 384)
-      g.fill()
-    }
-    collina(222, 10, '#a7b88d', 0)
-    collina(250, 14, '#93a873', 2)
-    collina(290, 8, '#7f9659', 4)
-    // uliveti a file
-    for (let fila = 0; fila < 4; fila++) {
-      for (let x = (fila % 2) * 18; x < 1024; x += 36) {
-        g.fillStyle = fila > 1 ? '#566b3a' : '#66804a'
-        g.beginPath()
-        g.arc(x, 286 + fila * 26, 9 + fila * 2.5, 0, Math.PI * 2)
-        g.fill()
-      }
-    }
-    const t = new THREE.CanvasTexture(c)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
-  }, [notte])
-  useEffect(() => () => tex?.dispose(), [tex])
-  return tex
-}
+/** La campagna oltre la vetrata è un vero esterno 3D, caricato a parte solo con la scena. */
+const Esterno = lazy(() => import('./esterno/Esterno'))
 
 function Vetrata() {
   const notte = useNotte()
-  const panorama = usePanorama(notte)
+  const qualita = useQualita()
   const montanti = [-5.5, -3.67, -1.83, 0, 1.83, 3.67, 5.5]
   return (
     <group>
-      <mesh position={[0, H / 2, -6.6]}>
-        <planeGeometry args={[16 * ((H + 0.8) / 5.2), H + 0.8]} />
-        <meshBasicMaterial map={panorama ?? undefined} color={panorama ? '#ffffff' : '#cfe2ec'} toneMapped={false} />
-      </mesh>
+      <Suspense fallback={null}>
+        <Esterno qualita={qualita} />
+      </Suspense>
       {/* vetro leggermente riflettente */}
       <mesh position={[0, H / 2, -6.02]}>
         <planeGeometry args={[11, H]} />
@@ -173,6 +116,7 @@ function Libreria({ etichetta }: { etichetta: boolean }) {
   const fonti = useStudio((s) => s.progetto.fonti)
   const vai = useStudio((s) => s.vai)
   const ombre = useQualita() === 'completa'
+  const mat = useMateriali()
   const libri = useMemo(() => {
     const colori: Record<string, string> = { da_leggere: '#c9bfa8', letta: '#4f8fbf', usata: '#6b7d2e', scartata: '#a4553a' }
     return fonti.slice(0, 80).map((f, i) => ({
@@ -186,15 +130,13 @@ function Libreria({ etichetta }: { etichetta: boolean }) {
   return (
     <group position={[-10.4, 0, -4.6]} rotation={[0, 0.5, 0]}>
       {[-1.15, 1.15].map((x) => (
-        <mesh key={x} position={[x, 1.25, 0]} castShadow={ombre}>
+        <mesh key={x} ref={uvMetriche(0.4)} position={[x, 1.25, 0]} castShadow={ombre} material={mat.metallo('#26282c')}>
           <boxGeometry args={[0.04, 2.5, 0.4]} />
-          <meshStandardMaterial color={COLORI.nero} metalness={0.5} roughness={0.4} />
         </mesh>
       ))}
       {[0.1, 0.72, 1.34, 1.96, 2.48].map((y) => (
-        <mesh key={y} position={[0, y, 0]} castShadow={ombre} receiveShadow>
+        <mesh key={y} ref={uvMetriche(0.8)} position={[0, y, 0]} castShadow={ombre} receiveShadow material={mat.rovere}>
           <boxGeometry args={[2.3, 0.035, 0.38]} />
-          <meshStandardMaterial color={COLORI.rovere} roughness={0.6} />
         </mesh>
       ))}
       {libri.map((l) => (
@@ -266,30 +208,27 @@ function Schermo({ etichetta }: { etichetta: boolean }) {
 /** Angolo relax: divano, poltrona, tavolino e tappeto. */
 function Relax() {
   const ombre = useQualita() === 'completa'
+  const mat = useMateriali()
+  const divano = mat.tessuto(COLORI.tessuto)
+  const g = uvMetriche(0.25)
   return (
     <group position={[-7.5, 0, -3.3]} rotation={[0, 0.55, 0]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0.2, 0.006, 0.7]} receiveShadow>
+      <mesh ref={uvMetriche(0.12)} rotation={[-Math.PI / 2, 0, 0]} position={[0.2, 0.006, 0.7]} receiveShadow material={mat.tessuto('#e2ddd2')}>
         <circleGeometry args={[1.9, 48]} />
-        <meshStandardMaterial color="#e2ddd2" roughness={0.95} />
       </mesh>
-      <RoundedBox args={[2.3, 0.42, 0.9]} radius={0.12} position={[0, 0.3, 0]} castShadow={ombre}>
-        <meshStandardMaterial color={COLORI.tessuto} roughness={0.95} />
-      </RoundedBox>
-      <RoundedBox args={[2.3, 0.6, 0.24]} radius={0.1} position={[0, 0.66, -0.36]} castShadow={ombre}>
-        <meshStandardMaterial color={COLORI.tessuto} roughness={0.95} />
-      </RoundedBox>
+      <RoundedBox ref={g} args={[2.3, 0.42, 0.9]} radius={0.12} position={[0, 0.3, 0]} castShadow={ombre} material={divano} />
+      <RoundedBox ref={g} args={[2.3, 0.6, 0.24]} radius={0.1} position={[0, 0.66, -0.36]} castShadow={ombre} material={divano} />
       {[-1.12, 1.12].map((x) => (
-        <RoundedBox key={x} args={[0.2, 0.55, 0.9]} radius={0.08} position={[x, 0.42, 0]} castShadow={ombre}>
-          <meshStandardMaterial color={COLORI.tessuto} roughness={0.95} />
-        </RoundedBox>
+        <RoundedBox key={x} ref={g} args={[0.2, 0.55, 0.9]} radius={0.08} position={[x, 0.42, 0]} castShadow={ombre} material={divano} />
       ))}
-      <RoundedBox args={[0.5, 0.36, 0.16]} radius={0.07} position={[-0.6, 0.66, -0.15]} rotation={[-0.25, 0.2, 0]}>
-        <meshStandardMaterial color={COLORI.oliva} roughness={0.9} />
-      </RoundedBox>
+      {/* cuscini della seduta */}
+      {[-0.52, 0.52].map((x) => (
+        <RoundedBox key={x} ref={g} args={[1.0, 0.14, 0.7]} radius={0.06} smoothness={4} position={[x, 0.56, 0.06]} castShadow={ombre} material={divano} />
+      ))}
+      <RoundedBox ref={g} args={[0.5, 0.36, 0.16]} radius={0.07} position={[-0.6, 0.72, -0.15]} rotation={[-0.25, 0.2, 0]} material={mat.tessuto(COLORI.oliva)} />
       {/* tavolino */}
-      <mesh position={[0.2, 0.4, 1.25]} castShadow={ombre}>
+      <mesh ref={uvMetriche(0.8)} position={[0.2, 0.4, 1.25]} castShadow={ombre} material={mat.rovere}>
         <cylinderGeometry args={[0.5, 0.5, 0.04, 40]} />
-        <meshStandardMaterial color={COLORI.rovere} roughness={0.5} />
       </mesh>
       <mesh position={[0.2, 0.2, 1.25]}>
         <cylinderGeometry args={[0.04, 0.04, 0.4, 10]} />
@@ -306,11 +245,13 @@ function Relax() {
 /** Tavolo riunioni rotondo con sedie. */
 function Riunioni() {
   const ombre = useQualita() === 'completa'
+  const mat = useMateriali()
+  const stoffa = mat.tessuto(COLORI.oliva)
+  const g = uvMetriche(0.25)
   return (
     <group position={[7.3, 0, -3.0]}>
-      <mesh position={[0, 0.74, 0]} castShadow={ombre} receiveShadow>
+      <mesh ref={uvMetriche(0.9)} position={[0, 0.74, 0]} castShadow={ombre} receiveShadow material={mat.rovere}>
         <cylinderGeometry args={[0.85, 0.85, 0.04, 48]} />
-        <meshStandardMaterial color={COLORI.piano} roughness={0.35} />
       </mesh>
       <mesh position={[0, 0.37, 0]}>
         <cylinderGeometry args={[0.06, 0.06, 0.72, 12]} />
@@ -322,12 +263,8 @@ function Riunioni() {
       </mesh>
       {[0, 2.1, 4.2].map((a) => (
         <group key={a} position={[Math.sin(a) * 1.15, 0, Math.cos(a) * 1.15]} rotation={[0, a + Math.PI, 0]}>
-          <RoundedBox args={[0.48, 0.07, 0.46]} radius={0.03} position={[0, 0.46, 0]} castShadow={ombre}>
-            <meshStandardMaterial color={COLORI.oliva} roughness={0.85} />
-          </RoundedBox>
-          <RoundedBox args={[0.46, 0.38, 0.06]} radius={0.03} position={[0, 0.72, -0.22]} castShadow={ombre}>
-            <meshStandardMaterial color={COLORI.oliva} roughness={0.85} />
-          </RoundedBox>
+          <RoundedBox ref={g} args={[0.48, 0.07, 0.46]} radius={0.03} position={[0, 0.46, 0]} castShadow={ombre} material={stoffa} />
+          <RoundedBox ref={g} args={[0.46, 0.38, 0.06]} radius={0.03} position={[0, 0.72, -0.22]} castShadow={ombre} material={stoffa} />
           {[-0.18, 0.18].map((x) =>
             [-0.18, 0.18].map((z) => (
               <mesh key={`${x}${z}`} position={[x, 0.22, z]}>
@@ -349,11 +286,13 @@ function Riunioni() {
  */
 function Soffitto() {
   const notte = useNotte()
+  const mat = useMateriali()
   const lamelle = useRef<THREE.InstancedMesh>(null)
   const posizioni = useMemo(() => Array.from({ length: 64 }, (_, i) => -12.2 + i * 0.385), [])
   useLayoutEffect(() => {
     const m = lamelle.current
     if (!m) return
+    uvMetriche(1.1)(m)
     const o = new THREE.Object3D()
     posizioni.forEach((x, i) => {
       o.position.set(x, H - 0.32, 1.75)
@@ -368,9 +307,8 @@ function Soffitto() {
         <planeGeometry args={[25, 22]} />
         <meshStandardMaterial color="#e7e4de" roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
-      <instancedMesh ref={lamelle} args={[undefined, undefined, posizioni.length]}>
+      <instancedMesh ref={lamelle} args={[undefined, mat.rovere, posizioni.length]}>
         <boxGeometry args={[0.07, 0.42, 15.5]} />
-        <meshStandardMaterial color={COLORI.rovere} roughness={0.7} />
       </instancedMesh>
       {[-7.5, -2.5, 2.5, 7.5].map((x) => (
         <mesh key={x} position={[x, H - 0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
@@ -457,6 +395,7 @@ function useInsegna(): THREE.CanvasTexture | null {
  */
 function PareteIngresso() {
   const notte = useNotte()
+  const mat = useMateriali()
   const insegna = useInsegna()
   const Z = PARETE_FONDO_Z
   const { larghezza: LP, altezza: HP } = PORTA
@@ -492,9 +431,8 @@ function PareteIngresso() {
       </mesh>
       {/* ante a vetro aperte, scivolate dietro la parete */}
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * (LP / 2 + LP / 4 + 0.05), HP / 2, Z + 0.16]}>
+        <mesh key={s} position={[s * (LP / 2 + LP / 4 + 0.05), HP / 2, Z + 0.16]} material={mat.vetro}>
           <boxGeometry args={[LP / 2, HP - 0.05, 0.03]} />
-          <meshStandardMaterial color="#cfe0ea" transparent opacity={0.25} roughness={0.05} metalness={0.3} />
         </mesh>
       ))}
       {/* insegna sul lato esterno */}
@@ -520,9 +458,8 @@ function PareteIngresso() {
       </mesh>
       {/* facciata esterna: listelli in rovere ai lati della porta e due piante */}
       {listelli.map((x) => (
-        <mesh key={x} position={[x, (HP + 0.9) / 2, Z + 0.13]}>
+        <mesh key={x} ref={uvMetriche(1.1)} position={[x, (HP + 0.9) / 2, Z + 0.13]} material={mat.rovere}>
           <boxGeometry args={[0.08, HP + 0.9, 0.06]} />
-          <meshStandardMaterial color={COLORI.rovere} roughness={0.7} />
         </mesh>
       ))}
       <Pianta posizione={[-2.05, 0, Z + 0.75]} alta scala={0.85} />
@@ -532,19 +469,45 @@ function PareteIngresso() {
 }
 
 /** Le etichette dell'arredo si nascondono in primo piano, per non finire sopra la conversazione. */
+/** Pavimento in resina: nella qualità completa riflette (sfocato) la sala e le luci. */
+function Pavimento() {
+  const completa = useQualita() === 'completa'
+  const notte = useNotte()
+  const mat = useMateriali()
+  return (
+    <mesh ref={uvMetriche(2.6)} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.6]} receiveShadow material={completa ? undefined : mat.resina}>
+      <planeGeometry args={[30, 23.2]} />
+      {completa && (
+        <MeshReflectorMaterial
+          map={mat.resinaMappe.map}
+          roughnessMap={mat.resinaMappe.roughnessMap}
+          color="#bdb5a8"
+          roughness={1}
+          metalness={0.02}
+          resolution={512}
+          blur={[420, 140]}
+          mixBlur={1}
+          mixStrength={notte ? 1.6 : 0.35}
+          mixContrast={1}
+          mirror={0}
+          depthScale={0.8}
+          minDepthThreshold={0.35}
+          maxDepthThreshold={1.25}
+        />
+      )}
+    </mesh>
+  )
+}
+
 export function Sala({ etichette = true }: { etichette?: boolean }) {
   const ombre = useQualita() === 'completa'
+  const mat = useMateriali()
   return (
     <group>
-      {/* pavimento in resina chiara */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.6]} receiveShadow>
-        <planeGeometry args={[30, 23.2]} />
-        <meshStandardMaterial color={COLORI.pavimento} roughness={0.42} metalness={0.02} />
-      </mesh>
+      <Pavimento />
       {/* tappeto della zona di lavoro */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, -1.5]} receiveShadow>
+      <mesh ref={uvMetriche(0.12)} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.006, -1.5]} receiveShadow material={mat.tessuto('#c7c1b5')}>
         <planeGeometry args={[11.5, 3.6]} />
-        <meshStandardMaterial color="#c7c1b5" roughness={0.98} />
       </mesh>
       {/* pareti laterali */}
       {[-12.5, 12.5].map((x) => (

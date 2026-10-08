@@ -6,7 +6,7 @@ import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { COLORI } from './layout'
 import { useNotte, useQualita } from './qualita'
 import { textureAlone } from './notte'
-import { useRgb } from './rgb'
+import { uvMetriche, useMateriali, useRgbLuce } from './materiali'
 
 /**
  * Postazione da "setup" di ultima generazione: scrivania scura con luce LED
@@ -126,22 +126,23 @@ function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: bool
     r.sporca = true
     s.pagina(r.y, r.cursore)
   })
+  const mat = useMateriali()
+  // con il bloom (qualità completa) le luci superano 1 e brillano davvero
+  const luceAccento = useMemo(() => new THREE.Color(colore).multiplyScalar(ombre ? 3 : 1), [colore, ombre])
+  const alluminio = mat.metallo('#c9ccd1')
   const R = 1.1
   const L = 0.74
   return (
     <group>
-      {/* braccio a morsetto */}
-      <mesh position={[0, 0.02, -0.12]}>
+      {/* braccio a morsetto in alluminio spazzolato */}
+      <mesh position={[0, 0.02, -0.12]} material={alluminio}>
         <boxGeometry args={[0.07, 0.04, 0.07]} />
-        <meshStandardMaterial color="#c9ccd1" metalness={0.85} roughness={0.25} />
       </mesh>
-      <mesh position={[0, 0.2, -0.12]}>
+      <mesh position={[0, 0.2, -0.12]} material={alluminio}>
         <cylinderGeometry args={[0.018, 0.018, 0.38, 12]} />
-        <meshStandardMaterial color="#c9ccd1" metalness={0.85} roughness={0.25} />
       </mesh>
-      <mesh position={[0, 0.39, -0.07]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0.39, -0.07]} rotation={[Math.PI / 2, 0, 0]} material={alluminio}>
         <cylinderGeometry args={[0.014, 0.014, 0.12, 10]} />
-        <meshStandardMaterial color="#c9ccd1" metalness={0.85} roughness={0.25} />
       </mesh>
       {/* scocca posteriore */}
       <mesh position={[0, 0.4, R]} castShadow={ombre}>
@@ -156,7 +157,7 @@ function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: bool
           color={schermata ? '#ffffff' : '#19212b'}
           emissive="#ffffff"
           emissiveMap={schermata ?? undefined}
-          emissiveIntensity={notte ? (acceso ? 1.35 : 0.7) : acceso ? 0.95 : 0.4}
+          emissiveIntensity={notte ? (acceso ? 1.15 : 0.6) : acceso ? 0.95 : 0.4}
           roughness={0.25}
           side={THREE.BackSide}
           toneMapped={false}
@@ -165,7 +166,7 @@ function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: bool
       {/* striscia luminosa sul retro, verso la parete */}
       <mesh position={[0, 0.4, R]}>
         <cylinderGeometry args={[R + 0.018, R + 0.018, 0.012, 48, 1, true, Math.PI - L / 2 + 0.05, L - 0.1]} />
-        <meshBasicMaterial color={colore} toneMapped={false} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={luceAccento} toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
       {notte && (
         <>
@@ -218,7 +219,8 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
   const completa = useQualita() === 'completa'
   const notte = useNotte()
   const fermo = useMovimentoRidotto()
-  const rgb = useRgb(sfasamento)
+  const rgb = useRgbLuce(sfasamento, 0.06, 0.55, completa ? 3.2 : 1)
+  const mat = useMateriali()
   const W = 0.24
   const H = 0.5
   const D = 0.44
@@ -266,13 +268,11 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
         <Ventola key={y} posizione={[0.005, y, D / 2 - 0.03]} materiale={rgb(5 + i) as (m: THREE.MeshBasicMaterial | null) => void} gira={!fermo} />
       ))}
       {/* vetri temperati: frontale e laterale */}
-      <mesh position={[0, H / 2, D / 2 - 0.004]}>
+      <mesh position={[0, H / 2, D / 2 - 0.004]} material={mat.vetro}>
         <boxGeometry args={[W - 0.01, H - 0.04, 0.006]} />
-        <meshPhysicalMaterial color="#9fb0c4" transparent opacity={0.16} roughness={0.05} metalness={0.1} clearcoat={1} />
       </mesh>
-      <mesh position={[W / 2 - 0.003, H / 2, 0]}>
+      <mesh position={[W / 2 - 0.003, H / 2, 0]} material={mat.vetro}>
         <boxGeometry args={[0.006, H - 0.04, D - 0.02]} />
-        <meshPhysicalMaterial color="#9fb0c4" transparent opacity={0.14} roughness={0.05} metalness={0.1} clearcoat={1} />
       </mesh>
       {/* striscia LED sotto il case */}
       <mesh position={[0, 0.002, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -282,10 +282,10 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
       {completa && <pointLight position={[0, H / 2, 0]} intensity={notte ? 1.3 : 0.35} distance={notte ? 1.6 : 0.9} color={colore} />}
       {notte && (
         <>
-          {/* alone RGB: un finto "bloom" senza post-processing */}
-          <sprite position={[0.02, H / 2, D / 2 + 0.02]} scale={[0.75, 0.9, 1]}>
+          {/* alone RGB: un finto "bloom" per la qualità ridotta (nella completa c'è quello vero) */}
+          {!completa && <sprite position={[0.02, H / 2, D / 2 + 0.02]} scale={[0.75, 0.9, 1]}>
             <spriteMaterial ref={rgb(9) as never} map={textureAlone() ?? undefined} transparent opacity={0.5} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
-          </sprite>
+          </sprite>}
           <mesh position={[0, 0.004, 0]} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[0.9, 0.9]} />
             <meshBasicMaterial ref={rgb(10)} map={textureAlone() ?? undefined} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
@@ -298,7 +298,7 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
 
 /** Tastiera meccanica con retroilluminazione che scorre. */
 function Tastiera({ sfasamento }: { sfasamento: number }) {
-  const rgb = useRgb(sfasamento + 0.3, 0.08, 0.6)
+  const rgb = useRgbLuce(sfasamento + 0.3, 0.08, 0.6, useQualita() === 'completa' ? 1.8 : 1)
   const tasti = useMemo(() => {
     const t: [number, number][] = []
     for (let r = 0; r < 5; r++) for (let c = 0; c < 15; c++) t.push([-0.196 + c * 0.028, -0.05 + r * 0.025])
@@ -336,12 +336,16 @@ export function Scrivania({
 }) {
   const ombre = useQualita() === 'completa'
   const notte = useNotte()
-  const led = useRgb(sfasamento + 0.5, 0.05, 0.55)
+  const led = useRgbLuce(sfasamento + 0.5, 0.05, 0.55, ombre ? 4 : 1)
+  const mat = useMateriali()
+  const gambe = mat.metallo('#1a1c20')
+  const accento = useMemo(() => new THREE.Color(colore).multiplyScalar(ombre ? 2.5 : 1), [colore, ombre])
   return (
     <group>
-      {/* piano in laminato grafite con bordo smussato */}
-      <RoundedBox args={[1.8, 0.045, 0.86]} radius={0.018} smoothness={3} position={[0, 0.74, 0]} castShadow={ombre} receiveShadow>
-        <meshStandardMaterial color="#25282d" roughness={0.45} metalness={0.15} />
+      {/* piano in rovere massello con bordo smussato e top in linoleum grafite */}
+      <RoundedBox ref={uvMetriche(0.9)} args={[1.8, 0.045, 0.86]} radius={0.016} smoothness={3} position={[0, 0.74, 0]} castShadow={ombre} receiveShadow material={mat.rovere} />
+      <RoundedBox args={[1.76, 0.006, 0.82]} radius={0.003} smoothness={2} position={[0, 0.7615, 0]} receiveShadow>
+        <meshStandardMaterial color="#2a2c30" roughness={0.62} metalness={0.05} />
       </RoundedBox>
       {/* striscia LED sotto il bordo, verso la sala */}
       <mesh position={[0, 0.712, 0.425]}>
@@ -358,17 +362,13 @@ export function Scrivania({
       {/* gambe a portale in alluminio scuro, regolabili in altezza */}
       {[-0.8, 0.8].map((x) => (
         <group key={x} position={[x, 0, 0]}>
-          <mesh position={[0, 0.36, 0]} castShadow={ombre}>
+          <mesh ref={uvMetriche(0.3)} position={[0, 0.36, 0]} castShadow={ombre} material={gambe}>
             <boxGeometry args={[0.07, 0.72, 0.07]} />
-            <meshStandardMaterial color="#1a1c20" roughness={0.35} metalness={0.7} />
           </mesh>
-          <mesh position={[0, 0.5, 0]}>
+          <mesh ref={uvMetriche(0.3)} position={[0, 0.5, 0]} material={mat.metallo('#4a4f57')}>
             <boxGeometry args={[0.06, 0.2, 0.06]} />
-            <meshStandardMaterial color="#3a3e45" roughness={0.3} metalness={0.8} />
           </mesh>
-          <RoundedBox args={[0.08, 0.035, 0.72]} radius={0.012} position={[0, 0.018, 0]}>
-            <meshStandardMaterial color="#1a1c20" roughness={0.35} metalness={0.7} />
-          </RoundedBox>
+          <RoundedBox ref={uvMetriche(0.3)} args={[0.08, 0.035, 0.72]} radius={0.012} position={[0, 0.018, 0]} material={gambe} />
         </group>
       ))}
       {/* tappetino XXL */}
@@ -377,7 +377,7 @@ export function Scrivania({
       </RoundedBox>
       <mesh position={[0.05, 0.768, -0.02]}>
         <boxGeometry args={[1.1, 0.002, 0.004]} />
-        <meshBasicMaterial color={colore} toneMapped={false} />
+        <meshBasicMaterial color={accento} toneMapped={false} />
       </mesh>
 
       {/* monitor curvo di lato, girato verso la persona: il viso resta libero */}

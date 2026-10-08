@@ -1,8 +1,47 @@
+import { useState } from 'react'
 import { AGENTE } from '../agents/agenti'
 import type { AgentKey } from '../types'
 
-/** Ritratto a mezzo busto, con gli stessi colori della persona nell'ufficio 3D. */
+/**
+ * Ritratto a mezzo busto della persona dell'ufficio 3D: la foto "da studio"
+ * dell'avatar (public/assets/persone/<chiave>.webp, resa offline dal GLB) su
+ * un fondo tondo nel colore dell'agente. Se l'immagine non arriva si torna al
+ * disegno vettoriale.
+ */
 export function Ritratto({ k, dimensione = 44 }: { k: AgentKey; dimensione?: number }) {
+  const [errore, setErrore] = useState(false)
+  const { nome } = AGENTE[k].persona
+  const colore = AGENTE[k].colore
+  if (errore) return <RitrattoDisegnato k={k} dimensione={dimensione} />
+  return (
+    <span
+      className="ritratto"
+      role="img"
+      aria-label={nome}
+      style={{
+        width: dimensione,
+        height: dimensione,
+        flex: 'none',
+        overflow: 'hidden',
+        background: `radial-gradient(circle at 50% 30%, color-mix(in srgb, ${colore} 16%, #fbf8f3), color-mix(in srgb, ${colore} 46%, #cfc6ba))`,
+      }}
+    >
+      <img
+        src={`${import.meta.env.BASE_URL}assets/persone/${k}.webp`}
+        alt=""
+        width={dimensione}
+        height={dimensione}
+        decoding="async"
+        draggable={false}
+        onError={() => setErrore(true)}
+        style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    </span>
+  )
+}
+
+/** Il ritratto disegnato, con gli stessi colori della persona semplice: riserva se manca la foto. */
+function RitrattoDisegnato({ k, dimensione }: { k: AgentKey; dimensione: number }) {
   const { aspetto: a, nome } = AGENTE[k].persona
   const fondo = AGENTE[k].colore
   return (

@@ -2,15 +2,114 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { AGENTE, AGENTI } from '../agents/agenti'
 import { chiediAgente } from '../agents/colloquio'
 import { Ritratto } from '../components/Ritratto'
-import { useLargo } from '../hooks/useLayoutMode'
+import { useLargo, useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useQualitaScena } from '../scene/qualita'
 import { useStudio } from '../store'
 import type { AgentKey } from '../types'
 import { useTurno, type Azione } from '../ufficio/dialoghi'
 import { eseguiAzione, useUfficio } from '../ufficio/statoUfficio'
+import { seguiAmbiente } from '../ui/ambiente'
+import type { Schermata } from '../types'
+import '../styles/caricamento.css'
 
 // L'ufficio 3D si carica a parte: sul telefono, o con la scena spenta, non si scarica nemmeno.
 const Scene = lazy(() => import('../scene/Scene').then((m) => ({ default: m.Scene })))
+
+/** Eventi della scena 3D (definiti in scene/Effetti e scene/punti: qui solo i nomi, per non caricarla). */
+const EVENTO_PRONTO = 'studio-tesi-ufficio-pronto'
+const EVENTO_PROGRESSO = 'studio-tesi-ufficio-progresso'
+const EVENTO_VOLO = 'studio-tesi-vola-schermo'
+/** Volo della telecamera dentro lo schermo prima di cambiare pagina: mai più di così. */
+const ATTESA_VOLO = 600
+
+let volando = false
+
+/**
+ * Apre una pagina dall'ufficio: se la sala 3D è visibile la telecamera vola
+ * nello schermo di chi parla e la pagina "esce" dal monitor; altrimenti (o
+ * con meno animazioni) si va subito.
+ */
+function apriDaSchermo(k: AgentKey, dove: Schermata) {
+  const vai = useStudio.getState().vai
+  const radice = document.documentElement
+  const ridotto = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const scena = document.querySelector('.scena-ufficio canvas')
+  if (ridotto || !scena || radice.dataset.ufficioPronto !== '1') {
+    vai(dove)
+    return
+  }
+  if (volando) return
+  volando = true
+  radice.classList.add('volo-schermo')
+  window.dispatchEvent(new CustomEvent(EVENTO_VOLO, { detail: k }))
+  window.setTimeout(() => {
+    volando = false
+    radice.classList.remove('volo-schermo')
+    radice.classList.add('esce-schermo')
+    vai(dove)
+    window.setTimeout(() => radice.classList.remove('esce-schermo'), 700)
+  }, ATTESA_VOLO)
+}
+
+/**
+ * Schermata di caricamento sopra la sala 3D: marchio, frase e una barra che
+ * segue i download veri (useProgress, dentro la scena). Sparisce in
+ * dissolvenza quando il primo fotogramma è pronto.
+ */
+function CaricamentoUfficio() {
+  const ridotto = useMovimentoRidotto()
+  const [progresso, setProgresso] = useState(0)
+  const [pronto, setPronto] = useState(() => document.documentElement.dataset.ufficioPronto === '1')
+  const [via, setVia] = useState(pronto)
+
+  useEffect(() => {
+    const avanza = (e: Event) => {
+      const p = Number((e as CustomEvent<number>).detail) || 0
+      setProgresso((x) => Math.max(x, p))
+    }
+    const fatto = () => setPronto(true)
+    window.addEventListener(EVENTO_PROGRESSO, avanza)
+    window.addEventListener(EVENTO_PRONTO, fatto)
+    // rete di sicurezza: la schermata non resta mai lì per sempre
+    const t = window.setTimeout(fatto, 30000)
+    return () => {
+      window.removeEventListener(EVENTO_PROGRESSO, avanza)
+      window.removeEventListener(EVENTO_PRONTO, fatto)
+      window.clearTimeout(t)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!pronto) return
+    const t = window.setTimeout(() => setVia(true), ridotto ? 0 : 650)
+    return () => window.clearTimeout(t)
+  }, [pronto, ridotto])
+
+  if (via) return null
+  // il primo 10% è lo scaricamento del codice 3D, poi i file veri
+  const quota = pronto ? 100 : Math.round(10 + progresso * 0.85)
+  return (
+    <div className={`caricamento-ufficio ${pronto ? 'caricamento-finito' : ''}`} role="status" aria-live="polite">
+      <div className="caricamento-centro">
+        <svg className="caricamento-marchio" viewBox="0 0 32 32" width="64" height="64" aria-hidden>
+          <g className="foglia foglia-oliva">
+            <ellipse cx="13" cy="17" rx="7" ry="10" transform="rotate(-25 13 17)" />
+          </g>
+          <g className="foglia foglia-oro">
+            <ellipse cx="21" cy="14" rx="5" ry="8" transform="rotate(30 21 14)" />
+          </g>
+        </svg>
+        <p className="caricamento-testo">{pronto ? 'Eccoci.' : "Sto preparando l'ufficio…"}</p>
+        <div className="caricamento-barra" role="progressbar" aria-label="Caricamento dell'ufficio" aria-valuemin={0} aria-valuemax={100} aria-valuenow={quota}>
+          <span style={{ transform: `scaleX(${quota / 100})` }} />
+        </div>
+        <p className="caricamento-quota" aria-hidden>
+          {quota}%
+        </p>
+      </div>
+    </div>
+  )
+}
 
 /** Larghezza del pannello della conversazione sopra la scena, margini compresi. */
 const PANNELLO = 470
@@ -50,7 +149,6 @@ function Colleghi() {
 }
 
 function BottoneAzione({ k, a }: { k: AgentKey; a: Azione }) {
-  const vai = useStudio((s) => s.vai)
   const occupato = useUfficio((s) => Boolean(s.occupato[k]))
   const input = useRef<HTMLInputElement>(null)
   const classe = `risposta ${a.principale ? 'risposta-principale' : ''}`
@@ -83,7 +181,7 @@ function BottoneAzione({ k, a }: { k: AgentKey; a: Azione }) {
       className={classe}
       disabled={occupato && !a.vai}
       onClick={() => {
-        if (a.vai) vai(a.vai)
+        if (a.vai) apriDaSchermo(k, a.vai)
         else if (a.esegui) void eseguiAzione(k, a.etichetta, a.lavoro ?? 'ci lavoro…', a.esegui)
       }}
     >
@@ -255,13 +353,16 @@ export function Ufficio() {
   const qualita = useQualitaScena()
   const largo = useLargo(1000)
   const conScena = largo && qualita !== 'spenta'
+  // sottofondo d'ufficio, solo se i suoni sono accesi e solo finché si è qui
+  useEffect(() => seguiAmbiente(), [])
   return (
     <div className={`ufficio ${conScena ? 'ufficio-con-scena' : ''}`}>
       {conScena && (
         <div className="ufficio-scena">
-          <Suspense fallback={<div className="scena scena-carico">Apro l'ufficio…</div>}>
-            <Scene qualita={qualita} spazioDestra={PANNELLO} />
+          <Suspense fallback={<div className="scena scena-carico" />}>
+            <Scene key={qualita} qualita={qualita} spazioDestra={PANNELLO} />
           </Suspense>
+          <CaricamentoUfficio key={qualita} />
         </div>
       )}
       <div className="ufficio-pannello">

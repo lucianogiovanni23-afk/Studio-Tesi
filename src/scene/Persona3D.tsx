@@ -1,17 +1,59 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { Component, Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { Persona } from '../agents/agenti'
+import { AGENTI, type Persona } from '../agents/agenti'
 import { Sedia } from './Sedia'
 import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useStudio } from '../store'
 import type { AgentStatus } from '../types'
+import { PersonaReale } from './PersonaReale'
 
 /**
- * Una persona seduta alla scrivania, in abito e cravatta, rivolta verso la
- * telecamera. Geometrie semplici, proporzioni realistiche: respira, si guarda
- * intorno, scrive al portatile quando lavora e parla quando la scegli.
+ * Una persona seduta alla scrivania, rivolta verso la sala.
+ *
+ * Persona3D mostra l'avatar realistico (PersonaReale, GLB Rocketbox scaricato
+ * con la scena); mentre arriva, o se non si riesce a caricarlo, resta al suo
+ * posto la versione semplice qui sotto (PersonaSemplice): stesse props, stessi
+ * comportamenti — respira, si guarda intorno, scrive quando lavora, parla
+ * quando la scegli, saluta quando ha finito.
  */
+
+interface PropsPersona {
+  persona: Persona
+  lavora: boolean
+  status?: AgentStatus
+  scelta: boolean
+  parla: boolean
+  sfasamento: number
+  ombre: boolean
+}
+
+/** Se il GLB non si carica (rete assente, WebGL limitato) si resta sulla versione semplice. */
+class ConfineAvatar extends Component<{ riserva: ReactNode; children: ReactNode }, { errore: boolean }> {
+  state = { errore: false }
+  static getDerivedStateFromError() {
+    return { errore: true }
+  }
+  componentDidCatch(e: unknown) {
+    console.warn('Avatar 3D non disponibile, uso la versione semplice.', e)
+  }
+  render() {
+    return this.state.errore ? this.props.riserva : this.props.children
+  }
+}
+
+export function Persona3D(props: PropsPersona) {
+  const chiave = AGENTI.find((a) => a.persona === props.persona)?.key
+  const semplice = <PersonaSemplice {...props} />
+  if (!chiave) return semplice
+  return (
+    <ConfineAvatar riserva={semplice}>
+      <Suspense fallback={semplice}>
+        <PersonaReale chiave={chiave} {...props} />
+      </Suspense>
+    </ConfineAvatar>
+  )
+}
 
 function scurisci(colore: string, quanto: number): string {
   return `#${new THREE.Color(colore).multiplyScalar(1 - quanto).getHexString()}`
@@ -162,23 +204,8 @@ function Braccio({
 /** Quanto dura il saluto quando un lavoro è finito. */
 const DURATA_SALUTO = 2.2
 
-export function Persona3D({
-  persona,
-  lavora,
-  status,
-  scelta,
-  parla,
-  sfasamento,
-  ombre,
-}: {
-  persona: Persona
-  lavora: boolean
-  status?: AgentStatus
-  scelta: boolean
-  parla: boolean
-  sfasamento: number
-  ombre: boolean
-}) {
+/** La persona "semplice", fatta di primitive: riserva mentre l'avatar si carica. */
+export function PersonaSemplice({ persona, lavora, status, scelta, parla, sfasamento, ombre }: PropsPersona) {
   const a = persona.aspetto
   const fermo = useMovimentoRidotto()
   const busto = useRef<THREE.Group>(null)
