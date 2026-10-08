@@ -23,6 +23,11 @@ export function impostaSuoni(acceso: boolean) {
   window.dispatchEvent(new Event('studio-tesi-suoni'))
 }
 
+/** Il contesto audio condiviso (anche dall'ambiente dell'ufficio); null se i suoni sono spenti. */
+export function contestoAudio(): AudioContext | null {
+  return ctx()
+}
+
 function ctx(): AudioContext | null {
   if (!suoniAccesi()) return null
   try {

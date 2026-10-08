@@ -265,8 +265,9 @@ l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
 
 - **Barra laterale** sul computer e sull'iPad: icone sempre visibili, nomi al passaggio del mouse
   (sull'iPad il nome sta sotto l'icona). Sul telefono resta la barra in basso.
-- **Intestazioni di pagina** con illustrazione disegnata (uliveto, scaffali, scrivania, lente,
-  ingranaggi), il passo del percorso e il collega che se ne occupa ("Chiedi a lui/lei").
+- **Intestazioni di pagina** con una foto realistica presa dall'ufficio 3D (vista sugli uliveti,
+  bibliotecario, scrittore, revisore, il PC, la squadra; se l'immagine non si carica torna il
+  disegno), il passo del percorso e il collega che se ne occupa ("Chiedi a lui/lei").
 - **Kit comune** (`src/ui/`): icone, "i" con la spiegazione lunga, sezioni a fisarmonica,
   cassetti che scorrono da destra, menu a tendina, coriandoli per i traguardi, suoni leggeri
   (spenti di default, pulsante in testata e in Impostazioni). Un solo pulsante verde per sezione.
@@ -284,10 +285,26 @@ l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
   in Word".
 - **Impostazioni** in quattro schede: Account e dispositivi, La tesi, Sicurezza, Avanzate.
 - **Tema scuro** nero caldo con dettagli oro; caratteri più ariosi.
-- **Ufficio**: interruttore giorno/notte (di notte cielo stellato, luna sul mare, luci del paese,
-  RGB più vivi; in automatico di notte dalle 20 alle 7), entrata in sala dalla porta di vetro al
+- **Ufficio**: interruttore giorno/notte (in automatico segue l'ora vera: alba, giorno, tramonto
+  e notte con il sole nella posizione giusta per la Calabria), entrata in sala dalla porta di vetro al
   primo avvio, colleghi che salutano con la mano quando finiscono un lavoro e monitor con il testo
   che scorre mentre lavorano.
+
+## Ufficio realistico
+
+- **Persone vere**: i quattro colleghi sono avatar realistici (Microsoft Rocketbox, licenza MIT)
+  seduti alla scrivania, con respiro, sguardo e saluto; i loro volti compaiono anche nelle
+  linguette della chat. Se il modello non si carica resta il personaggio semplice.
+- **Fuori dalla vetrata** un paesaggio 3D calabrese: cielo che segue l'ora (sole reale per
+  38,9° N), mar Tirreno con riflessi, terrazze di ulivi con muretti a secco, casolari, un paese
+  con il campanile sulla costa, nuvole che si muovono e stormi di uccelli. Di notte luna sul mare,
+  stelle e finestre accese. Il paesaggio si carica solo quando serve.
+- **Luce ed effetti**: materiali con texture vere (legno, pelle, metallo), riflessi presi dal cielo
+  di fuori, profondità di campo, bagliore, ombre morbide e colore da cinema. Schermata di
+  caricamento all'ingresso e volo della telecamera verso il monitor quando apri un collega.
+- **Qualità**: in "ridotta" (iPad e computer leggeri) alberi, terreno ed effetti sono più leggeri e
+  il mare non fa lo specchio. Con "riduci movimento" vento, uccelli e nuvole stanno fermi.
+- Crediti delle risorse in `public/assets/CREDITS.md`.
 
 ## Interfaccia: un percorso in quattro passi
 
@@ -525,7 +542,8 @@ src/
                prompt, schemi, Lettore del corso, cataloghi, Bibliotecario, schede,
                Scrittore, controllo delle citazioni, Revisore, chat
   io/          Salva/Apri progetto, PDF dei paper
-  scene/       scena 3D (ambiente, uliveto, scaffale, capitoli, agenti, telecamera)
+  scene/       scena 3D (sala, persone realistiche, effetti, telecamera, esterno/ con cielo,
+               mare e uliveti)
   screens/     cruscotto, scrittura, ricerca, biblioteca, corso, revisione, glossario, chat,
                impostazioni
   components/  conferme in linea, nuvolette, barra degli agenti, costi, modalità carta

@@ -14,7 +14,9 @@ import { CAMERA_BERSAGLIO, CAMERA_CASA, DIETRO_SCRIVANIA, POSTAZIONI } from './l
 import { Persona3D } from './Persona3D'
 import { ContestoEtichette, ContestoNotte, ContestoQualita } from './qualita'
 import { Etichetta } from './Etichetta'
+import { Effetti } from './Effetti'
 import { useNotteScena } from './notte'
+import { AmbienteCielo, LuceVetrata } from './esterno/AmbienteCielo'
 import { Icona } from '../ui/Icona'
 import '../styles/scena.css'
 
@@ -134,16 +136,16 @@ function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
       <fog attach="fog" args={[sfondo, 26, 48]} />
       {/* luce d'ambiente generata in locale: riflessi morbidi senza scaricare niente */}
       <Environment key={notte ? 'notte' : 'giorno'} resolution={256} frames={1}>
+        {/* fuori dalla vetrata: il cielo vero del momento (esterno 3D) */}
+        <AmbienteCielo />
         {notte ? (
           <>
-            <Lightformer form="rect" intensity={0.35} color="#4d5f9c" position={[0, 3, -9]} scale={[16, 5, 1]} />
             <Lightformer form="rect" intensity={0.75} color="#ffd9a6" position={[0, 8, 0]} rotation-x={Math.PI / 2} scale={[14, 8, 1]} />
             <Lightformer form="rect" intensity={0.25} color="#ffcf9a" position={[-10, 3, 2]} rotation-y={Math.PI / 2} scale={[10, 4, 1]} />
             <Lightformer form="rect" intensity={0.25} color="#ffcf9a" position={[10, 3, 2]} rotation-y={-Math.PI / 2} scale={[10, 4, 1]} />
           </>
         ) : (
           <>
-            <Lightformer form="rect" intensity={2.2} color="#fff6e8" position={[0, 3, -9]} scale={[16, 5, 1]} />
             <Lightformer form="rect" intensity={1.2} color="#ffffff" position={[0, 8, 0]} rotation-x={Math.PI / 2} scale={[14, 8, 1]} />
             <Lightformer form="rect" intensity={0.6} color="#dfe7ee" position={[-10, 3, 2]} rotation-y={Math.PI / 2} scale={[10, 4, 1]} />
             <Lightformer form="rect" intensity={0.6} color="#fff0dc" position={[10, 3, 2]} rotation-y={-Math.PI / 2} scale={[10, 4, 1]} />
@@ -151,7 +153,7 @@ function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
         )}
       </Environment>
       <hemisphereLight
-        args={notte ? ['#ffdcb0', '#2b2638', completa ? 0.28 : 0.62] : ['#ffffff', '#b9ae9c', completa ? 0.45 : 0.9]}
+        args={notte ? ['#ffdcb0', '#2b2638', completa ? 0.28 : 0.62] : ['#ffffff', '#b9ae9c', completa ? 0.34 : 0.72]}
       />
       <directionalLight
         position={[4, 9, 9]}
@@ -169,8 +171,8 @@ function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
         shadow-bias={-0.0003}
         shadow-normalBias={0.02}
       />
-      {/* luce dalla vetrata, alle spalle delle persone: sole di giorno, luna di notte */}
-      <directionalLight position={[0, 5, -10]} intensity={notte ? 0.35 : 0.55} color={notte ? '#7f97e0' : '#e9f2ff'} />
+      {/* luce dalla vetrata, alle spalle delle persone: segue il sole (e la luna di notte) */}
+      <LuceVetrata />
     </>
   )
 }
@@ -234,6 +236,7 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
                   <Postazione key={a.key} k={a.key} scelta={scelto === a.key} primoPiano={vista === a.key} onScegli={scegli} />
                 ))}
                 {completa && <ContactShadows position={[0, 0.01, 0]} scale={30} resolution={1024} blur={2.4} opacity={notte ? 0.5 : 0.38} far={3} frames={1} />}
+                <Effetti qualita={qualita} notte={notte} fuoco={vista} />
               </Suspense>
             </ContestoEtichette.Provider>
           </ContestoNotte.Provider>

@@ -1,13 +1,24 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import * as THREE from 'three'
 
 /**
- * Giorno e notte nella sala. Di base segue l'orologio (notte dalle 20 alle 7);
- * se scegli tu, la scelta resta salvata in questo browser.
+ * Ora del giorno nella sala. In automatico segue l'orologio di chi usa l'app
+ * e il sole fuori dalla vetrata passa per alba, giorno, tramonto e notte.
+ * Il pulsante "Giorno o notte" forza l'uno o l'altra; la scelta resta in
+ * questo browser. Nessun dato meteo reale: il cielo è calcolato.
  */
 export type PreferenzaNotte = 'auto' | 'giorno' | 'notte'
+export type FaseGiorno = 'alba' | 'giorno' | 'tramonto' | 'notte'
 
 const CHIAVE = 'studio-tesi.notte'
+/** Solo per le prove: un'ora fissa (es. "19.4") al posto dell'orologio. */
+const CHIAVE_PROVA = 'studio-tesi.ora-prova'
+
+/** La campagna fuori dalla vetrata: colline sopra la costa calabrese. */
+const LATITUDINE = 38.9
+const LONGITUDINE = 16.6
+/** Sotto questa altezza del sole (gradi) la sala passa alle luci della notte. */
+const SOGLIA_NOTTE = -4
 
 function leggiPreferenza(): PreferenzaNotte {
   try {
@@ -19,144 +30,179 @@ function leggiPreferenza(): PreferenzaNotte {
   return 'auto'
 }
 
-export function notteDellOrologio(d = new Date()): boolean {
-  const h = d.getHours()
-  return h >= 20 || h < 7
+function oraDiProva(): number | null {
+  try {
+    const v = localStorage.getItem(CHIAVE_PROVA)
+    if (v === null) return null
+    const n = Number(v)
+    return Number.isFinite(n) ? ((n % 24) + 24) % 24 : null
+  } catch {
+    return null
+  }
 }
 
-export function useNotteScena(): { notte: boolean; preferenza: PreferenzaNotte; alterna: () => void } {
-  const [preferenza, setPreferenza] = useState<PreferenzaNotte>(leggiPreferenza)
-  const [orologio, setOrologio] = useState(() => notteDellOrologio())
-  useEffect(() => {
-    const id = window.setInterval(() => setOrologio(notteDellOrologio()), 60_000)
-    return () => window.clearInterval(id)
-  }, [])
-  const notte = preferenza === 'auto' ? orologio : preferenza === 'notte'
+/** Data e ora "dell'orologio", con l'eventuale ora di prova. */
+function adesso(): Date {
+  const d = new Date()
+  const prova = oraDiProva()
+  if (prova !== null) d.setHours(Math.floor(prova), Math.round((prova % 1) * 60), 0, 0)
+  return d
+}
+
+function oraDecimale(d: Date): number {
+  return d.getHours() + d.getMinutes() / 60 + d.getSeconds() / 3600
+}
+
+/** Ora legale in vigore per quella data (sul fuso di chi usa l'app). */
+function oraLegale(d: Date): boolean {
+  const gen = new Date(d.getFullYear(), 0, 1).getTimezoneOffset()
+  const lug = new Date(d.getFullYear(), 6, 1).getTimezoneOffset()
+  return d.getTimezoneOffset() < Math.max(gen, lug)
+}
+
+/**
+ * Altezza e azimut del sole (gradi; azimut da nord verso est) per la Calabria,
+ * leggendo l'orologio locale come se fosse l'ora italiana.
+ */
+export function posizioneSole(d: Date, ora = oraDecimale(d)): { altezza: number; azimut: number } {
+  const inizio = new Date(d.getFullYear(), 0, 0)
+  const giorno = Math.floor((d.getTime() - inizio.getTime()) / 86_400_000)
+  const b = ((2 * Math.PI) / 365) * (giorno - 81)
+  const equazioneTempo = (9.87 * Math.sin(2 * b) - 7.53 * Math.cos(b) - 1.5 * Math.sin(b)) / 60
+  const oraSolare = ora - (oraLegale(d) ? 1 : 0) + (LONGITUDINE - 15) / 15 + equazioneTempo
+  const rad = Math.PI / 180
+  const decl = 23.44 * Math.sin(b) * rad
+  const lat = LATITUDINE * rad
+  const h = 15 * (oraSolare - 12) * rad
+  const sinAlt = Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(h)
+  const altezza = Math.asin(THREE.MathUtils.clamp(sinAlt, -1, 1))
+  const azSud = Math.atan2(Math.sin(h), Math.cos(h) * Math.sin(lat) - Math.tan(decl) * Math.cos(lat))
+  return { altezza: altezza / rad, azimut: (azSud / rad + 180 + 360) % 360 }
+}
+
+/**
+ * Direzione nel mondo della scena: la vetrata (-z) guarda a ovest, sul
+ * Tirreno; +x è il nord, +z l'est.
+ */
+export function direzioneDaCielo(altezza: number, azimut: number, v = new THREE.Vector3()): THREE.Vector3 {
+  const h = THREE.MathUtils.degToRad(altezza)
+  const a = THREE.MathUtils.degToRad(azimut)
+  return v.set(Math.cos(h) * Math.cos(a), Math.sin(h), Math.cos(h) * Math.sin(a))
+}
+
+function notteAllOra(d: Date, ora: number): boolean {
+  return posizioneSole(d, ora).altezza < SOGLIA_NOTTE
+}
+
+export function notteDellOrologio(d = adesso()): boolean {
+  return notteAllOra(d, oraDecimale(d))
+}
+
+/** L'ora mostrata fuori: quella vera, o una bella ora di giorno / di notte se l'hai forzata. */
+function oraScena(preferenza: PreferenzaNotte, d: Date): number {
+  const vera = oraDecimale(d)
+  if (preferenza === 'auto') return vera
+  const notteVera = notteAllOra(d, vera)
+  if (preferenza === 'giorno') return notteVera ? 11 : vera
+  return notteVera ? vera : 22.5
+}
+
+/* --- piccolo archivio condiviso: la sala, il cielo e il pulsante leggono lo stesso stato --- */
+
+interface StatoOra {
+  preferenza: PreferenzaNotte
+  /** Arrotondata al minuto: il cielo si aggiorna una volta al minuto. */
+  istante: number
+}
+
+let stato: StatoOra = { preferenza: leggiPreferenza(), istante: minuto() }
+const ascoltatori = new Set<() => void>()
+let timer: number | undefined
+
+function minuto(): number {
+  const d = adesso()
+  d.setSeconds(0, 0)
+  return d.getTime()
+}
+
+function aggiorna(parz: Partial<StatoOra>) {
+  stato = { ...stato, ...parz }
+  ascoltatori.forEach((f) => f())
+}
+
+function iscrivi(f: () => void) {
+  ascoltatori.add(f)
+  if (timer === undefined && typeof window !== 'undefined') {
+    timer = window.setInterval(() => {
+      const m = minuto()
+      if (m !== stato.istante) aggiorna({ istante: m })
+    }, 20_000)
+  }
+  return () => {
+    ascoltatori.delete(f)
+    if (ascoltatori.size === 0 && timer !== undefined) {
+      window.clearInterval(timer)
+      timer = undefined
+    }
+  }
+}
+
+const leggi = () => stato
+
+export interface Cielo {
+  /** Ora decimale mostrata fuori (0–24). */
+  ora: number
+  fase: FaseGiorno
+  notte: boolean
+  /** Altezza e azimut del sole in gradi. */
+  altezza: number
+  azimut: number
+  /** Direzione verso il sole, nel mondo della scena. */
+  sole: THREE.Vector3
+}
+
+function calcolaCielo(s: StatoOra): Cielo {
+  const d = new Date(s.istante)
+  const ora = oraScena(s.preferenza, d)
+  const { altezza, azimut } = posizioneSole(d, ora)
+  const notte = altezza < SOGLIA_NOTTE
+  const mattino = ora < 12.5
+  const fase: FaseGiorno = notte ? 'notte' : altezza < 9 ? (mattino ? 'alba' : 'tramonto') : 'giorno'
+  return { ora, fase, notte, altezza, azimut, sole: direzioneDaCielo(altezza, azimut) }
+}
+
+let cacheChiave: StatoOra | null = null
+let cacheCielo: Cielo | null = null
+
+function cieloDa(s: StatoOra): Cielo {
+  if (cacheChiave !== s || !cacheCielo) {
+    cacheChiave = s
+    cacheCielo = calcolaCielo(s)
+  }
+  return cacheCielo
+}
+
+/** Il cielo del momento: posizione del sole, fase del giorno, notte sì o no. */
+export function useCielo(): Cielo {
+  return cieloDa(useSyncExternalStore(iscrivi, leggi, leggi))
+}
+
+export function useNotteScena(): { notte: boolean; preferenza: PreferenzaNotte; alterna: () => void; cielo: Cielo } {
+  const s = useSyncExternalStore(iscrivi, leggi, leggi)
+  const cielo = cieloDa(s)
+  const notte = cielo.notte
   const alterna = useCallback(() => {
     const voluta = !notte
     // Se la scelta coincide con l'orologio torni a seguirlo.
     const nuova: PreferenzaNotte = voluta === notteDellOrologio() ? 'auto' : voluta ? 'notte' : 'giorno'
-    setPreferenza(nuova)
-    setOrologio(notteDellOrologio())
+    aggiorna({ preferenza: nuova, istante: minuto() })
     try {
       localStorage.setItem(CHIAVE, nuova)
     } catch {
       /* storage non disponibile */
     }
   }, [notte])
-  return { notte, preferenza, alterna }
-}
-
-/** Numeri pseudo-casuali ripetibili: le stelle restano sempre al loro posto. */
-function generatore(seme: number) {
-  let s = seme
-  return () => {
-    s = (s * 16807) % 2147483647
-    return (s - 1) / 2147483646
-  }
-}
-
-/** Cielo stellato sulla campagna calabrese, con la luna e i paesi accesi sulle colline. */
-export function disegnaPanoramaNotte(g: CanvasRenderingContext2D, w: number, h: number) {
-  const cielo = g.createLinearGradient(0, 0, 0, 215)
-  cielo.addColorStop(0, '#050817')
-  cielo.addColorStop(0.45, '#0f1a3d')
-  cielo.addColorStop(0.8, '#2c2d5c')
-  cielo.addColorStop(1, '#6b4a66')
-  g.fillStyle = cielo
-  g.fillRect(0, 0, w, h)
-  // ultimo chiarore del tramonto
-  const chiarore = g.createRadialGradient(260, 215, 10, 260, 215, 360)
-  chiarore.addColorStop(0, 'rgba(255,150,100,0.42)')
-  chiarore.addColorStop(1, 'rgba(255,150,100,0)')
-  g.fillStyle = chiarore
-  g.fillRect(0, 0, w, 230)
-  // stelle
-  const r = generatore(7)
-  for (let i = 0; i < 260; i++) {
-    const x = r() * w
-    const y = Math.pow(r(), 1.6) * 190
-    const grande = r() > 0.93
-    g.globalAlpha = 0.35 + r() * 0.65 * (1 - y / 230)
-    g.fillStyle = r() > 0.85 ? '#ffe7c2' : '#ffffff'
-    g.beginPath()
-    g.arc(x, y, grande ? 1.6 : 0.8, 0, Math.PI * 2)
-    g.fill()
-  }
-  g.globalAlpha = 1
-  // luna con alone
-  const alone = g.createRadialGradient(790, 64, 8, 790, 64, 90)
-  alone.addColorStop(0, 'rgba(255,248,225,0.55)')
-  alone.addColorStop(1, 'rgba(255,248,225,0)')
-  g.fillStyle = alone
-  g.fillRect(690, 0, 200, 170)
-  g.fillStyle = '#fff6dc'
-  g.beginPath()
-  g.arc(790, 64, 20, 0, Math.PI * 2)
-  g.fill()
-  g.fillStyle = 'rgba(200,190,160,0.35)'
-  for (const [x, y, rr] of [[783, 58, 4], [797, 70, 3], [786, 73, 2.5]]) {
-    g.beginPath()
-    g.arc(x, y, rr, 0, Math.PI * 2)
-    g.fill()
-  }
-  // mare con il riflesso della luna
-  g.fillStyle = '#18213f'
-  g.fillRect(0, 200, w, 18)
-  g.fillStyle = 'rgba(255,240,200,0.55)'
-  for (let i = 0; i < 6; i++) g.fillRect(770 - i * 3 + (i % 2) * 8, 202 + i * 2.6, 36 - i * 4, 1.4)
-  // colline scure
-  const collina = (base: number, ampiezza: number, colore: string, fase: number) => {
-    g.fillStyle = colore
-    g.beginPath()
-    g.moveTo(0, h)
-    for (let x = 0; x <= w; x += 8) g.lineTo(x, base + Math.sin(x / 140 + fase) * ampiezza + Math.sin(x / 47 + fase) * (ampiezza / 4))
-    g.lineTo(w, h)
-    g.fill()
-  }
-  collina(222, 10, '#1a2233', 0)
-  // paesi sulle colline lontane: lucine calde
-  const luci = generatore(42)
-  for (const [cx, cy, n] of [[150, 226, 14], [470, 230, 9], [640, 224, 18], [930, 232, 8]]) {
-    for (let i = 0; i < n; i++) {
-      const x = cx + (luci() - 0.5) * 70
-      const y = cy + luci() * 12
-      g.fillStyle = 'rgba(255,190,110,0.28)'
-      g.beginPath()
-      g.arc(x, y, 3.2, 0, Math.PI * 2)
-      g.fill()
-      g.fillStyle = luci() > 0.3 ? '#ffd28a' : '#fff1c9'
-      g.fillRect(x - 0.8, y - 0.8, 1.7, 1.7)
-    }
-  }
-  collina(250, 14, '#131a26', 2)
-  collina(290, 8, '#0e141d', 4)
-  for (let fila = 0; fila < 4; fila++) {
-    for (let x = (fila % 2) * 18; x < w; x += 36) {
-      g.fillStyle = fila > 1 ? '#080c12' : '#0b1018'
-      g.beginPath()
-      g.arc(x, 286 + fila * 26, 9 + fila * 2.5, 0, Math.PI * 2)
-      g.fill()
-    }
-  }
-  // qualche casolare acceso sulla collina: sagoma con tetto e finestre calde
-  for (const [x, y] of [[330, 262], [720, 270]]) {
-    const luce = g.createRadialGradient(x, y, 1, x, y, 16)
-    luce.addColorStop(0, 'rgba(255,190,100,0.35)')
-    luce.addColorStop(1, 'rgba(255,190,100,0)')
-    g.fillStyle = luce
-    g.fillRect(x - 16, y - 16, 32, 32)
-    g.fillStyle = '#0b0f16'
-    g.fillRect(x - 12, y - 3, 24, 8)
-    g.beginPath()
-    g.moveTo(x - 14, y - 3)
-    g.lineTo(x - 4, y - 9)
-    g.lineTo(x + 14, y - 3)
-    g.fill()
-    g.fillStyle = '#ffcf80'
-    g.fillRect(x - 8, y, 2, 2)
-    g.fillRect(x + 5, y, 2, 2)
-  }
+  return { notte, preferenza: s.preferenza, alterna, cielo }
 }
 
 let alone: THREE.CanvasTexture | null = null

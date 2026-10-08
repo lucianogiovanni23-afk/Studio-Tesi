@@ -16,7 +16,8 @@ export function Info({ children, etichetta = 'Spiegazione' }: { children: ReactN
         aria-label={etichetta}
         aria-expanded={aperta}
         aria-describedby={aperta ? id : undefined}
-        onClick={() => setAperta((a) => !a)}
+        // apre e basta: col mouse la spiegazione è già aperta al passaggio e il clic la richiudeva
+        onClick={() => setAperta(true)}
         onBlur={() => setAperta(false)}
       >
         <Icona nome="info" dimensione={16} />

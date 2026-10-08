@@ -350,6 +350,69 @@ h3 {
   }
 }
 
+/* foto resa dalla scena 3D: cartolina nitida quando c'è spazio... */
+.illustrazione-foto {
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
+  width: 262px;
+  height: 140px;
+  opacity: 1;
+  object-fit: cover;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--colore-agente, var(--oliva)) 30%, var(--bordo));
+  background: color-mix(in srgb, var(--colore-agente, var(--oliva)) 12%, var(--carta));
+  box-shadow: 0 16px 32px -18px rgba(20, 18, 10, 0.55);
+}
+
+/* nel tema scuro la cartolina si abbassa un poco di tono */
+:root[data-tema='scuro'] .illustrazione-foto {
+  filter: brightness(0.88);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-tema='auto'] .illustrazione-foto {
+    filter: brightness(0.88);
+  }
+}
+
+/* ...e sfondo sfumato a destra quando la testata si stringe (iPad, finestre strette, telefono) */
+@media (max-width: 1400px) {
+  .illustrazione-foto {
+    right: 0;
+    width: min(48%, 440px);
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: none;
+    opacity: 0.55;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 60%);
+    mask-image: linear-gradient(to right, transparent, #000 60%);
+    animation: none;
+  }
+  :root[data-tema='scuro'] .illustrazione-foto {
+    opacity: 0.4;
+  }
+}
+
+@media (max-width: 1400px) and (prefers-color-scheme: dark) {
+  :root[data-tema='auto'] .illustrazione-foto {
+    opacity: 0.4;
+  }
+}
+
+@media (max-width: 700px) {
+  .illustrazione-foto,
+  :root[data-tema='scuro'] .illustrazione-foto,
+  :root[data-tema='auto'] .illustrazione-foto {
+    width: 75%;
+    opacity: 0.16;
+    -webkit-mask-image: linear-gradient(to right, transparent 10%, #000 85%);
+    mask-image: linear-gradient(to right, transparent 10%, #000 85%);
+  }
+}
+
 /* --- iPad: tocchi da 44px e testo da almeno 15px anche nei componenti nuovi --- */
 .app.modo-ipad .info-bottone {
   width: 44px;

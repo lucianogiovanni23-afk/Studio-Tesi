@@ -1,8 +1,11 @@
+import { useState } from 'react'
+
 /**
- * Illustrazioni delle intestazioni di pagina, disegnate a mano in SVG:
- * uliveto (Corso), scaffali (Fonti), scrivania (Scrittura), lente
- * (Revisione), ingranaggi (Impostazioni). Usano il colore del collega
- * della pagina (--colore-agente) e l'oro.
+ * Illustrazioni delle intestazioni di pagina: fotografie rese dalla scena 3D
+ * dell'ufficio (public/assets/intestazioni/<tipo>.webp) — uliveto (Corso),
+ * scaffali (Fonti), scrivania (Scrittura), lente (Revisione), ingranaggi
+ * (Impostazioni), chat (Chiedi). Se l'immagine non arriva resta il disegno
+ * SVG qui sotto, nel colore del collega della pagina (--colore-agente) e l'oro.
  */
 export type TipoIllustrazione = 'uliveto' | 'scaffali' | 'scrivania' | 'lente' | 'ingranaggi' | 'chat'
 
@@ -126,6 +129,23 @@ function Chat() {
 }
 
 export function Illustrazione({ tipo }: { tipo: TipoIllustrazione }) {
+  // tipo la cui foto non si è caricata: per quello si torna al disegno
+  const [rotta, setRotta] = useState<TipoIllustrazione | null>(null)
+  if (rotta !== tipo) {
+    return (
+      <img
+        key={tipo}
+        className="illustrazione-pagina illustrazione-foto"
+        src={`${import.meta.env.BASE_URL}assets/intestazioni/${tipo}.webp`}
+        alt=""
+        width={960}
+        height={512}
+        loading="lazy"
+        decoding="async"
+        onError={() => setRotta(tipo)}
+      />
+    )
+  }
   return (
     <svg className="illustrazione-pagina" viewBox="0 0 300 160" aria-hidden>
       {tipo === 'uliveto' && <Uliveto />}

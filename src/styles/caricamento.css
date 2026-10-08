@@ -1,0 +1,207 @@
+/* Schermata di caricamento dell'ufficio 3D e passaggio "dallo schermo alla pagina". */
+
+.caricamento-ufficio {
+  --car-fondo-1: #f6f1e6;
+  --car-fondo-2: #e8e1d2;
+  --car-testo: var(--inchiostro, #2a2e22);
+  --car-binario: color-mix(in srgb, var(--inchiostro, #2a2e22) 12%, transparent);
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(120% 90% at 40% 35%, var(--car-fondo-1) 0%, var(--car-fondo-2) 70%, color-mix(in srgb, var(--car-fondo-2) 80%, #9f9580) 100%);
+  color: var(--car-testo);
+  opacity: 1;
+  transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+}
+
+:root[data-tema='scuro'] .caricamento-ufficio {
+  --car-fondo-1: #1d2333;
+  --car-fondo-2: #121726;
+  --car-binario: rgba(240, 236, 220, 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-tema='auto'] .caricamento-ufficio {
+    --car-fondo-1: #1d2333;
+    --car-fondo-2: #121726;
+    --car-binario: rgba(240, 236, 220, 0.14);
+  }
+}
+
+/* Con il pannello della conversazione a destra, il contenuto sta al centro dello spazio libero. */
+.ufficio-con-scena .caricamento-ufficio {
+  padding-right: 470px;
+}
+
+.caricamento-finito {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.caricamento-centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  transform: translateY(0);
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.caricamento-finito .caricamento-centro {
+  transform: translateY(-10px) scale(0.98);
+}
+
+.caricamento-marchio {
+  overflow: visible;
+  filter: drop-shadow(0 8px 18px rgba(70, 85, 27, 0.22));
+}
+
+.caricamento-marchio .foglia {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.foglia-oliva {
+  fill: #6b7d2e;
+  animation: foglia-respira 2.8s ease-in-out infinite;
+}
+
+.foglia-oro {
+  fill: #c9a43a;
+  animation: foglia-respira 2.8s ease-in-out -1.4s infinite;
+}
+
+/* le foglie si muovono appena, come al vento: ruotano attorno al proprio picciolo */
+@keyframes foglia-respira {
+  0%,
+  100% {
+    rotate: -4deg;
+  }
+  50% {
+    rotate: 4deg;
+  }
+}
+
+.caricamento-testo {
+  margin: 4px 0 0;
+  font-family: var(--serif);
+  font-size: 1.28rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+}
+
+.caricamento-barra {
+  position: relative;
+  width: 240px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--car-binario);
+}
+
+.caricamento-barra span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6b7d2e, #9db04c 60%, #c9a43a);
+  transform-origin: left center;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* un riflesso che scorre sulla barra mentre si aspetta */
+.caricamento-barra span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: translateX(-100%);
+  animation: barra-riflesso 1.6s ease-in-out infinite;
+}
+
+@keyframes barra-riflesso {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.caricamento-quota {
+  margin: 0;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--car-testo) 60%, transparent);
+}
+
+/* --- Dallo schermo alla pagina ------------------------------------------- */
+
+/* Durante il volo verso il monitor il pannello si fa da parte. */
+.volo-schermo .ufficio-con-scena .ufficio-pannello {
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity 0.3s ease, transform 0.35s ease;
+  pointer-events: none;
+}
+
+.volo-schermo .ufficio-scena::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(60% 60% at 42% 50%, rgba(235, 242, 255, 0) 30%, rgba(235, 242, 255, 0.9) 100%);
+  animation: volo-bagliore 0.6s ease-in forwards;
+}
+
+@keyframes volo-bagliore {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* La pagina nuova "esce" dallo schermo: parte piccola, luminosa e sfocata. */
+.esce-schermo .contenuto {
+  animation: esce-schermo 0.48s cubic-bezier(0.16, 0.84, 0.3, 1) backwards;
+  transform-origin: 50% 32%;
+}
+
+@keyframes esce-schermo {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+    filter: blur(6px) brightness(1.35);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0) brightness(1.05);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caricamento-ufficio,
+  .caricamento-centro,
+  .caricamento-barra span {
+    transition: none;
+  }
+
+  .foglia-oliva,
+  .foglia-oro,
+  .caricamento-barra span::after {
+    animation: none;
+  }
+
+  .esce-schermo .contenuto,
+  .volo-schermo .ufficio-scena::after {
+    animation: none;
+  }
+}
