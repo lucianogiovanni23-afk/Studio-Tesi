@@ -17,9 +17,12 @@ import { coloreCitazione } from '../domain/citazioniTesto'
 import { Icona } from '../ui/Icona'
 import { Info } from '../ui/Info'
 import { useStudio } from '../store'
+import { Correzioni } from '../revisione/Correzioni'
+import { Somiglianze } from '../revisione/Somiglianze'
+import { Discussione } from '../discussione/Discussione'
 import type { Osservazione, PropostaRevisione, TipoRilievo } from '../types'
 
-type Scheda = 'osservazioni' | 'controllo' | 'bibliografia' | 'word'
+type Scheda = 'osservazioni' | 'correzioni' | 'controllo' | 'somiglianze' | 'bibliografia' | 'word' | 'discussione'
 
 function useEtichettaSezione() {
   const capitoli = useStudio((s) => s.progetto.capitoli)
@@ -538,7 +541,15 @@ function EsportaWord() {
   )
 }
 
-const ICONA_SCHEDA: Record<Scheda, string> = { osservazioni: 'nota', controllo: 'lente', bibliografia: 'libri', word: 'word' }
+const ICONA_SCHEDA: Record<Scheda, string> = {
+  osservazioni: 'nota',
+  correzioni: 'spunta',
+  controllo: 'lente',
+  somiglianze: 'copia',
+  bibliografia: 'libri',
+  word: 'word',
+  discussione: 'bandiera',
+}
 
 /** In alto: note aperte, cosa ha trovato l'ultimo controllo e il file Word in un tocco. */
 function Riepilogo({ vai }: { vai: (s: Scheda) => void }) {
@@ -622,11 +633,15 @@ function Riepilogo({ vai }: { vai: (s: Scheda) => void }) {
 export function Revisione() {
   const [scheda, setScheda] = useState<Scheda>('osservazioni')
   const aperte = useStudio((s) => s.progetto.osservazioni.filter((o) => o.stato === 'aperta').length)
+  const daCorreggere = useStudio((s) => (s.progetto.correzioni ?? []).reduce((n, x) => n + x.compiti.filter((c) => !c.fatto).length, 0))
   const voci: { id: Scheda; nome: string }[] = [
     { id: 'osservazioni', nome: `Note del relatore${aperte ? ` (${aperte})` : ''}` },
+    { id: 'correzioni', nome: `Correzioni${daCorreggere ? ` (${daCorreggere})` : ''}` },
     { id: 'controllo', nome: 'Controlla la tesi' },
+    { id: 'somiglianze', nome: 'Frasi simili alle fonti' },
     { id: 'bibliografia', nome: 'Bibliografia' },
     { id: 'word', nome: 'Scarica in Word' },
+    { id: 'discussione', nome: 'Discussione' },
   ]
   return (
     <div className="rev">
@@ -648,7 +663,10 @@ export function Revisione() {
       </div>
       <div className="rev-corpo" key={scheda}>
         {scheda === 'osservazioni' && <Osservazioni />}
+        {scheda === 'correzioni' && <Correzioni />}
         {scheda === 'controllo' && <Controllo />}
+        {scheda === 'somiglianze' && <Somiglianze />}
+        {scheda === 'discussione' && <Discussione />}
         {scheda === 'bibliografia' && <Bibliografia />}
         {scheda === 'word' && <EsportaWord />}
       </div>

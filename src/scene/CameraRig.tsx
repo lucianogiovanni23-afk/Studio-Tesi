@@ -16,26 +16,48 @@ export interface ControlliOrbita {
 const DURATA = 1.4
 /** Volo verso lo schermo prima di aprire una pagina: breve, non deve mai far aspettare. */
 const DURATA_VOLO = 0.6
-const DURATA_INTRO = 2.6
+/** Entrata dalla porta a vetri, a ogni apertura dell'app. */
+const DURATA_INTRO = 3.4
+/** Distanza dallo schermo a fine volo. */
+const DISTANZA_SCHERMO = 0.32
+
+/** Come entra la telecamera quando si apre l'ufficio. */
+export type Ingresso = { tipo: 'intro' } | null
+
+/** Posa della telecamera "dentro" lo schermo di k, e punto di controllo della curva di volo. */
+function posaSchermo(k: AgentKey, pos: THREE.Vector3, bers: THREE.Vector3, ctrl: THREE.Vector3) {
+  const { centro, normale } = puntoSchermo(k)
+  bers.copy(centro)
+  pos.copy(centro).addScaledVector(normale, DISTANZA_SCHERMO)
+  ctrl.copy(centro).addScaledVector(normale, 1.3)
+  ctrl.y += 0.75
+}
 /** La telecamera non sale mai fin dentro le lamelle del soffitto. */
 const QUOTA_MASSIMA = ALTEZZA_SALA - 1.2
 
 /**
  * Transizione fluida verso la postazione scelta (o la vista d'insieme). Con
  * prefers-reduced-motion la telecamera arriva subito, senza animazione.
- * Alla prima visita (intro) entra dalla porta in fondo e plana sulla sala.
+ * A ogni apertura dell'app (intro) entra dalla porta a vetri in fondo e plana
+ * sulla sala.
  */
 export function CameraRig({
   controlli,
   fuoco,
   token,
-  intro = false,
+  ingresso = null,
+  partenza = false,
+  salta = 0,
   onFineIntro,
 }: {
   controlli: React.MutableRefObject<ControlliOrbita | null>
   fuoco: AgentKey | null
   token: number
-  intro?: boolean
+  /** Entrata dalla porta: la telecamera aspetta fuori finché `partenza` diventa vero. */
+  ingresso?: Ingresso
+  partenza?: boolean
+  /** Cambia per saltare l'entrata e arrivare subito alla vista d'insieme. */
+  salta?: number
   onFineIntro?: () => void
 }) {
   const camera = useThree((s) => s.camera)
@@ -53,6 +75,8 @@ export function CameraRig({
   const aBers = useRef(new THREE.Vector3())
   /** Punto di controllo della curva di volo: si passa sopra la spalla della persona, non attraverso il monitor. */
   const controllo = useRef(new THREE.Vector3())
+  /** L'entrata è pronta ma aspetta il via (la schermata di caricamento sta ancora sparendo). */
+  const inAttesa = useRef(false)
   const fine = useRef(onFineIntro)
   fine.current = onFineIntro
 
@@ -63,10 +87,12 @@ export function CameraRig({
     fine.current?.()
   }
 
-  // Intro: si parte fuori dalla porta, alle spalle della vista d'insieme.
+  // Entrata: la telecamera si mette fuori dalla porta e aspetta il via.
   useEffect(() => {
-    if (!intro || ridotto) return
+    if (!ingresso || ridotto) return
     inIntro.current = true
+    inAttesa.current = true
+    if (controlli.current) controlli.current.enabled = false
     durata.current = DURATA_INTRO
     daPos.current.set(...CAMERA_INGRESSO)
     daBers.current.set(...INGRESSO_BERSAGLIO)
@@ -74,13 +100,39 @@ export function CameraRig({
     aBers.current.set(...CAMERA_BERSAGLIO)
     camera.position.copy(daPos.current)
     camera.lookAt(daBers.current)
-    avanzamento.current = 0
+    avanzamento.current = 1
     invalida()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
+    if (!partenza || !inAttesa.current) return
+    inAttesa.current = false
+    avanzamento.current = 0
+    invalida()
+  }, [partenza, invalida])
+
+  // Salto (tocco, clic o Esc): si arriva subito alla vista d'insieme.
+  useEffect(() => {
+    if (salta === 0 || !inIntro.current) return
+    inAttesa.current = false
+    avanzamento.current = 1
+    camera.position.set(...CAMERA_CASA)
+    const c = controlli.current
+    if (c) {
+      c.target.set(...CAMERA_BERSAGLIO)
+      c.enabled = true
+    }
+    camera.lookAt(...CAMERA_BERSAGLIO)
+    c?.update()
+    chiudiIntro()
+    invalida()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salta])
+
+  useEffect(() => {
     if (token === 0) return
+    inAttesa.current = false
     chiudiIntro()
     if (inVolo.current) {
       inVolo.current = false
@@ -117,15 +169,12 @@ export function CameraRig({
       const k = (e as CustomEvent<AgentKey>).detail
       if (!k || !POSTAZIONI[k]) return
       chiudiIntro()
-      const { centro, normale } = puntoSchermo(k)
+      inAttesa.current = false
       inVolo.current = true
       durata.current = DURATA_VOLO
       daPos.current.copy(camera.position)
       daBers.current.copy(controlli.current?.target ?? bersaglio.current.set(...CAMERA_BERSAGLIO))
-      aBers.current.copy(centro)
-      aPos.current.copy(centro).addScaledVector(normale, 0.32)
-      controllo.current.copy(centro).addScaledVector(normale, 1.3)
-      controllo.current.y += 0.75
+      posaSchermo(k, aPos.current, aBers.current, controllo.current)
       if (controlli.current) controlli.current.enabled = false
       avanzamento.current = 0
       invalida()
@@ -136,6 +185,13 @@ export function CameraRig({
   }, [camera, controlli, ridotto, invalida])
 
   useFrame((_, grezzo) => {
+    if (inAttesa.current) {
+      // ferma in posizione finché non parte l'entrata
+      if (controlli.current?.enabled) controlli.current.enabled = false
+      camera.position.copy(daPos.current)
+      camera.lookAt(daBers.current)
+      return
+    }
     if (avanzamento.current >= 1) {
       if (inVolo.current) return
       // rete di sicurezza: mai sopra il soffitto
@@ -150,7 +206,7 @@ export function CameraRig({
     const morbido = inVolo.current
       ? t * t * (2.2 - 1.2 * t) // accelera verso lo schermo
       : inIntro.current
-      ? 1 - Math.pow(1 - t, 3) * (1 - t * 0.35) // parte deciso e si posa piano
+      ? t * t * t * (t * (t * 6 - 15) + 10) // parte piano, attraversa la porta, si posa piano
       : t < 0.5
         ? 4 * t * t * t
         : 1 - Math.pow(-2 * t + 2, 3) / 2

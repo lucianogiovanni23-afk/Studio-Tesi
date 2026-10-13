@@ -1,17 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useRef } from 'react'
 import { useProgress, useTexture } from '@react-three/drei'
 import { Bloom, EffectComposer, LUT, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
-import { BlendFunction, DepthOfFieldEffect, KernelSize, MaskFunction, ToneMappingMode } from 'postprocessing'
+import { BlendFunction, KernelSize, ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
-import { useMovimentoRidotto } from '../hooks/useLayoutMode'
-import type { AgentKey } from '../types'
-import { EVENTO_VOLO, puntoSchermo, puntoViso } from './punti'
 
 /**
  * Post-produzione "da videogioco":
- * - profondità di campo quando la telecamera inquadra una persona (nella
- *   vista d'insieme è tutto a fuoco), con passaggio morbido;
+ * - niente profondità di campo: anche da vicino tutto resta nitido;
  * - bloom selettivo: brillano solo le luci più forti della scena (LED RGB,
  *   lampade, tagli di luce del soffitto), non gli schermi o le pareti chiare;
  * - occlusione ambientale (N8AO) per le ombre di contatto;
@@ -52,81 +47,6 @@ function useSegnalePronto() {
   }, [])
 }
 
-/**
- * Regia della profondità di campo: il fuoco va sul viso della persona
- * inquadrata (o sullo schermo, in volo) e la sfocatura entra e esce piano.
- */
-class FuocoMorbido {
-  readonly effetto: DepthOfFieldEffect
-  private forza = 0
-  private obiettivo = 0
-  private volo = false
-
-  constructor(camera: THREE.Camera) {
-    this.effetto = new DepthOfFieldEffect(camera, { focusDistance: 3, focusRange: 1.6, bokehScale: 0, resolutionScale: 0.5 })
-    this.effetto.target = new THREE.Vector3(...puntoViso('lettore'))
-    ;(this.effetto as unknown as { maskPass: { maskFunction: MaskFunction } }).maskPass.maskFunction = MaskFunction.MULTIPLY_RGB_SET_ALPHA
-    this.applica()
-  }
-
-  mira(fuoco: AgentKey | null, subito: boolean) {
-    this.volo = false
-    this.obiettivo = fuoco ? 1 : 0
-    if (fuoco) this.effetto.target?.set(...puntoViso(fuoco))
-    if (subito) this.forza = this.obiettivo
-    this.applica()
-  }
-
-  vola(k: AgentKey) {
-    this.effetto.target?.copy(puntoSchermo(k).centro)
-    this.volo = true
-    this.obiettivo = 1
-  }
-
-  /** Avanza la transizione; true se serve un altro fotogramma. */
-  passo(delta: number): boolean {
-    if (Math.abs(this.forza - this.obiettivo) <= 0.001) return false
-    // ~1.2 s per entrare a fuoco: accompagna il volo della telecamera
-    this.forza += (this.obiettivo - this.forza) * Math.min(1, delta * 3.2)
-    if (Math.abs(this.forza - this.obiettivo) <= 0.001) this.forza = this.obiettivo
-    this.applica()
-    return true
-  }
-
-  private applica() {
-    this.effetto.blendMode.opacity.value = this.forza
-    this.effetto.bokehScale = this.forza * (this.volo ? 4.5 : 3.2)
-    this.effetto.cocMaterial.focusRange = this.volo ? 0.6 : 1.4
-  }
-}
-
-/** Profondità di campo che segue la persona inquadrata. */
-function useProfondita(fuoco: AgentKey | null, attiva: boolean) {
-  const camera = useThree((s) => s.camera)
-  const invalida = useThree((s) => s.invalidate)
-  const fermo = useMovimentoRidotto()
-  const regia = useMemo(() => (attiva ? new FuocoMorbido(camera) : null), [camera, attiva])
-  useEffect(() => () => regia?.effetto.dispose(), [regia])
-
-  useEffect(() => {
-    regia?.mira(fuoco, fermo)
-    invalida()
-  }, [regia, fuoco, fermo, invalida])
-
-  // In volo verso lo schermo il fuoco passa al monitor e lo sfondo si sfoca di più.
-  useEffect(() => {
-    if (!regia) return
-    const vola = (e: Event) => regia.vola((e as CustomEvent<AgentKey>).detail)
-    window.addEventListener(EVENTO_VOLO, vola)
-    return () => window.removeEventListener(EVENTO_VOLO, vola)
-  }, [regia])
-
-  useFrame((_, delta) => {
-    if (regia?.passo(delta)) invalida()
-  })
-  return regia?.effetto ?? null
-}
-
 function preparaLut(t: THREE.Texture | THREE.Texture[]) {
   for (const x of Array.isArray(t) ? t : [t]) {
     x.flipY = false
@@ -143,10 +63,9 @@ function impostaOpacita(e: ConOpacita | null, valore: number) {
   if (e) e.blendMode.opacity.value = valore
 }
 
-export function Effetti({ qualita, notte, fuoco }: { qualita: 'completa' | 'ridotta'; notte: boolean; fuoco: AgentKey | null }) {
+export function Effetti({ qualita, notte }: { qualita: 'completa' | 'ridotta'; notte: boolean }) {
   const completa = qualita === 'completa'
   useSegnalePronto()
-  const dof = useProfondita(fuoco, completa)
   const lut = useTexture(LUT_URL, preparaLut)
   const lutRef = useRef<ConOpacita | null>(null)
   useEffect(() => impostaOpacita(lutRef.current, notte ? 0.3 : 0.45))
@@ -154,7 +73,6 @@ export function Effetti({ qualita, notte, fuoco }: { qualita: 'completa' | 'rido
   return (
     <EffectComposer multisampling={completa ? 4 : 2} enableNormalPass={false}>
       {completa ? <N8AO aoRadius={0.55} distanceFalloff={0.9} intensity={notte ? 2.2 : 2.6} quality="medium" halfRes color={notte ? '#0b0d18' : '#1a140c'} /> : <></>}
-      {dof ? <primitive object={dof} /> : <></>}
       <Bloom
         mipmapBlur={completa}
         kernelSize={completa ? KernelSize.LARGE : KernelSize.SMALL}

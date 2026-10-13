@@ -4,6 +4,7 @@ import { normalizzaProgetto, progettoIniziale } from '../domain/progettoIniziale
 import { estrazioneInCorso, useStudio } from '../store'
 import type { Passaggio, Progetto } from '../types'
 import { creaCopia } from './copie'
+import { avviaCopieGitHub } from './copieGitHub'
 import { controllaSegreti, fileCorsoControllati, FORMATO, VERSIONE } from './fileProgetto'
 
 /**
@@ -84,6 +85,18 @@ function salvaCollegamento(c: Collegamento | null) {
   scrivi(CHIAVE_COLLEGAMENTO, c ? JSON.stringify(c) : null)
 }
 
+/** Repository e token di questo dispositivo, se è collegato. Il token non esce mai da qui se non verso GitHub. */
+export function datiCollegamento(): { repo: string; token: string; giàSincronizzato: boolean } | null {
+  const col = leggiCollegamento()
+  const token = leggi(CHIAVE_TOKEN)
+  return col && token ? { repo: col.repo, token, giàSincronizzato: Boolean(col.shaProgetto) } : null
+}
+
+/** Aspetta che finisca il giro di sincronizzazione in corso (due commit insieme sullo stesso ramo possono scontrarsi). */
+export async function dopoLaSincronizzazione(): Promise<void> {
+  while (inCorso) await inCorso.catch(() => {})
+}
+
 export const useSync = create<SyncUI>(() => {
   const c = leggiCollegamento()
   return { stato: c ? 'ok' : 'spenta', messaggio: '', repo: c?.repo ?? null, ultima: c?.ultima ?? null, conflitto: null }
@@ -134,7 +147,7 @@ function progettoVuoto(p: Progetto): boolean {
 
 // --- API di GitHub -----------------------------------------------------------
 
-class ErroreSync extends Error {
+export class ErroreSync extends Error {
   tipo: 'offline' | 'conflitto' | 'errore'
   constructor(tipo: 'offline' | 'conflitto' | 'errore', messaggio: string) {
     super(messaggio)
@@ -142,7 +155,7 @@ class ErroreSync extends Error {
   }
 }
 
-async function gh(token: string, percorso: string, init: { method?: string; body?: unknown; accept?: string } = {}): Promise<Response> {
+export async function gh(token: string, percorso: string, init: { method?: string; body?: unknown; accept?: string } = {}): Promise<Response> {
   try {
     return await fetch(`https://api.github.com${percorso}`, {
       method: init.method ?? 'GET',
@@ -161,7 +174,7 @@ async function gh(token: string, percorso: string, init: { method?: string; body
   }
 }
 
-async function errore(r: Response, cosa: string): Promise<ErroreSync> {
+export async function errore(r: Response, cosa: string): Promise<ErroreSync> {
   if (r.status === 401) return new ErroreSync('errore', 'GitHub non accetta il token, forse è scaduto. Creane uno nuovo e collega di nuovo questo dispositivo.')
   if (r.status === 403 || r.status === 429) {
     const testo = await r.text().catch(() => '')
@@ -182,13 +195,13 @@ async function shaRemoto(token: string, repo: string, file: string): Promise<str
 }
 
 /** Il contenuto esatto di quella versione (fino a 100 MB). */
-async function leggiVersione(token: string, repo: string, sha: string): Promise<string> {
+export async function leggiVersione(token: string, repo: string, sha: string): Promise<string> {
   const r = await gh(token, `/repos/${repo}/git/blobs/${sha}`, { accept: 'application/vnd.github.raw+json' })
   if (!r.ok) throw await errore(r, 'mentre leggevo i dati')
   return r.text()
 }
 
-function base64Utf8(testo: string): string {
+export function base64Utf8(testo: string): string {
   const byte = new TextEncoder().encode(testo)
   let binario = ''
   for (let i = 0; i < byte.length; i += 0x8000) binario += String.fromCharCode(...byte.subarray(i, i + 0x8000))
@@ -250,7 +263,7 @@ export function scollega() {
 type Scelta = 'invia' | 'ricevi'
 
 /** Applica un progetto ricevuto senza spostare lo studente dalla schermata in cui si trova. */
-function applicaProgetto(progetto: Progetto) {
+export function applicaProgetto(progetto: Progetto) {
   useStudio.setState((s) => {
     const capitolo = progetto.capitoli.find((c) => c.id === s.capitoloAperto)
     const sezioneEsiste = capitolo?.sezioni.some((x) => x.id === s.sezioneAperta)
@@ -405,6 +418,8 @@ export function avviaSincronizzazione() {
     if (s.corpusSincronizzato && !prima.corpusSincronizzato) void sincronizza()
   })
   if (useStudio.getState().corpusSincronizzato) void sincronizza()
+  // Una copia datata al giorno su GitHub, se è attiva.
+  avviaCopieGitHub()
   // Uscendo dall'app (per esempio passando dall'iPhone al computer) si invia subito.
   document.addEventListener('visibilitychange', () => {
     clearTimeout(timer)

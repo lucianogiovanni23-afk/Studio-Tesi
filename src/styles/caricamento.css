@@ -164,6 +164,38 @@
   }
 }
 
+/* Entrata dalla porta: un tocco ovunque la salta, e un piccolo invito lo dice. */
+.salta-velo {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: pointer;
+}
+
+.salta-intro {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: #fff;
+  background: rgba(20, 22, 18, 0.55);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  animation: salta-compare 0.4s ease 0.9s backwards;
+}
+
+@keyframes salta-compare {
+  from {
+    opacity: 0;
+  }
+}
+
 /* La pagina nuova "esce" dallo schermo: parte piccola, luminosa e sfocata. */
 .esce-schermo .contenuto {
   animation: esce-schermo 0.48s cubic-bezier(0.16, 0.84, 0.3, 1) backwards;
@@ -201,7 +233,8 @@
   }
 
   .esce-schermo .contenuto,
-  .volo-schermo .ufficio-scena::after {
+  .volo-schermo .ufficio-scena::after,
+  .salta-intro {
     animation: none;
   }
 }

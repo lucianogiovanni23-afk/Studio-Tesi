@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { caricaCorpus, rimuoviDalCorpus } from './agents/corpus'
 import { installaHookControllore, logAvviso } from './agents/supervisor'
 import { AgentiBar } from './components/AgentiBar'
@@ -12,19 +12,22 @@ import { NavigazionePrincipale, TestaSchermata } from './components/Navigazione'
 import { avviaCopieAutomatiche } from './io/copie'
 import { avviaSincronizzazione } from './io/sincronizzazione'
 import { AvvisoSincronizzazione, ChipSincronizzazione } from './components/Sincronizzazione'
-import { Corso } from './screens/Corso'
-import { Cruscotto } from './screens/Cruscotto'
-import { Glossario } from './screens/Glossario'
-import { Impostazioni } from './screens/Impostazioni'
-import { Biblioteca } from './screens/Biblioteca'
-import { Chat } from './screens/Chat'
-import { Revisione } from './screens/Revisione'
-import { Ricerca } from './screens/Ricerca'
-import { Ufficio } from './screens/Ufficio'
-import { Copertura } from './screens/Copertura'
-import { Scrittura } from './screens/Scrittura'
+import { AvvisoAggiornamento } from './components/AvvisoAggiornamento'
 import { useStudio } from './store'
 import type { Schermata } from './types'
+
+// Ogni schermata si scarica solo quando serve: l'app si apre più in fretta.
+const Corso = lazy(() => import('./screens/Corso').then((m) => ({ default: m.Corso })))
+const Cruscotto = lazy(() => import('./screens/Cruscotto').then((m) => ({ default: m.Cruscotto })))
+const Glossario = lazy(() => import('./screens/Glossario').then((m) => ({ default: m.Glossario })))
+const Impostazioni = lazy(() => import('./screens/Impostazioni').then((m) => ({ default: m.Impostazioni })))
+const Biblioteca = lazy(() => import('./screens/Biblioteca').then((m) => ({ default: m.Biblioteca })))
+const Chat = lazy(() => import('./screens/Chat').then((m) => ({ default: m.Chat })))
+const Revisione = lazy(() => import('./screens/Revisione').then((m) => ({ default: m.Revisione })))
+const Ricerca = lazy(() => import('./screens/Ricerca').then((m) => ({ default: m.Ricerca })))
+const Ufficio = lazy(() => import('./screens/Ufficio').then((m) => ({ default: m.Ufficio })))
+const Copertura = lazy(() => import('./screens/Copertura').then((m) => ({ default: m.Copertura })))
+const Scrittura = lazy(() => import('./screens/Scrittura').then((m) => ({ default: m.Scrittura })))
 
 /**
  * Il corpus del corso vive in IndexedDB, separato dal progetto: all'avvio si
@@ -143,12 +146,15 @@ export default function App() {
       <NavigazionePrincipale />
 
       <AvvisoSincronizzazione />
+      <AvvisoAggiornamento />
 
       <AgentiBar />
 
       <div className="contenuto">
         <TestaSchermata />
-        <Schermo s={schermata} />
+        <Suspense fallback={<div className="schermata-attesa" aria-busy="true" aria-label="Sto aprendo la schermata" />}>
+          <Schermo s={schermata} />
+        </Suspense>
       </div>
 
       <ModalitaCarta />

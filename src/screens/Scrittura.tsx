@@ -18,6 +18,8 @@ import { contaParoleTesto, useStudio } from '../store'
 import type { Autore, Capitolo, Sezione } from '../types'
 import { Cassetto } from '../ui/Cassetto'
 import { Icona } from '../ui/Icona'
+import { BottoneDettatura, StatoDettatura } from '../ui/Dettatura'
+import { unisciDettato, useDettatura } from '../ui/dettaturaVoce'
 import '../styles/scrittura.css'
 
 function nomeAutore(a: Autore): string {
@@ -138,11 +140,23 @@ function SelettoreCapitoli({ capitoli, cap, sez }: { capitoli: Capitolo[]; cap: 
 }
 
 /** Testo della sezione: modificabile direttamente; si salva nello store con un breve ritardo. */
-function Editor({ cap, sez, onCursore }: { cap: Capitolo; sez: Sezione; onCursore: (paragrafo: number) => void }) {
+function Editor({
+  cap,
+  sez,
+  onCursore,
+  registra,
+}: {
+  cap: Capitolo
+  sez: Sezione
+  onCursore: (paragrafo: number) => void
+  /** L'editor registra qui la funzione che inserisce testo al cursore (per la dettatura). */
+  registra?: (inserisci: ((testo: string) => void) | null) => void
+}) {
   const setTesto = useStudio((s) => s.setTestoSezione)
   const [testo, setTestoLocale] = useState(sez.testo)
   const [sezioneMostrata, setSezioneMostrata] = useState(sez.id)
   const timer = useRef<number | null>(null)
+  const area = useRef<HTMLTextAreaElement>(null)
   const inSospeso = useRef<{ cap: string; sez: string; testo: string } | null>(null)
 
   // Cambio di sezione o ripristino di una versione: si riparte dal testo salvato.
@@ -165,18 +179,43 @@ function Editor({ cap, sez, onCursore }: { cap: Capitolo; sez: Sezione; onCursor
   // Alla chiusura o al cambio di sezione il testo in sospeso non va perso.
   useEffect(() => () => scrivi(), [sez.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const cambia = (valore: string) => {
+    setTestoLocale(valore)
+    inSospeso.current = { cap: cap.id, sez: sez.id, testo: valore }
+    if (timer.current) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(scrivi, 600)
+  }
+
+  // Testo dettato: va dove c'è il cursore (o al posto della parte selezionata), poi il cursore lo segue.
+  useEffect(() => {
+    if (!registra) return
+    registra((dettato: string) => {
+      const el = area.current
+      if (!el) return
+      const valore = el.value
+      const inizio = el.selectionStart ?? valore.length
+      const fine = el.selectionEnd ?? inizio
+      const pezzo = unisciDettato(valore.slice(0, inizio), dettato)
+      if (!pezzo) return
+      const nuovo = valore.slice(0, inizio) + pezzo + valore.slice(fine)
+      cambia(nuovo)
+      const cursore = inizio + pezzo.length
+      requestAnimationFrame(() => {
+        el.setSelectionRange(cursore, cursore)
+        onCursore(paragrafoAlCursore(nuovo, cursore))
+      })
+    })
+    return () => registra(null)
+  })
+
   return (
     <textarea
+      ref={area}
       className="editor-testo"
       value={testo}
       placeholder={'Comincia a scrivere qui…\n\nOppure, dopo aver scelto fonti e scaletta, chiedi una bozza allo Scrittore: puoi sempre cambiarla tu. I segni tipo [F12] o [C3] dicono da quale fonte viene una frase.'}
       onSelect={(e) => onCursore(paragrafoAlCursore(e.currentTarget.value, e.currentTarget.selectionStart))}
-      onChange={(e) => {
-        setTestoLocale(e.target.value)
-        inSospeso.current = { cap: cap.id, sez: sez.id, testo: e.target.value }
-        if (timer.current) window.clearTimeout(timer.current)
-        timer.current = window.setTimeout(scrivi, 600)
-      }}
+      onChange={(e) => cambia(e.target.value)}
       onBlur={scrivi}
       aria-label={`Testo della sezione ${sez.titolo}`}
       spellCheck
@@ -447,6 +486,8 @@ function LavoroSezione({ cap, sez, numero }: { cap: Capitolo; sez: Sezione; nume
   }
   const mostra: Passo = concentrazione ? 'testo' : aperto
   const approvate = sez.fontiApprovate.length
+  const inserisci = useRef<((testo: string) => void) | null>(null)
+  const voce = useDettatura((t) => inserisci.current?.(t))
 
   return (
     <>
@@ -488,6 +529,7 @@ function LavoroSezione({ cap, sez, numero }: { cap: Capitolo; sez: Sezione; nume
                   {approvate > 0 && <span className="sc-contatore">{approvate}</span>}
                 </button>
                 <span className="sc-separatore" aria-hidden />
+                <BottoneDettatura voce={voce} classe="sc-dettatura" />
                 <button type="button" className="sc-icona-bottone" onClick={() => setConcentrazione(true)} aria-label="Concentrazione" title="Concentrazione: solo il testo (Esc per uscire)">
                   <Icona nome="concentrazione" dimensione={20} />
                 </button>
@@ -497,8 +539,9 @@ function LavoroSezione({ cap, sez, numero }: { cap: Capitolo; sez: Sezione; nume
               </>
             }
           />
+          <StatoDettatura voce={voce} classe="sc-dettatura-stato" />
           <div className="sc-foglio">
-            <Editor cap={cap} sez={sez} onCursore={(n) => selezionaParagrafo(sez.id, n)} />
+            <Editor cap={cap} sez={sez} onCursore={(n) => selezionaParagrafo(sez.id, n)} registra={(f) => (inserisci.current = f)} />
             <PiedeFoglio cap={cap} sez={sez} />
           </div>
         </section>

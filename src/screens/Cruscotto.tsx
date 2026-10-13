@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useState } from 'react'
 import { formattaDollari } from '../agents/costs'
 import { Conferma } from '../components/Conferma'
 import { IndiceEditor } from '../components/IndiceEditor'
+import { ConsegnaRitmo } from '../components/panoramica/ConsegnaRitmo'
 import { useGuida } from '../components/guidaStato'
 import { ETICHETTA_STATO } from '../domain/etichette'
 import { suggerimenti } from '../domain/suggerimenti'
@@ -487,6 +488,7 @@ export function Cruscotto() {
         <AChePuntoSei />
         <ProssimoPasso apriIndice={() => setEditor(true)} />
       </div>
+      <ConsegnaRitmo />
       <Percorso />
       <Indice apriEditor={() => setEditor(true)} />
       <EditorIndice aperto={editor} chiudi={() => setEditor(false)} />

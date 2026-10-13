@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { fermaChat, inviaMessaggio, stimaMessaggio, useChat } from '../agents/chat'
 import { formattaDollari } from '../agents/costs'
 import { Conferma } from '../components/Conferma'
+import { CollegaPensa } from '../components/CollegaPensa'
+import { Dettatura } from '../ui/Dettatura'
+import { aggiungiDettato } from '../ui/dettaturaVoce'
+import { collegaPerDomanda } from '../components/pensaFrasi'
+import { usePonte } from '../agents/ponte'
 import { useStudio } from '../store'
 
 const SPUNTI = [
@@ -20,6 +25,7 @@ export function Chat() {
   const modello = useStudio((s) => s.preferenze.modelli.chat)
   const inCorso = useChat((s) => s.inCorso)
   const errore = useChat((s) => s.errore)
+  const suClaudeAi = usePonte((s) => s.coda.some((r) => r.chi === 'chat'))
   const [testo, setTesto] = useState('')
   const fine = useRef<HTMLDivElement>(null)
   const progetto = useStudio((s) => s.progetto)
@@ -63,12 +69,21 @@ export function Chat() {
             ))}
           </div>
         )}
-        {messaggi.map((m) => (
-          <div key={m.id} className={`messaggio messaggio-${m.ruolo}`}>
-            <span className="messaggio-chi">{m.ruolo === 'studente' ? 'Tu' : 'Assistente'}</span>
-            <div className="messaggio-testo">{m.testo || (inCorso ? '…' : '')}</div>
-          </div>
-        ))}
+        {messaggi.map((m, i) =>
+          m.ruolo === 'assistente' && !m.testo && inCorso && i === messaggi.length - 1 ? (
+            <div key={m.id} className="messaggio messaggio-assistente messaggio-pensa">
+              <CollegaPensa
+                k={collegaPerDomanda(messaggi[i - 1]?.testo ?? '')}
+                dettaglio={suClaudeAi ? 'Aspetto la risposta da Claude.ai: copia, incolla e torna qui.' : undefined}
+              />
+            </div>
+          ) : (
+            <div key={m.id} className={`messaggio messaggio-${m.ruolo}`}>
+              <span className="messaggio-chi">{m.ruolo === 'studente' ? 'Tu' : 'Assistente'}</span>
+              <div className="messaggio-testo">{m.testo}</div>
+            </div>
+          ),
+        )}
         <div ref={fine} />
       </div>
 
@@ -95,6 +110,7 @@ export function Chat() {
             aria-label="Messaggio per la chat"
           />
           <div className="riga-editor">
+            <Dettatura onTesto={(t) => setTesto((b) => aggiungiDettato(b, t))} />
             {inCorso ? (
               <button type="button" className="bottone bottone-vuoto" onClick={fermaChat}>
                 Ferma

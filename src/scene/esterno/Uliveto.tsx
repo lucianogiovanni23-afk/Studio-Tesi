@@ -1,7 +1,9 @@
 import { useEffect, useMemo } from 'react'
 import { useGLTF, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
-import { materialeCorteccia, materialeFoglie, materialeImpostori } from './materiali'
+import { materialeCorteccia, materialeFoglie, materialeImpostori, materialeRaccolta } from './materiali'
+import { costruisciRaccolta } from './raccolta'
+import { INDICE_STAGIONE, type Stagione } from './stagioni'
 import { FACCIATA_Z, altezza, type Olivo } from './terreno'
 import { LUNA } from './atmosfera'
 import { textureAlone } from '../notte'
@@ -181,24 +183,51 @@ function Lontani({ alberi, atlante }: { alberi: Olivo[]; atlante: THREE.Texture 
   return <primitive object={mesh} />
 }
 
-function useMaterialiOlivo(completa: boolean) {
+/** Autunno: reti, cassette di olive e una scala sotto gli ulivi più vicini alla vetrata. */
+function Raccolta({ alberi }: { alberi: Olivo[] }) {
+  const dati = useMemo(() => costruisciRaccolta(alberi), [alberi])
+  const materiali = useMemo(() => ({ reti: materialeRaccolta(true), attrezzi: materialeRaccolta(false) }), [])
+  useEffect(
+    () => () => {
+      dati?.reti.dispose()
+      dati?.attrezzi.dispose()
+    },
+    [dati],
+  )
+  useEffect(
+    () => () => {
+      materiali.reti.dispose()
+      materiali.attrezzi.dispose()
+    },
+    [materiali],
+  )
+  if (!dati) return null
+  return (
+    <>
+      <mesh geometry={dati.reti} material={materiali.reti} renderOrder={2} />
+      <mesh geometry={dati.attrezzi} material={materiali.attrezzi} />
+    </>
+  )
+}
+
+function useMaterialiOlivo(completa: boolean, stagione: Stagione) {
   const mappa = useTexture(`${BASE}corteccia.jpg`, prepara(true))
   const normali = useTexture(`${BASE}corteccia-n.jpg`, prepara(false))
   const foglieTex = useTexture(`${BASE}foglie.webp`, prepara(true, false, 4))
   return useMemo(() => {
-    return { corteccia: materialeCorteccia(mappa, completa ? normali : null), foglie: materialeFoglie(foglieTex) }
-  }, [mappa, normali, foglieTex, completa])
+    return { corteccia: materialeCorteccia(mappa, completa ? normali : null), foglie: materialeFoglie(foglieTex, INDICE_STAGIONE[stagione]) }
+  }, [mappa, normali, foglieTex, completa, stagione])
 }
 
 /**
  * L'uliveto: alberi vicini in pieno dettaglio, quelli a media distanza più
  * semplici, i lontani come immagini sempre rivolte verso chi guarda.
  */
-export function Uliveto({ alberi, completa, sole, notte }: { alberi: Olivo[]; completa: boolean; sole: THREE.Vector3; notte: number }) {
+export function Uliveto({ alberi, completa, sole, notte, stagione }: { alberi: Olivo[]; completa: boolean; sole: THREE.Vector3; notte: number; stagione: Stagione }) {
   const medi = useGLTF(`${BASE}olivi-medi.glb`, false, true)
   const atlante = useTexture(`${BASE}olivi-lontani.webp`, prepara(true, false))
   const variantiMedie = useMemo(() => estrai(medi.scene), [medi])
-  const materiali = useMaterialiOlivo(completa)
+  const materiali = useMaterialiOlivo(completa, stagione)
   useEffect(() => () => {
     materiali.corteccia.dispose()
     materiali.foglie.dispose()
@@ -215,8 +244,16 @@ export function Uliveto({ alberi, completa, sole, notte }: { alberi: Olivo[]; co
       return { x: p.x, z, y: altezza(p.x, z) - 0.15, scala: p.scala, rot: p.rot, variante: p.variante, d: p.d }
     })
     const ombre = [...patriarchi, ...alberi.filter((a) => a.d < limiteMedi + 40)]
-    return { vicini, medi, lontani, patriarchi, ombre }
-  }, [alberi, limiteVicini, limiteMedi])
+    // per la raccolta: i due patriarchi del giardino e gli alberi più vicini che si vedono dalla vetrata
+    const daRaccogliere = [
+      ...patriarchi.slice(0, 2),
+      ...alberi
+        .filter((a) => a.d < 30 && Math.abs(a.x) < 22)
+        .sort((a, b) => a.d - b.d)
+        .slice(0, completa ? 3 : 1),
+    ]
+    return { vicini, medi, lontani, patriarchi, ombre, daRaccogliere }
+  }, [alberi, limiteVicini, limiteMedi, completa])
 
   return (
     <group>
@@ -233,6 +270,7 @@ export function Uliveto({ alberi, completa, sole, notte }: { alberi: Olivo[]; co
       <Specie varianti={variantiMedie} alberi={gruppi.medi} corteccia={materiali.corteccia} foglie={materiali.foglie} />
       <Lontani alberi={gruppi.lontani} atlante={atlante} />
       <Ombre alberi={gruppi.ombre} sole={sole} notte={notte} />
+      {stagione === 'autunno' && <Raccolta alberi={gruppi.daRaccogliere} />}
     </group>
   )
 }

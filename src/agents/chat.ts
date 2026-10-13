@@ -58,8 +58,18 @@ export function contestoVariabile(): string {
   const perChi = new Map<string, number>()
   for (const u of p.usi) perChi.set(nomeChi(u.chi), (perChi.get(nomeChi(u.chi)) ?? 0) + u.costo)
   const costi = [...perChi.entries()].map(([k, v]) => `${k} ${formattaDollari(v)}`).join(', ')
+  const correzioni = (p.correzioni ?? [])
+    .flatMap((n) => n.compiti.filter((c) => !c.fatto))
+    .slice(0, 40)
+    .map((c) => {
+      const i = p.capitoli.findIndex((x) => x.id === c.capitoloId)
+      const j = i >= 0 ? p.capitoli[i].sezioni.findIndex((x) => x.id === c.sezioneId) : -1
+      return `- ${i < 0 ? 'tutta la tesi' : j < 0 ? `cap. ${i + 1}` : `${i + 1}.${j + 1}${c.paragrafo ? ` §${c.paragrafo}` : ''}`}: ${c.compito}`
+    })
+    .join('\n')
   return [
     `OSSERVAZIONI DEL RELATORE:\n${osservazioni || '(nessuna)'}`,
+    `CORREZIONI DEL RELATORE ANCORA DA FARE:\n${correzioni || '(nessuna)'}`,
     `RISULTATI DI RICERCA DA APPROVARE: ${p.inAttesa.length}`,
     `STATO DEGLI AGENTI:\n${agenti}`,
     `COSTI: questo mese ${formattaDollari(costoDelMese(p.usi))}; totale per agente: ${costi || 'nessuno'}`,
@@ -133,8 +143,9 @@ export async function inviaMessaggio(testo: string): Promise<void> {
     })
     useStudio.getState().aggiornaMessaggio(idRisposta, finale || accumulato)
   } catch (err) {
-    const fermata = controller?.signal.aborted
-    useStudio.getState().aggiornaMessaggio(idRisposta, accumulato + (fermata ? '\n\n(risposta fermata a metà)' : ''))
+    // Fermata con il tasto, oppure annullata dalla finestra di Claude.ai.
+    const fermata = controller?.signal.aborted || (err instanceof DOMException && err.name === 'AbortError')
+    useStudio.getState().aggiornaMessaggio(idRisposta, fermata ? (accumulato ? `${accumulato}\n\n(risposta fermata a metà)` : '(domanda annullata)') : accumulato)
     if (!fermata) useChat.setState({ errore: toApiError(err).message })
   } finally {
     useChat.setState({ inCorso: false })

@@ -13,10 +13,11 @@ const tonemap = /* glsl */ `
   #include <colorspace_fragment>
 `
 
-export function materialeTerreno(erba: THREE.Texture, oliviFino: number): THREE.ShaderMaterial {
+export function materialeTerreno(erba: THREE.Texture, oliviFino: number, stagione = 3): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     name: 'TerrenoEsterno',
     uniforms: { ...uniformiCielo, uErba: { value: erba }, uOliviFino: { value: oliviFino } },
+    defines: { STAGIONE: stagione },
     vertexShader: /* glsl */ `
       attribute vec4 aTipo;
       varying vec3 vWorld;
@@ -66,6 +67,18 @@ export function materialeTerreno(erba: THREE.Texture, oliviFino: number): THREE.
         vec3 verde = mix(vec3(0.14, 0.17, 0.07), vec3(0.22, 0.24, 0.11), macchie);
         vec3 terra = mix(vec3(0.27, 0.18, 0.11), vec3(0.34, 0.25, 0.16), macchie);
         vec3 arato = mix(vec3(0.24, 0.16, 0.10), vec3(0.30, 0.21, 0.13), fbm(vWorld.xz / 6.0));
+        #if STAGIONE == 0
+          // inverno: dopo le piogge l'erba torna verde
+          secca = mix(secca, verde * 1.2, 0.55);
+        #elif STAGIONE == 1
+          // primavera: prati verdi e pieni
+          secca = mix(secca, verde * 1.45, 0.75);
+          verde *= 1.15;
+        #elif STAGIONE == 2
+          // estate: erba secca e dorata
+          secca = mix(vec3(0.46, 0.38, 0.19), vec3(0.58, 0.48, 0.26), macchie);
+          verde = mix(verde, secca, 0.7);
+        #endif
         // sotto gli ulivi: terra con erba rada
         vec3 uliveto = mix(terra, mix(secca, verde, 0.35), smoothstep(0.35, 0.75, macchie) * 0.8);
         vec3 alb = uliveto * vTipo.x + secca * vTipo.y + mix(verde, secca, 0.35) * vTipo.z + arato * vTipo.w;
@@ -80,7 +93,23 @@ export function materialeTerreno(erba: THREE.Texture, oliviFino: number): THREE.
         // giardino: prato curato ma non irrigato
         float giardino = 1.0 - smoothstep(${(FINE_GIARDINO - 0.6).toFixed(1)}, ${FINE_GIARDINO.toFixed(1)}, d);
         vec3 prato = mix(vec3(0.15, 0.18, 0.08), vec3(0.27, 0.26, 0.13), smoothstep(0.3, 0.8, macchie));
+        #if STAGIONE == 0
+          prato = mix(prato, vec3(0.13, 0.19, 0.08), 0.5);
+        #elif STAGIONE == 1
+          prato = mix(vec3(0.13, 0.21, 0.06), vec3(0.2, 0.27, 0.09), smoothstep(0.3, 0.8, macchie));
+        #elif STAGIONE == 2
+          prato = mix(prato, vec3(0.44, 0.37, 0.2), 0.65);
+        #endif
         alb = mix(alb, prato, giardino);
+        #if STAGIONE == 1
+          // fiori di campo: puntini gialli, bianchi e rossi, solo vicino
+          vec2 qf = vWorld.xz * 8.0;
+          float hf = hash12(floor(qf));
+          float fiore = step(0.885, hf) * (1.0 - smoothstep(0.16, 0.3, length(fract(qf) - 0.5)));
+          fiore *= (1.0 - smoothstep(30.0, 70.0, dist)) * (1.0 - vTipo.w) * (1.0 - smoothstep(0.5, 0.8, 1.0 - n.y));
+          vec3 colFiore = hf > 0.965 ? vec3(0.8, 0.12, 0.08) : hf > 0.93 ? vec3(0.95, 0.93, 0.86) : vec3(0.98, 0.8, 0.16);
+          alb = mix(alb, colFiore * 1.25, fiore);
+        #endif
         // vialetto in ghiaia lungo la facciata
         float vialetto = (1.0 - smoothstep(1.4, 1.7, d)) * step(0.0, d);
         alb = mix(alb, vec3(0.55, 0.50, 0.42) * (0.8 + 0.4 * hash12(floor(vWorld.xz * 40.0))), vialetto);
@@ -100,6 +129,9 @@ export function materialeTerreno(erba: THREE.Texture, oliviFino: number): THREE.
         // piccole ombre di occlusione tra i cespugli
         float ao = 0.75 + 0.25 * smoothstep(0.2, 0.7, macchie);
         vec3 col = illumina(alb, n, ao);
+        #if STAGIONE == 0
+          col *= vec3(0.93, 0.98, 1.07); // luce d'inverno, più fredda
+        #endif
         col = foschia(col, vWorld);
         gl_FragColor = vec4(col, 1.0);
         ${tonemap}
@@ -167,10 +199,11 @@ export function materialeCorteccia(mappa: THREE.Texture, normali: THREE.Texture 
   })
 }
 
-export function materialeFoglie(mappa: THREE.Texture): THREE.ShaderMaterial {
+export function materialeFoglie(mappa: THREE.Texture, stagione = 3): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     name: 'FoglieOlivo',
     uniforms: { ...uniformiCielo, uMappa: { value: mappa } },
+    defines: { STAGIONE: stagione },
     side: THREE.DoubleSide,
     vertexShader: /* glsl */ `
       ${VENTO}
@@ -179,8 +212,11 @@ export function materialeFoglie(mappa: THREE.Texture): THREE.ShaderMaterial {
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vInterno;
+      varying vec3 vSeme;
       void main() {
         vec4 radice = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        // punto fisso sulla chioma (il vento non lo sposta): fiori e olive restano attaccati
+        vSeme = position + radice.xyz * 0.37;
         vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
         wp.xyz += vento(position, radice.xyz, 5.0, uv.y);
         vWorld = wp.xyz;
@@ -197,18 +233,37 @@ export function materialeFoglie(mappa: THREE.Texture): THREE.ShaderMaterial {
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vInterno;
+      varying vec3 vSeme;
       ${LUCE}
       void main() {
         vec4 t = texture2D(uMappa, vUv);
         if (t.a < 0.5) discard;
         vec3 n = normalize(vNormal);
         vec3 alb = t.rgb * vec3(0.78, 0.84, 0.74);
+        #if STAGIONE == 1 || STAGIONE == 3
+          // primavera: fiorellini color crema; autunno: olive verdi e nere tra le foglie
+          vec3 qs = vSeme * (STAGIONE == 1 ? 15.0 : 11.0);
+          vec3 cs = floor(qs);
+          float hs = fract(sin(dot(cs, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+          float vicino = 1.0 - smoothstep(32.0, 60.0, length(vWorld - cameraPosition));
+          #if STAGIONE == 1
+            float macchia = step(0.78, hs) * (1.0 - smoothstep(0.2, 0.36, length(fract(qs) - 0.5))) * vicino;
+            alb = mix(alb, vec3(0.95, 0.92, 0.74), macchia);
+          #else
+            float macchia = step(0.8, hs) * (1.0 - smoothstep(0.24, 0.36, length(fract(qs) - 0.5))) * vicino;
+            vec3 oliva = hs > 0.92 ? vec3(0.42, 0.46, 0.12) : hs > 0.86 ? vec3(0.2, 0.06, 0.12) : vec3(0.05, 0.03, 0.05);
+            alb = mix(alb, oliva, macchia);
+          #endif
+        #endif
         float ao = mix(0.55, 1.0, vInterno) * mix(0.7, 1.0, n.y * 0.5 + 0.5);
         vec3 col = illumina(alb, n, ao);
         // luce che passa attraverso le foglie in controluce
         vec3 v = normalize(cameraPosition - vWorld);
         float trasl = pow(max(dot(-v, uSoleDir), 0.0), 4.0);
         col += alb * uSoleColore * trasl * 0.45 * vec3(0.9, 1.0, 0.6);
+        #if STAGIONE == 0
+          col *= vec3(0.93, 0.98, 1.07);
+        #endif
         col = foschia(col, vWorld);
         gl_FragColor = vec4(col, 1.0);
         ${tonemap}
@@ -339,4 +394,68 @@ export function materialeLucine(): THREE.ShaderMaterial {
       }
     `,
   })
+}
+
+/**
+ * Reti, cassette e scala della raccolta delle olive: colori per vertice
+ * (reti: trama a maglie e olive cadute), con la stessa luce dell'esterno.
+ */
+export function materialeRaccolta(rete: boolean): THREE.ShaderMaterial {
+  const m = new THREE.ShaderMaterial({
+    name: rete ? 'ReteOlive' : 'AttrezziRaccolta',
+    uniforms: { ...uniformiCielo },
+    vertexColors: true,
+    defines: rete ? { RETE: '' } : {},
+    vertexShader: /* glsl */ `
+      varying vec3 vWorld;
+      varying vec3 vNormal;
+      varying vec3 vColore;
+      varying vec2 vUv;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorld = wp.xyz;
+        vNormal = normalize(mat3(modelMatrix) * normal);
+        vColore = color;
+        vUv = uv;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      varying vec3 vWorld;
+      varying vec3 vNormal;
+      varying vec3 vColore;
+      varying vec2 vUv;
+      ${LUCE}
+      ${RUMORE}
+      void main() {
+        vec3 n = normalize(vNormal);
+        vec3 alb = vColore;
+        #ifdef RETE
+          // bordo irregolare, maglie fitte che da lontano si fondono, olive cadute sopra
+          vec2 c = vUv - 0.5;
+          float bordo = 0.5 - 0.035 * rumore(vUv * 9.0);
+          if (length(c) > bordo) discard;
+          vec2 g = abs(fract(vWorld.xz * 22.0) - 0.5);
+          float w = max(fwidth(vWorld.x), fwidth(vWorld.z)) * 22.0;
+          float filo = smoothstep(0.5 - 0.12 - w, 0.5 - 0.12, max(g.x, g.y));
+          filo = mix(filo, 0.45, clamp(w * 1.5, 0.0, 1.0));
+          alb *= 0.72 + 0.4 * filo;
+          vec2 qo = vWorld.xz * 11.0;
+          float ho = hash12(floor(qo));
+          float oliva = step(0.8, ho) * (1.0 - smoothstep(0.18, 0.3, length(fract(qo) - 0.5))) * (1.0 - smoothstep(0.15, 0.42, length(c)));
+          alb = mix(alb, ho > 0.94 ? vec3(0.28, 0.33, 0.1) : vec3(0.06, 0.04, 0.06), oliva);
+        #endif
+        vec3 col = illumina(alb, n, 0.85);
+        col = foschia(col, vWorld);
+        gl_FragColor = vec4(col, 1.0);
+        ${tonemap}
+      }
+    `,
+  })
+  if (rete) {
+    m.polygonOffset = true
+    m.polygonOffsetFactor = -3
+    m.polygonOffsetUnits = -3
+  }
+  return m
 }

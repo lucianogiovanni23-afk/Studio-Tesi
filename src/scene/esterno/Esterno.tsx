@@ -14,6 +14,7 @@ import { geometriaTerreno, piantaOlivi, Y_MARE } from './terreno'
 import { Uccelli } from './Uccelli'
 import { Uliveto } from './Uliveto'
 import { prepara } from './texture'
+import { INDICE_STAGIONE, meseCorrente, stagioneDelMese, type Stagione } from './stagioni'
 
 const BASE = `${import.meta.env.BASE_URL}assets/esterno/`
 /** Fin dove arriva la vista: il mare all'orizzonte è a una decina di km. */
@@ -64,12 +65,12 @@ function Mare({ completa, stato }: { completa: boolean; stato: StatoAtmosfera })
   return <primitive object={acqua} />
 }
 
-function Terreno({ completa, oliviFino }: { completa: boolean; oliviFino: number }) {
+function Terreno({ completa, oliviFino, stagione }: { completa: boolean; oliviFino: number; stagione: Stagione }) {
   const erba = useTexture(`${BASE}erba-${completa ? 1024 : 512}.jpg`, prepara(true, true, completa ? 8 : 2))
   const geometria = useMemo(() => geometriaTerreno(!completa), [completa])
   const materiale = useMemo(() => {
-    return materialeTerreno(erba, oliviFino)
-  }, [erba, oliviFino])
+    return materialeTerreno(erba, oliviFino, INDICE_STAGIONE[stagione])
+  }, [erba, oliviFino, stagione])
   useEffect(
     () => () => {
       geometria.dispose()
@@ -107,11 +108,15 @@ function Costruito({ dati }: { dati: ReturnType<typeof costruisci> }) {
  * La campagna calabrese vista dalla vetrata, in 3D vero: cielo fisico che
  * segue l'ora, mare in fondo, colline con uliveti a filari, muretti a secco,
  * casolari, nuvole e qualche uccello. Di notte stelle, luna e paesi accesi.
+ * Cambia con le stagioni (vedi stagioni.ts): raccolta delle olive in autunno,
+ * ulivi in fiore in primavera, erba secca d'estate.
  */
 export default function Esterno({ qualita }: { qualita: 'completa' | 'ridotta' }) {
   const completa = qualita === 'completa'
   const fermo = useMovimentoRidotto()
   const cielo = useCielo()
+  // la stagione si legge all'apertura della sala (basta: cambia una volta ogni tre mesi)
+  const stagione = useMemo(() => stagioneDelMese(meseCorrente()), [])
   const stato = useMemo(() => statoAtmosfera(cielo), [cielo])
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
   const invalida = useThree((s) => s.invalidate)
@@ -156,14 +161,14 @@ export default function Esterno({ qualita }: { qualita: 'completa' | 'ridotta' }
     <group>
       <Cielo stato={stato} />
       <Suspense fallback={null}>
-        <Terreno completa={completa} oliviFino={oliviFino} />
+        <Terreno completa={completa} oliviFino={oliviFino} stagione={stagione} />
         <Costruito dati={dati.costruito} />
       </Suspense>
       <Suspense fallback={null}>
         <Mare completa={completa} stato={stato} />
       </Suspense>
       <Suspense fallback={null}>
-        <Uliveto alberi={dati.alberi} completa={completa} sole={stato.sole} notte={stato.notte} />
+        <Uliveto alberi={dati.alberi} completa={completa} sole={stato.sole} notte={stato.notte} stagione={stagione} />
       </Suspense>
       <Suspense fallback={null}>
         <Luna notte={stato.notte} />

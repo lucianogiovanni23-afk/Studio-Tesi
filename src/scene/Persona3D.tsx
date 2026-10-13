@@ -7,6 +7,7 @@ import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useStudio } from '../store'
 import type { AgentStatus } from '../types'
 import { PersonaReale } from './PersonaReale'
+import { occhiataIngresso } from './sguardi'
 
 /**
  * Una persona seduta alla scrivania, rivolta verso la sala.
@@ -216,6 +217,9 @@ export function PersonaSemplice({ persona, lavora, status, scelta, parla, sfasam
   const spallaSx = useRef<THREE.Group>(null)
   const spallaDx = useRef<THREE.Group>(null)
   const radice = useRef<THREE.Group>(null)
+  const rivolta = useRef(0)
+  /** Direzione della telecamera rispetto alla persona (rad). */
+  const verso = useRef(0)
   // Saluto: quando lo stato diventa "fatto" la persona si gira verso di te e alza la mano.
   const saluto = useRef({ richiesto: false, inizio: -1, peso: 0 })
   const statoPrima = useRef(status)
@@ -244,12 +248,15 @@ export function PersonaSemplice({ persona, lavora, status, scelta, parla, sfasam
       busto.current.scale.y = 1 + Math.sin(t * 1.7) * 0.008
       // si gira verso la telecamera (solo il busto: sedia e gambe restano ferme)
       let girata = 0
-      if (w > 0.001 && radice.current) {
+      rivolta.current += ((scelta ? 1 : 0) - rivolta.current) * (1 - Math.exp(-delta * 3.2))
+      const peso = Math.max(w, rivolta.current * 0.42)
+      if (radice.current) {
         const e = radice.current.matrixWorld.elements
         const yawMondo = Math.atan2(e[8], e[10])
         const dxCam = stato.camera.position.x - e[12]
         const dzCam = stato.camera.position.z - e[14]
-        girata = THREE.MathUtils.clamp(Math.atan2(dxCam, dzCam) - yawMondo, -0.7, 0.7) * w
+        verso.current = THREE.MathUtils.clamp(Math.atan2(dxCam, dzCam) - yawMondo, -0.7, 0.7)
+        girata = verso.current * peso
       }
       busto.current.rotation.y = girata
     }
@@ -258,8 +265,9 @@ export function PersonaSemplice({ persona, lavora, status, scelta, parla, sfasam
     if (spallaSx.current) spallaSx.current.rotation.z = -1.25 * w
     if (testa.current) {
       // Chi è scelto (o saluta) guarda verso di te; gli altri si guardano intorno o guardano lo schermo.
-      const guarda = scelta || w > 0.5
-      const yaw = guarda ? 0 : lavora ? Math.sin(t * 0.7) * 0.08 : Math.sin(t * 0.35) * 0.35
+      const guarda = scelta || w > 0.5 || occhiataIngresso((sfasamento + 4.5) / 3)
+      // la testa completa la girata del busto: guarda dritto verso di te
+      const yaw = guarda ? THREE.MathUtils.clamp(verso.current - (busto.current?.rotation.y ?? 0), -0.8, 0.8) * 0.9 : lavora ? Math.sin(t * 0.7) * 0.08 : Math.sin(t * 0.35) * 0.35
       const pitch = guarda ? -0.04 : lavora ? 0.22 : Math.sin(t * 0.5) * 0.04
       testa.current.rotation.y += (yaw - testa.current.rotation.y) * k
       testa.current.rotation.x += (pitch - testa.current.rotation.x) * k

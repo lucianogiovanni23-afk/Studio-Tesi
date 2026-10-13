@@ -1,6 +1,8 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { AGENTE, AGENTI } from '../agents/agenti'
 import { chiediAgente, staRispondendo } from '../agents/colloquio'
+import { usePonte } from '../agents/ponte'
+import { CollegaPensa } from '../components/CollegaPensa'
 import { Ritratto } from '../components/Ritratto'
 import { useLargo, useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useQualitaScena } from '../scene/qualita'
@@ -9,6 +11,8 @@ import type { AgentKey } from '../types'
 import { useTurno, type Azione } from '../ufficio/dialoghi'
 import { eseguiAzione, useUfficio } from '../ufficio/statoUfficio'
 import { seguiAmbiente } from '../ui/ambiente'
+import { Dettatura } from '../ui/Dettatura'
+import { aggiungiDettato } from '../ui/dettaturaVoce'
 import type { Schermata } from '../types'
 import '../styles/caricamento.css'
 
@@ -215,6 +219,8 @@ function Conversazione({ k }: { k: AgentKey }) {
   const campo = useRef<HTMLTextAreaElement>(null)
   const modoSpeciale = turno.speciale ? (speciale ?? turno.speciale.avvio) : false
   const lavora = occupato || (runtime.status === 'lavoro' ? runtime.etichetta || 'sta lavorando…' : null)
+  // Domanda libera in attesa (gratis: aspetta Claude.ai): al posto dei puntini, il collega che pensa.
+  const suClaudeAi = usePonte((s) => s.coda.some((r) => r.chi === 'chat'))
 
   useEffect(() => {
     fondo.current?.scrollIntoView({ block: 'end' })
@@ -257,22 +263,21 @@ function Conversazione({ k }: { k: AgentKey }) {
         <div className="battuta battuta-agente">
           <p>Ciao! {def.persona.saluto}</p>
         </div>
-        {battute.map((b) => (
-          <div key={b.id} className={`battuta battuta-${b.da} ${b.tono ? `battuta-${b.tono}` : ''}`}>
-            <p>{b.testo}</p>
-            <time dateTime={b.data}>{ora(b.data)}</time>
-          </div>
-        ))}
+        {battute.map((b, i) =>
+          b.da === 'agente' && b.testo === '…' && i === battute.length - 1 && staRispondendo(k) ? (
+            <div key={b.id} className="battuta battuta-agente battuta-attesa">
+              <CollegaPensa k={k} dimensione={44} dettaglio={suClaudeAi ? 'Aspetto la risposta da Claude.ai: copia, incolla e torna qui.' : undefined} />
+            </div>
+          ) : (
+            <div key={b.id} className={`battuta battuta-${b.da} ${b.tono ? `battuta-${b.tono}` : ''}`}>
+              <p>{b.testo}</p>
+              <time dateTime={b.data}>{ora(b.data)}</time>
+            </div>
+          ),
+        )}
         {lavora ? (
           <div className="battuta battuta-agente battuta-attesa">
-            <p>
-              <span className="puntini" aria-hidden>
-                <i />
-                <i />
-                <i />
-              </span>{' '}
-              {avanzamento ?? lavora}
-            </p>
+            <CollegaPensa k={k} dimensione={44} frase={avanzamento ?? undefined} dettaglio={avanzamento ? undefined : lavora} />
           </div>
         ) : (
           <div className="battuta battuta-agente battuta-turno">
@@ -340,6 +345,7 @@ function Conversazione({ k }: { k: AgentKey }) {
             }}
             aria-label={`Messaggio per ${def.persona.nome}`}
           />
+          <Dettatura onTesto={(t) => setTesto((b) => aggiungiDettato(b, t))} />
           <button type="submit" className="bottone bottone-primario" disabled={!testo.trim() || Boolean(occupato)}>
             {modoSpeciale && turno.speciale ? turno.speciale.invio : 'Invia'}
           </button>

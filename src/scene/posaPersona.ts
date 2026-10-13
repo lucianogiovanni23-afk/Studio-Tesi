@@ -159,6 +159,8 @@ export interface StatoPersona {
   salutoDa: number
   /** Rotazione del busto verso la telecamera durante il saluto (rad). */
   girata: number
+  /** 0..1: quanto si è girata verso di te mentre ti parla (busto un po', testa del tutto). */
+  rivolta: number
   sorriso: number
 }
 
@@ -269,7 +271,7 @@ export class RigPersona {
     this.gira(s.get('Spine2'), 'x', -respiro * 0.01)
     this.gira(s.get('L_Clavicle'), 'z', respiro * 0.012)
     this.gira(s.get('R_Clavicle'), 'z', -respiro * 0.012)
-    const busto = st.girata * st.saluto
+    const busto = st.girata * Math.max(st.saluto, st.rivolta * 0.42)
     this.gira(s.get('Spine1'), 'y', busto * 0.5)
     this.gira(s.get('Spine2'), 'y', busto * 0.5)
     // un po' di dondolio mentre scrive

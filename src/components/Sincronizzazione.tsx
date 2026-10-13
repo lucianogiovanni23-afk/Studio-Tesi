@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { attivaCopieGitHub, copiaDelGiorno, elencoCopieGitHub, ripristinaCopiaGitHub, useCopieGitHub } from '../io/copieGitHub'
+import { dataDi, giornoDi } from '../domain/ritmo'
 import { collega, nomeDispositivo, preposizione, scollega, sincronizza, useSync, type StatoSync } from '../io/sincronizzazione'
 import { Icona } from '../ui/Icona'
 import { Info } from '../ui/Info'
@@ -72,6 +74,129 @@ export function AvvisoSincronizzazione() {
     )
   }
   return null
+}
+
+/** "oggi alle 9:12", "ieri alle 18:40", "il 3 ottobre alle 9:12". */
+function quandoRelativo(iso: string): string {
+  const d = new Date(iso)
+  const ora = d.toLocaleTimeString('it-IT', { hour: 'numeric', minute: '2-digit' })
+  const giorno = giornoDi(d)
+  const oggi = giornoDi()
+  const ieri = giornoDi(new Date(Date.now() - 86_400_000))
+  if (giorno === oggi) return `oggi alle ${ora}`
+  if (giorno === ieri) return `ieri alle ${ora}`
+  return `il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })} alle ${ora}`
+}
+
+function giornoCopia(giorno: string): string {
+  if (giorno === giornoDi()) return 'Oggi'
+  if (giorno === giornoDi(new Date(Date.now() - 86_400_000))) return 'Ieri'
+  const d = dataDi(giorno)
+  const anno = d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' as const } : {}
+  const testo = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', ...anno })
+  return testo.charAt(0).toUpperCase() + testo.slice(1)
+}
+
+const QUANTE_SUBITO = 5
+
+/** Copie datate su GitHub: interruttore, ultima copia ed elenco con "Ripristina". */
+function CopieGitHub() {
+  const { attive, ultima, giorno, lavoro, messaggio, errore, elenco } = useCopieGitHub()
+  const [tutte, setTutte] = useState(false)
+  const [esito, setEsito] = useState<{ tono: 'ok' | 'errore'; testo: string } | null>(null)
+  const [carico, setCarico] = useState(true)
+
+  useEffect(() => {
+    let attivo = true
+    elencoCopieGitHub()
+      .catch(() => [])
+      .finally(() => attivo && setCarico(false))
+    return () => {
+      attivo = false
+    }
+  }, [])
+
+  const ultimaTesto = ultima
+    ? `Ultima copia: ${quandoRelativo(ultima)}.`
+    : giorno
+      ? `Ultima copia: ${giornoCopia(giorno).toLowerCase()} (da un altro dispositivo).`
+      : elenco?.length
+        ? `Ultima copia: ${giornoCopia(elenco[0].giorno).toLowerCase()}.`
+        : 'Ancora nessuna copia su GitHub.'
+  const mostrate = elenco ? (tutte ? elenco : elenco.slice(0, QUANTE_SUBITO)) : []
+
+  return (
+    <div className="imp-copie-github">
+      <h3>
+        <Icona nome="versioni" dimensione={18} /> Copia di sicurezza su GitHub
+        <Info>
+          Una volta al giorno, la prima volta che apri l'app, salvo una copia datata della tesi nel tuo repository privato
+          (cartella <code>studio-tesi/copie</code>). Tengo le ultime 30. Il testo delle lezioni non c'è: resta quello che hai.
+          Se torni a una copia, prima salvo quello che hai adesso fra le copie di questo browser.
+        </Info>
+      </h3>
+      <label className="interruttore imp-interruttore imp-riga-interruttore">
+        <span>Una copia al giorno, in automatico</span>
+        <input type="checkbox" checked={attive} onChange={(e) => attivaCopieGitHub(e.target.checked)} />
+      </label>
+      <p className={errore ? 'allerta allerta-errore' : 'nota nota-ok'} role="status">
+        {lavoro ? 'Faccio la copia…' : errore ? `L'ultima copia non è riuscita: ${messaggio}` : attive ? ultimaTesto : 'Copie automatiche spente su questo dispositivo.'}
+      </p>
+      <div className="riga-editor">
+        <button
+          type="button"
+          className="bottone bottone-secondario"
+          disabled={lavoro}
+          onClick={async () => {
+            setEsito(null)
+            const fatta = await copiaDelGiorno(true)
+            if (fatta) setEsito({ tono: 'ok', testo: 'Copia di oggi salvata su GitHub.' })
+          }}
+        >
+          <Icona nome="copia" dimensione={16} /> Fai una copia adesso
+        </button>
+      </div>
+
+      {carico && !elenco && <p className="nota">Guardo le copie su GitHub…</p>}
+      {elenco && elenco.length > 0 && (
+        <ul className="imp-copie-github-elenco" aria-label="Copie su GitHub">
+          {mostrate.map((c) => (
+            <li key={c.sha}>
+              <span>
+                <strong>{giornoCopia(c.giorno)}</strong>
+                <span className="nota"> · {Math.max(1, Math.round(c.dimensione / 1024)).toLocaleString('it-IT')} KB</span>
+              </span>
+              <Conferma
+                classe="bottone bottone-piccolo bottone-secondario"
+                etichetta="Ripristina"
+                domanda="Torni a questa copia? Prima salvo quello che hai adesso."
+                conferma="Ripristina"
+                onConferma={async () => {
+                  setEsito(null)
+                  try {
+                    await ripristinaCopiaGitHub(c)
+                    setEsito({ tono: 'ok', testo: `Fatto, sei tornato alla copia di ${giornoCopia(c.giorno).toLowerCase()}. Quello che avevi prima è fra le copie di sicurezza (scheda Sicurezza).` })
+                  } catch (err) {
+                    setEsito({ tono: 'errore', testo: err instanceof Error ? err.message : 'Non sono riuscito a tornare a quella copia.' })
+                  }
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      {elenco && elenco.length > QUANTE_SUBITO && (
+        <button type="button" className="bottone bottone-vuoto bottone-piccolo" onClick={() => setTutte((t) => !t)}>
+          {tutte ? 'Mostra meno' : `Mostra tutte (${elenco.length})`}
+        </button>
+      )}
+      {esito && (
+        <p className={esito.tono === 'ok' ? 'nota nota-ok' : 'allerta allerta-errore'} role="status">
+          {esito.testo}
+        </p>
+      )}
+    </div>
+  )
 }
 
 /** Pannello delle Impostazioni: collegamento al repository privato e stato. */
@@ -165,6 +290,7 @@ export function PannelloSincronizzazione() {
               onConferma={scollega}
             />
           </div>
+          <CopieGitHub />
         </>
       ) : (
         <>

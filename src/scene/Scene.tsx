@@ -9,28 +9,59 @@ import { estrazioneInCorso, useStudio } from '../store'
 import type { AgentKey } from '../types'
 import { Sala } from './Arredamento'
 import { Scrivania } from './Scrivania'
-import { CameraRig, type ControlliOrbita } from './CameraRig'
+import { CameraRig, type ControlliOrbita, type Ingresso } from './CameraRig'
 import { CAMERA_BERSAGLIO, CAMERA_CASA, DIETRO_SCRIVANIA, POSTAZIONI } from './layout'
 import { Persona3D } from './Persona3D'
 import { ContestoEtichette, ContestoNotte, ContestoQualita } from './qualita'
 import { Etichetta } from './Etichetta'
-import { Effetti } from './Effetti'
+import { EVENTO_PRONTO, Effetti } from './Effetti'
+import { segnalaIngresso } from './sguardi'
+import { introDaSaltare, passaggio } from '../ufficio/passaggio'
 import { useNotteScena } from './notte'
 import { AmbienteCielo, LuceVetrata } from './esterno/AmbienteCielo'
 import { Icona } from '../ui/Icona'
 import '../styles/scena.css'
 
-const CHIAVE_INTRO = 'studio-tesi.intro-vista'
-
-/** L'intro parte solo alla prima visita e mai con meno animazioni. */
-function introDaFare(ridotto: boolean): boolean {
-  if (ridotto) return false
-  try {
-    return localStorage.getItem(CHIAVE_INTRO) === null
-  } catch {
-    return false
-  }
+/** A ogni apertura dell'app si entra dalla porta a vetri; mai con meno animazioni. */
+function scegliIngresso(ridotto: boolean): Ingresso {
+  if (ridotto) return null
+  if (!passaggio.introFatta && !introDaSaltare()) return { tipo: 'intro' }
+  return null
 }
+
+/**
+ * La sala si disegna solo quando la guardi: si ferma se l'app va in
+ * background (scheda nascosta) o se il canvas esce dallo schermo.
+ */
+function useVisibile(el: React.RefObject<HTMLElement | null>): boolean {
+  const [nascosta, setNascosta] = useState(() => typeof document !== 'undefined' && document.hidden)
+  const [fuori, setFuori] = useState(false)
+  useEffect(() => {
+    const cambia = () => setNascosta(document.hidden)
+    document.addEventListener('visibilitychange', cambia)
+    return () => document.removeEventListener('visibilitychange', cambia)
+  }, [])
+  useEffect(() => {
+    const nodo = el.current
+    if (!nodo || typeof IntersectionObserver === 'undefined') return
+    const oss = new IntersectionObserver(([v]) => setFuori(!v.isIntersecting))
+    oss.observe(nodo)
+    return () => oss.disconnect()
+  }, [el])
+  return !nascosta && !fuori
+}
+
+/** Tornando visibile ridisegna subito (serve con frameloop "demand"). */
+function Risveglio({ visibile }: { visibile: boolean }) {
+  const invalida = useThree((s) => s.invalidate)
+  useEffect(() => {
+    if (visibile) invalida()
+  }, [visibile, invalida])
+  return null
+}
+
+/** Dopo che la scena è pronta (evento di Effetti), il tempo perché la schermata di caricamento sparisca. */
+const ATTESA_CARICAMENTO = 620
 
 const STATO = {
   riposo: '',
@@ -180,6 +211,8 @@ function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
 export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ridotta'; spazioDestra?: number }) {
   const completa = qualita === 'completa'
   const controlli = useRef<ControlliOrbita | null>(null)
+  const contenitore = useRef<HTMLDivElement>(null)
+  const visibile = useVisibile(contenitore)
   const modo = useModoUso()
   const fermo = useMovimentoRidotto()
   const scelto = useStudio((s) => s.agenteUfficio)
@@ -191,16 +224,46 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
   const [token, setToken] = useState(0)
   const [inquadraturaPrima, setInquadraturaPrima] = useState(inquadratura)
   const { notte, preferenza, alterna } = useNotteScena()
-  const [intro, setIntro] = useState(() => introDaFare(fermo))
-  const fineIntro = useCallback(() => setIntro(false), [])
+  const [ingresso] = useState(() => scegliIngresso(fermo))
+  const [intro, setIntro] = useState(ingresso !== null)
+  const [partenza, setPartenza] = useState(false)
+  const [salta, setSalta] = useState(0)
+  const fineIntro = useCallback(() => {
+    setIntro(false)
+    segnalaIngresso()
+  }, [])
 
+  // L'entrata vale per questa apertura: tornando da una pagina non si ripete.
+  useEffect(() => {
+    passaggio.introFatta = true
+  }, [])
+
+  // Via all'entrata quando la scena è pronta e la schermata di caricamento è sparita;
+  // senza entrata, i colleghi alzano lo sguardo appena la sala si vede.
+  useEffect(() => {
+    let t = 0
+    const via = () => {
+      t = window.setTimeout(() => {
+        if (ingresso) setPartenza(true)
+        else segnalaIngresso()
+      }, ATTESA_CARICAMENTO)
+    }
+    if (document.documentElement.dataset.ufficioPronto === '1') via()
+    else window.addEventListener(EVENTO_PRONTO, via, { once: true })
+    return () => {
+      window.removeEventListener(EVENTO_PRONTO, via)
+      window.clearTimeout(t)
+    }
+  }, [ingresso])
+
+  // Tocco, clic o Esc saltano l'entrata.
   useEffect(() => {
     if (!intro) return
-    try {
-      localStorage.setItem(CHIAVE_INTRO, '1')
-    } catch {
-      /* storage non disponibile */
+    const tasto = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSalta((x) => x + 1)
     }
+    window.addEventListener('keydown', tasto)
+    return () => window.removeEventListener('keydown', tasto)
   }, [intro])
 
   if (inquadraturaPrima !== inquadratura) {
@@ -213,10 +276,10 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
     document.body.style.cursor = ''
   }, [])
 
-  const frameloop = estrazione ? 'never' : fermo ? 'demand' : 'always'
+  const frameloop = estrazione || !visibile ? 'never' : fermo ? 'demand' : 'always'
 
   return (
-    <div className="scena scena-ufficio">
+    <div className="scena scena-ufficio" ref={contenitore}>
       <Canvas
         frameloop={frameloop}
         shadows={completa ? 'soft' : false}
@@ -236,14 +299,15 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
                   <Postazione key={a.key} k={a.key} scelta={scelto === a.key} primoPiano={vista === a.key} onScegli={scegli} />
                 ))}
                 {completa && <ContactShadows position={[0, 0.01, 0]} scale={30} resolution={1024} blur={2.4} opacity={notte ? 0.5 : 0.38} far={3} frames={1} />}
-                <Effetti qualita={qualita} notte={notte} fuoco={vista} />
+                <Effetti qualita={qualita} notte={notte} />
               </Suspense>
             </ContestoEtichette.Provider>
           </ContestoNotte.Provider>
         </ContestoQualita.Provider>
 
         <CentroOttico spostamento={spazioDestra} />
-        <CameraRig controlli={controlli} fuoco={vista} token={token} intro={intro} onFineIntro={fineIntro} />
+        <Risveglio visibile={visibile} />
+        <CameraRig controlli={controlli} fuoco={vista} token={token} ingresso={ingresso} partenza={partenza} salta={salta} onFineIntro={fineIntro} />
         {modo === 'computer' && (
           <OrbitControls
             ref={controlli as never}
@@ -259,6 +323,16 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
           />
         )}
       </Canvas>
+
+      {intro && partenza && (
+        <button type="button" className="salta-intro" style={{ left: `calc((100% - ${spazioDestra}px) / 2)` }} onClick={() => setSalta((x) => x + 1)}>
+          Tocca per saltare
+        </button>
+      )}
+      {intro && (
+        // durante l'entrata un tocco ovunque sulla sala la salta
+        <div className="salta-velo" aria-hidden onPointerDown={() => setSalta((x) => x + 1)} />
+      )}
 
       <div className="scena-comandi" role="toolbar" aria-label="Inquadrature">
         <button

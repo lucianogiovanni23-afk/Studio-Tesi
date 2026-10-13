@@ -959,3 +959,122 @@
     transition: none;
   }
 }
+
+/* --- obiettivo: pagine o parole, consegna ---------------------------- */
+.imp-misura {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 0 14px;
+  padding: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--inchiostro) 6%, var(--carta));
+  border: 1px solid var(--bordo);
+}
+
+.imp-misura-scelta {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--inchiostro-2);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.imp-misura-attiva {
+  background: var(--scheda-attiva);
+  color: var(--oliva-scuro);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.imp-misura-scelta:focus-visible {
+  outline: 2px solid var(--oliva);
+  outline-offset: 2px;
+}
+
+.imp-consegna {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 4px 12px;
+  margin-top: 14px;
+}
+
+.imp-consegna .campo-blocco {
+  flex: 1 1 200px;
+  margin-bottom: 0;
+}
+
+/* --- frontespizio ----------------------------------------------------- */
+.imp-frontespizio {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px;
+}
+
+.imp-frontespizio .campo-blocco {
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.imp-frontespizio .imp-campo-largo {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .imp-frontespizio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --- copie su GitHub --------------------------------------------------- */
+.imp-copie-github {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--bordo);
+}
+
+.imp-copie-github h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.imp-copie-github .imp-riga-interruttore {
+  margin: 4px 0 6px;
+}
+
+.imp-copie-github-elenco {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.imp-copie-github-elenco li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--bordo);
+  background: color-mix(in srgb, var(--carta) 80%, var(--crema));
+}
+
+.imp-copie-github-elenco .nota {
+  margin: 0;
+}
+
+.app.modo-ipad .imp-misura-scelta {
+  min-height: 44px;
+  font-size: 15px;
+}

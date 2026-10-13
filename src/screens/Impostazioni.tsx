@@ -17,7 +17,8 @@ import { useStudio } from '../store'
 import { Icona } from '../ui/Icona'
 import { Info } from '../ui/Info'
 import { impostaSuoni, suoniAccesi, suonoRisposta } from '../ui/suoni'
-import type { ModalitaScena, ModelSlot, ModoUso, StileCitazione, Tema } from '../types'
+import type { Frontespizio, ModalitaScena, ModelSlot, ModoUso, StileCitazione, Tema } from '../types'
+import { frontespizioDi, giornoLeggibile, impostaFrontespizio, impostaObiettivo } from '../domain/ritmo'
 
 /** Riquadro delle impostazioni: icona, titolo, una riga sotto e la "i" per le spiegazioni lunghe. */
 function Carta({
@@ -285,35 +286,150 @@ function Lunghezza() {
   const setObiettivo = useStudio((s) => s.setObiettivo)
   const numero = (v: string, min: number, max: number) => Math.min(max, Math.max(min, Math.round(Number(v) || min)))
   const mille = (n: number) => n.toLocaleString('it-IT')
+  const parole = obiettivo.misura === 'parole'
+  const ppp = obiettivo.parolePerPagina
+  // In parole si scrive il numero di parole; dentro resta sempre il numero di pagine.
+  const daParole = (v: string) => Math.round(numero(v, 10 * ppp, 300 * ppp) / ppp)
 
   return (
     <Carta
       icona="grafico"
-      titolo="Lunghezza della tesi"
-      sotto="Serve a misurare quanto manca."
-      info="300 parole sono circa una pagina Word (Times 12, interlinea 1,5). Se il relatore vuole un altro formato, cambia il numero."
+      titolo="Obiettivo e consegna"
+      sotto="Quanto scrivere e per quando: in Panoramica vedi il ritmo."
+      info="300 parole sono circa una pagina Word (Times 12, interlinea 1,5). Se il relatore vuole un altro formato, cambia il numero. Con la data di consegna la Panoramica ti dice quanto scrivere ogni giorno e se sei in anticipo o in ritardo."
     >
       <div className="imp-obiettivo">
         <span className="imp-obiettivo-numero">
-          {mille(obiettivo.pagineMin * obiettivo.parolePerPagina)}–{mille(obiettivo.pagineMax * obiettivo.parolePerPagina)}
+          {parole
+            ? `${mille(obiettivo.pagineMin * ppp)}–${mille(obiettivo.pagineMax * ppp)}`
+            : `${obiettivo.pagineMin}–${obiettivo.pagineMax}`}
         </span>
-        <span className="imp-obiettivo-unita">parole in tutto</span>
+        <span className="imp-obiettivo-unita">
+          {parole ? `parole (circa ${obiettivo.pagineMin}–${obiettivo.pagineMax} pagine)` : `pagine (circa ${mille(obiettivo.pagineMin * ppp)}–${mille(obiettivo.pagineMax * ppp)} parole)`}
+        </span>
+      </div>
+      <div className="imp-misura" role="radiogroup" aria-label="Conta in">
+        {(['pagine', 'parole'] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={(obiettivo.misura ?? 'pagine') === m}
+            className={`imp-misura-scelta ${(obiettivo.misura ?? 'pagine') === m ? 'imp-misura-attiva' : ''}`}
+            onClick={() => setObiettivo({ misura: m })}
+          >
+            {m === 'pagine' ? 'Conto in pagine' : 'Conto in parole'}
+          </button>
+        ))}
       </div>
       <fieldset className="campi-obiettivo imp-campi-obiettivo">
         <legend className="etichetta imp-nascosto">Lunghezza della tesi</legend>
         <label className="campo-blocco">
-          <span className="etichetta">Pagine, da</span>
-          <input className="campo" type="number" inputMode="numeric" min={10} max={300} value={obiettivo.pagineMin} onChange={(e) => setObiettivo({ pagineMin: numero(e.target.value, 10, 300) })} />
+          <span className="etichetta">{parole ? 'Parole, da' : 'Pagine, da'}</span>
+          <input
+            key={`min-${parole}-${obiettivo.pagineMin}-${ppp}`}
+            className="campo"
+            type="number"
+            inputMode="numeric"
+            min={parole ? 10 * ppp : 10}
+            max={parole ? 300 * ppp : 300}
+            step={parole ? 100 : 1}
+            defaultValue={parole ? obiettivo.pagineMin * ppp : obiettivo.pagineMin}
+            onBlur={(e) => {
+              const pagineMin = parole ? daParole(e.target.value) : numero(e.target.value, 10, 300)
+              setObiettivo({ pagineMin, pagineMax: Math.max(pagineMin, obiettivo.pagineMax) })
+            }}
+          />
         </label>
         <label className="campo-blocco">
           <span className="etichetta">a</span>
-          <input className="campo" type="number" inputMode="numeric" min={10} max={300} value={obiettivo.pagineMax} onChange={(e) => setObiettivo({ pagineMax: Math.max(obiettivo.pagineMin, numero(e.target.value, 10, 300)) })} />
+          <input
+            key={`max-${parole}-${obiettivo.pagineMax}-${ppp}`}
+            className="campo"
+            type="number"
+            inputMode="numeric"
+            min={parole ? 10 * ppp : 10}
+            max={parole ? 300 * ppp : 300}
+            step={parole ? 100 : 1}
+            defaultValue={parole ? obiettivo.pagineMax * ppp : obiettivo.pagineMax}
+            onBlur={(e) => setObiettivo({ pagineMax: Math.max(obiettivo.pagineMin, parole ? daParole(e.target.value) : numero(e.target.value, 10, 300)) })}
+          />
         </label>
         <label className="campo-blocco">
           <span className="etichetta">Parole per pagina</span>
-          <input className="campo" type="number" inputMode="numeric" min={150} max={600} value={obiettivo.parolePerPagina} onChange={(e) => setObiettivo({ parolePerPagina: numero(e.target.value, 150, 600) })} />
+          <input className="campo" type="number" inputMode="numeric" min={150} max={600} value={ppp} onChange={(e) => setObiettivo({ parolePerPagina: numero(e.target.value, 150, 600) })} />
         </label>
       </fieldset>
+      <div className="imp-consegna">
+        <label className="campo-blocco">
+          <span className="etichetta">Data di consegna</span>
+          <input
+            className="campo"
+            type="date"
+            value={obiettivo.consegna ?? ''}
+            onChange={(e) => impostaObiettivo({ consegna: e.target.value || null })}
+          />
+        </label>
+        {obiettivo.consegna && (
+          <button type="button" className="bottone bottone-vuoto" onClick={() => impostaObiettivo({ consegna: null })}>
+            <Icona nome="chiudi" dimensione={16} /> Togli la data
+          </button>
+        )}
+      </div>
+      <p className="nota imp-piccola">
+        {obiettivo.consegna
+          ? `Consegna il ${giornoLeggibile(obiettivo.consegna, true)}. Il ritmo parte dal giorno in cui hai scelto la data.`
+          : 'Senza data non posso dirti quanto scrivere al giorno.'}
+      </p>
+    </Carta>
+  )
+}
+
+const CAMPI_FRONTESPIZIO: { chiave: Exclude<keyof Frontespizio, 'carattere'>; nome: string; esempio: string }[] = [
+  { chiave: 'universita', nome: 'Università', esempio: 'Università della Calabria' },
+  { chiave: 'dipartimento', nome: 'Dipartimento', esempio: 'Dipartimento di Scienze aziendali e giuridiche' },
+  { chiave: 'corsoDiLaurea', nome: 'Corso di laurea', esempio: 'Corso di laurea in Economia aziendale' },
+  { chiave: 'candidato', nome: 'Candidato (nome e cognome)', esempio: 'Mario Rossi' },
+  { chiave: 'matricola', nome: 'Matricola', esempio: '123456' },
+  { chiave: 'relatore', nome: 'Relatore', esempio: 'Prof. Giuseppe Verdi' },
+  { chiave: 'correlatore', nome: 'Correlatore (se c\'è)', esempio: '' },
+  { chiave: 'annoAccademico', nome: 'Anno accademico', esempio: '2026/2027' },
+]
+
+function DatiFrontespizio() {
+  const salvato = useStudio((s) => s.progetto.frontespizio)
+  const f = frontespizioDi({ frontespizio: salvato })
+  return (
+    <Carta
+      icona="word"
+      titolo="Frontespizio e file Word"
+      sotto="Vanno nella prima pagina della tesi in Word."
+      info="Il file Word ha il frontespizio, l'indice automatico, i numeri di pagina in basso, margini da tesi (3 cm a sinistra per la rilegatura, 2,5 cm sugli altri lati), carattere 12 con interlinea 1,5, testo giustificato, un capitolo per pagina e la bibliografia in fondo. Quando apri il file, Word ti chiede se aggiornare i campi: rispondi Sì, così l'indice prende i numeri di pagina giusti."
+    >
+      <div className="imp-frontespizio">
+        {CAMPI_FRONTESPIZIO.map((c) => (
+          <label key={c.chiave} className={`campo-blocco ${c.chiave === 'universita' || c.chiave === 'dipartimento' || c.chiave === 'corsoDiLaurea' ? 'imp-campo-largo' : ''}`}>
+            <span className="etichetta">{c.nome}</span>
+            <input
+              className="campo"
+              value={f[c.chiave]}
+              placeholder={c.esempio}
+              onChange={(e) => impostaFrontespizio({ [c.chiave]: e.target.value })}
+            />
+          </label>
+        ))}
+        <label className="campo-blocco">
+          <span className="etichetta">Carattere</span>
+          <select className="campo" value={f.carattere} onChange={(e) => impostaFrontespizio({ carattere: e.target.value as Frontespizio['carattere'] })}>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Garamond">Garamond</option>
+          </select>
+        </label>
+      </div>
+      <p className="imp-esempio">
+        <Icona nome="info" dimensione={16} />
+        <span>Quando apri il file, Word ti chiede di aggiornare i campi: rispondi Sì e l'indice si completa con i numeri di pagina.</span>
+      </p>
     </Carta>
   )
 }
@@ -385,6 +501,19 @@ function Suoni() {
         />
       </label>
     </div>
+  )
+}
+
+function AppSullIpad() {
+  return (
+    <Carta icona="dispositivi" titolo="Usala come un'app sull'iPad" sotto="Un'icona sulla schermata Home, a tutto schermo.">
+      <p className="nota imp-spiega">
+        Apri il sito in Safari, tocca Condividi › Aggiungi alla schermata Home, poi Aggiungi. Dopo la prima apertura funziona
+        anche senza internet: l'ufficio 3D, i ritratti e le pagine restano sul dispositivo. Internet serve solo per Claude, la
+        ricerca delle fonti e la sincronizzazione con GitHub. Quando c'è una versione nuova compare in alto «C'è una versione
+        nuova · Aggiorna»: toccalo quando hai finito di scrivere.
+      </p>
+    </Carta>
   )
 }
 
@@ -677,7 +806,7 @@ type IdScheda = 'account' | 'tesi' | 'sicurezza' | 'avanzate'
 
 const SCHEDE: { id: IdScheda; nome: string; icona: string; sotto: string }[] = [
   { id: 'account', nome: 'Account e dispositivi', icona: 'persona', sotto: 'Chiave, sincronizzazione, tema' },
-  { id: 'tesi', nome: 'La tesi', icona: 'libro', sotto: 'Titolo, lunghezza, citazioni' },
+  { id: 'tesi', nome: 'La tesi', icona: 'libro', sotto: 'Titolo, consegna, frontespizio' },
   { id: 'sicurezza', nome: 'Sicurezza', icona: 'scudo', sotto: 'File, copie, ripristino' },
   { id: 'avanzate', nome: 'Avanzate', icona: 'ingranaggio', sotto: 'Modelli, costi, prove' },
 ]
@@ -780,6 +909,7 @@ export function Impostazioni() {
           <div className="imp-colonna">
             <Chiave />
             <Dispositivo />
+            <AppSullIpad />
           </div>
           <div className="imp-colonna">
             <PannelloSincronizzazione />
@@ -791,6 +921,7 @@ export function Impostazioni() {
         <>
           <div className="imp-colonna">
             <TitoloDomanda />
+            <DatiFrontespizio />
           </div>
           <div className="imp-colonna">
             <Lunghezza />

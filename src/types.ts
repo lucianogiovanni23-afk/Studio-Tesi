@@ -379,6 +379,14 @@ export interface Progetto {
   budgetMensile: number | null
   /** Lunghezza attesa della tesi, in pagine Word (Times 12, interlinea 1,5). */
   obiettivo: ObiettivoPagine
+  /** Parole scritte giorno per giorno (una voce al giorno, l'ultimo valore del giorno): disegna il grafico dei progressi. */
+  diario?: GiornoScritto[]
+  /** Dati del frontespizio per il file Word. */
+  frontespizio?: Frontespizio
+  /** Note del relatore trasformate in liste di cose da fare, una per invio. */
+  correzioni?: NoteCorrezioni[]
+  /** Preparazione alla discussione: domande probabili e scaletta delle slide. */
+  discussione?: PreparazioneDiscussione | null
   creatoIl: string
   salvatoSuFileIl: string | null
 }
@@ -396,6 +404,32 @@ export interface ObiettivoPagine {
   pagineMin: number
   pagineMax: number
   parolePerPagina: number
+  /** Data di consegna, "AAAA-MM-GG"; null o assente = nessuna scadenza. */
+  consegna?: string | null
+  /** Da dove parte il ritmo ideale: il giorno in cui hai fissato la consegna e le parole che avevi. */
+  consegnaDa?: { giorno: string; parole: number } | null
+  /** Come preferisci vedere l'obiettivo: in pagine o in parole. */
+  misura?: 'pagine' | 'parole'
+}
+
+/** Una voce del diario dei progressi. */
+export interface GiornoScritto {
+  /** "AAAA-MM-GG", ora locale. */
+  giorno: string
+  parole: number
+}
+
+export interface Frontespizio {
+  universita: string
+  dipartimento: string
+  corsoDiLaurea: string
+  candidato: string
+  matricola: string
+  relatore: string
+  correlatore: string
+  annoAccademico: string
+  /** Carattere del file Word. */
+  carattere: 'Times New Roman' | 'Garamond'
 }
 
 export interface Preferenze {
@@ -424,4 +458,64 @@ export type Schermata =
 export interface Consegna<T> {
   passaggi: string[]
   risultato: T
+}
+
+// ---------------------------------------------------------------------------
+// Correzioni del relatore e preparazione alla discussione
+// ---------------------------------------------------------------------------
+
+/** Una cosa concreta da fare, ricavata dalle note del relatore. */
+export interface CompitoCorrezione {
+  id: string
+  /** Cosa fare, in una frase che inizia con un verbo. */
+  compito: string
+  /** Le parole del relatore da cui nasce. */
+  nota: string
+  capitoloId: string | null
+  sezioneId: string | null
+  /** Paragrafo della sezione (da 1), se il compito riguarda un paragrafo preciso. */
+  paragrafo: number | null
+  /** Inizio del paragrafo, per ritrovarlo anche se nel frattempo il testo è cambiato. */
+  passo: string
+  fatto: boolean
+  fattoIl?: string
+}
+
+/** Un invio di note del relatore con la sua lista di correzioni. */
+export interface NoteCorrezioni {
+  id: string
+  data: string
+  /** Il testo delle note, così come l'hai incollato. */
+  testo: string
+  /** Da dove viene (per esempio il nome del file caricato). */
+  origine: string
+  compiti: CompitoCorrezione[]
+  /** Compiti che il Revisore aveva legato a un paragrafo che non esiste: tenuti ma legati alla sezione. */
+  spostati: number
+}
+
+export interface DomandaDiscussione {
+  id: string
+  domanda: string
+  risposta: string
+  /** Sezione della tesi su cui si basa la risposta, se c'è. */
+  capitoloId: string | null
+  sezioneId: string | null
+  /** true quando hai provato a rispondere e ti senti pronto. */
+  pronta: boolean
+}
+
+export interface SlideDiscussione {
+  titolo: string
+  punti: string[]
+  /** Cosa mostrare: grafico, immagine o tabella. */
+  immagine: string
+  /** Cosa dire a voce, in breve. */
+  aVoce: string
+}
+
+export interface PreparazioneDiscussione {
+  data: string
+  domande: DomandaDiscussione[]
+  slide: SlideDiscussione[]
 }

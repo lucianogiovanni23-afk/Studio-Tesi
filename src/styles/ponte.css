@@ -1,0 +1,146 @@
+/* ================================================================== */
+/* Ponte con Claude.ai: copia e apri in un tocco, risposta ritrovata.  */
+/* ================================================================== */
+
+.ponte {
+  --colore-agente: var(--oliva);
+}
+
+.ponte-testa {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ponte-testa > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.ponte-testa h2 {
+  margin: 2px 0 0;
+}
+
+.ponte-codice {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px dashed color-mix(in srgb, var(--colore-agente) 55%, var(--bordo));
+  color: var(--inchiostro-2);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.ponte-copia-apri {
+  min-height: 48px;
+  padding-inline: 20px;
+  font-size: 1.02rem;
+}
+
+.ponte-ritorno {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--bordo-cielo);
+  background: var(--cielo-chiaro);
+}
+
+.ponte-ritorno p {
+  margin: 0;
+}
+
+.ponte-incolla-grande {
+  min-height: 56px;
+  padding-inline: 26px;
+  font-size: 1.1rem;
+  border-radius: 16px;
+}
+
+.ponte-trovata {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  margin: 0 0 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--bordo-verde);
+  background: var(--verde-chiaro);
+}
+
+.ponte-trovata-icona {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--verde-ok);
+}
+
+.ponte-trovata-testo {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ponte-trovata-testo strong {
+  font-size: 1.05rem;
+}
+
+.ponte-anteprima {
+  display: block;
+  overflow: hidden;
+  max-height: 3.2em;
+  color: var(--inchiostro-2);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  quotes: none;
+  word-break: break-word;
+}
+
+.ponte-trovata-azioni {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ponte-trovata-azioni .bottone {
+  min-width: 96px;
+  min-height: 44px;
+}
+
+.ponte-piede {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ponte-trovata,
+  .ponte-ritorno {
+    animation: ponte-entra 0.28s ease both;
+  }
+}
+
+@keyframes ponte-entra {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.app.modo-ipad .ponte-codice,
+.app.modo-ipad .ponte-anteprima {
+  font-size: 15px;
+}
+
+.app.modo-ipad .ponte .bottone-piccolo {
+  min-height: 44px;
+}

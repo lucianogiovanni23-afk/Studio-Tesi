@@ -306,6 +306,35 @@ l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
   il mare non fa lo specchio. Con "riduci movimento" vento, uccelli e nuvole stanno fermi.
 - Crediti delle risorse in `public/assets/CREDITS.md`.
 
+## Strumenti per finire la tesi
+
+- **Ponte con Claude.ai in un tocco**: "Copia e apri Claude.ai" copia la richiesta (con un codice tipo
+  `ST-C3RQ`) e apre Claude.ai. Quando torni, l'app riconosce la risposta negli appunti e chiede
+  "Ho trovato la risposta di Claude: la uso?". Su Safari basta un tocco su "Incolla la risposta".
+- **Collega che pensa**: mentre aspetti, il volto del collega respira con una frase su cosa sta facendo.
+- **Correzioni del relatore** (Revisione): incolli le note o carichi .txt/.pdf/.docx (anche i commenti
+  a margine) e il revisore le trasforma in cose da fare, paragrafo per paragrafo, da spuntare.
+- **Frasi simili alle fonti** (Revisione): controllo gratuito e senza internet a sequenze di 8 parole
+  contro lezioni e fonti, con percentuale e passaggio originale. Non sostituisce l'antiplagio
+  dell'università.
+- **Discussione** (Revisione): 10-15 domande probabili della commissione con risposta breve e scaletta
+  delle slide; si scaricano in .md o .txt.
+- **Consegna e ritmo** (Panoramica): data di consegna, giorni che mancano, quanto scrivere oggi, se sei
+  in anticipo o in ritardo. **I tuoi progressi**: grafico delle pagine giorno per giorno con la linea del
+  ritmo giusto.
+- **Word pronto da consegnare**: frontespizio (dati in Impostazioni › La tesi), indice automatico, numeri
+  di pagina, margini 2,5 cm (3 a sinistra), 12 pt, interlinea 1,5, capitoli su pagina nuova.
+- **Dettatura a voce** in Scrittura e nelle chat (it-IT; "virgola", "punto", "a capo").
+- **Copia automatica su GitHub** una volta al giorno in `studio-tesi/copie/AAAA-MM-GG.json`, ultime 30,
+  ripristino da Impostazioni.
+- **Ufficio**: niente sfocatura sui colleghi, chi ti parla si gira verso di te, gli altri alzano lo
+  sguardo quando entri; entrata dalla porta a ogni apertura (tocca per saltare); fuori la stagione vera
+  (raccolta con reti e cassette in autunno, ulivi in fiore in primavera); la scena si ferma quando non
+  la guardi.
+- **Più veloce e installabile**: ogni pagina si carica solo quando serve (primo caricamento da 218 a
+  95 kB compressi); app installabile sull'iPad (Condividi › Aggiungi alla schermata Home) che funziona
+  anche senza internet, con avviso "C'è una versione nuova · Aggiorna".
+
 ## Interfaccia: un percorso in quattro passi
 
 - **Menu**: Inizio · 1 Corso · 2 Fonti · 3 Scrittura · 4 Revisione · Chiedi, con Guida e
@@ -444,7 +473,7 @@ copia "Prima del ripristino", le quattro schede delle Impostazioni, il pulsante 
 cassetto dell'indice, il menu dello scrittore, il cassetto di una fonte, il giorno/notte
 dell'ufficio e nessuno scorrimento orizzontale su iPhone in 21 viste. Il collaudo ha trovato due
 problemi, corretti: misure da iPad (tocchi 44 px, testo 15 px) nei componenti nuovi e la conferma
-dopo il ripristino che non si vedeva. Passano tutti: 409 controlli in 12 collaudi.
+dopo il ripristino che non si vedeva. Passano tutti: 409 controlli in 12 collaudi. Dopo le nuove funzioni (ponte in un tocco, correzioni, frasi simili, discussione, consegna e ritmo, Word, dettatura, copie su GitHub, app installabile) i collaudi sono saliti a 507 controlli, tutti verdi.
 
 ```bash
 npm install

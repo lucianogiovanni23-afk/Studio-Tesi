@@ -1,0 +1,128 @@
+/* ================================================================== */
+/* Dettatura a voce: bottone col microfono e pallino rosso che pulsa   */
+/* ================================================================== */
+
+.dettatura {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dettatura-bottone {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 42px;
+  height: 42px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--inchiostro-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dettatura-bottone:hover {
+  background: color-mix(in srgb, var(--oliva) 12%, transparent);
+  color: var(--oliva-scuro);
+}
+
+.dettatura-bottone:focus-visible {
+  outline: 2px solid var(--oliva);
+  outline-offset: 2px;
+}
+
+.dettatura-attiva,
+.dettatura-attiva:hover {
+  background: var(--rosso-chiaro);
+  color: var(--rosso);
+}
+
+.dettatura-pallino {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e0362c;
+  box-shadow: 0 0 0 2px var(--carta);
+}
+
+.dettatura-pallino-fermo {
+  position: static;
+  flex: none;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dettatura-pallino {
+    animation: dettatura-pulsa 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes dettatura-pulsa {
+  0% {
+    box-shadow: 0 0 0 2px var(--carta), 0 0 0 2px rgba(224, 54, 44, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 2px var(--carta), 0 0 0 9px rgba(224, 54, 44, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 2px var(--carta), 0 0 0 2px rgba(224, 54, 44, 0);
+  }
+}
+
+.dettatura-stato {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--rosso-chiaro) 55%, var(--carta));
+  border: 1px solid color-mix(in srgb, var(--bordo-rosso) 60%, transparent);
+  color: var(--inchiostro-2);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.dettatura-stato .dettatura-pallino-fermo {
+  margin-top: 5px;
+}
+
+.dettatura-provvisorio {
+  color: var(--inchiostro);
+  font-style: italic;
+}
+
+.dettatura-problema {
+  background: var(--ambra-chiaro);
+  border-color: var(--bordo-ambra);
+  color: var(--testo-ambra);
+}
+
+/* nella chat il riquadro sta sopra il campo, senza spostare niente */
+.dettatura-stato-flottante {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 5;
+  width: min(320px, 80vw);
+  margin: 0;
+  box-shadow: var(--ombra);
+}
+
+.app.modo-ipad .dettatura-bottone {
+  min-width: 44px;
+  height: 44px;
+}
+
+.app.modo-ipad .dettatura-stato {
+  font-size: 15px;
+}

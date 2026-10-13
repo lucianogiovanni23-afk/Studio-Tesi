@@ -13,13 +13,13 @@ import { logOk, sorveglia } from './supervisor'
 /** Oltre questa lunghezza la tesi viene mandata al Revisore a pezzi di capitolo: per ora si ferma con un avviso. */
 const MAX_CARATTERI_TESI = 400_000
 
-interface Posto {
+export interface Posto {
   cap: Capitolo
   sez: Sezione
   etichetta: string
 }
 
-function posti(capitoloId: string | null): Posto[] {
+export function posti(capitoloId: string | null): Posto[] {
   const p = useStudio.getState().progetto
   return p.capitoli.flatMap((c, i) =>
     capitoloId && c.id !== capitoloId ? [] : c.sezioni.map((s, j) => ({ cap: c, sez: s, etichetta: `${i + 1}.${j + 1}` })),
@@ -27,7 +27,7 @@ function posti(capitoloId: string | null): Posto[] {
 }
 
 /** Testo con paragrafi etichettati "1.2 §3": il Revisore li indica così e il codice li ritrova. */
-function testoEtichettato(elenco: Posto[]): string {
+export function testoEtichettato(elenco: Posto[]): string {
   return elenco
     .map(({ sez, etichetta }) => {
       const pars = paragrafi(sez.testo)
@@ -36,7 +36,7 @@ function testoEtichettato(elenco: Posto[]): string {
     .join('\n\n')
 }
 
-function contesto(): string {
+export function contesto(): string {
   const p = useStudio.getState().progetto
   return `TITOLO: ${p.titolo}\nDOMANDA DI RICERCA: ${p.domanda}\n\nGLOSSARIO (termini da usare, non le varianti):\n${glossarioTestuale(p)}\n\nQUADRO TEORICO DEL CORSO:\n${quadroTestuale(p.quadro)}`
 }

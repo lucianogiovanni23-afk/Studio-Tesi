@@ -17,6 +17,12 @@ export interface RichiestaPonte {
   testo: string
   /** Con uno schema la risposta deve essere JSON. */
   schema: Record<string, unknown> | null
+  /**
+   * Codice breve che Claude deve ripetere sulla prima riga della risposta:
+   * così, quando lo studente torna nell'app, si riconosce negli appunti la
+   * risposta giusta (e non quella di una richiesta vecchia).
+   */
+  codice: string
   /** Se è un nuovo tentativo: perché la risposta precedente è stata scartata. */
   avviso: string | null
   risolvi: (risposta: string) => void
@@ -39,11 +45,22 @@ function testoDiContenuto(content: Anthropic.MessageParam['content']): string {
     .join('\n\n')
 }
 
+/** Codice della richiesta: "ST-" più 4 caratteri facili da leggere (niente 0/O, 1/I). */
+export function nuovoCodice(): string {
+  const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let c = ''
+  for (let i = 0; i < 4; i++) c += alfabeto[Math.floor(Math.random() * alfabeto.length)]
+  return `ST-${c}`
+}
+
+const RE_CODICE = /\bST-[A-Z2-9]{4}\b/g
+
 /** Tutta la richiesta in un unico testo da incollare in una chat nuova. */
 export function componiRichiesta(
   system: Anthropic.TextBlockParam[],
   messages: Anthropic.MessageParam[],
   schema: Record<string, unknown> | null,
+  codice?: string,
 ): string {
   const parti = ['=== ISTRUZIONI (seguile alla lettera) ===', system.map((b) => b.text).join('\n\n')]
   for (const m of messages) {
@@ -54,8 +71,10 @@ export function componiRichiesta(
     parti.push(
       '=== FORMATO DELLA RISPOSTA ===',
       [
-        'Rispondi con UN SOLO oggetto JSON valido e conforme allo schema qui sotto.',
-        'Niente testo prima o dopo, niente commenti, niente artifact o file: scrivi il JSON direttamente nel messaggio.',
+        codice
+          ? `Sulla prima riga scrivi solo il codice ${codice}. Dalla riga dopo, UN SOLO oggetto JSON valido e conforme allo schema qui sotto.`
+          : 'Rispondi con UN SOLO oggetto JSON valido e conforme allo schema qui sotto.',
+        'Niente altro testo prima o dopo, niente commenti, niente artifact o file: scrivi il JSON direttamente nel messaggio.',
         'Tutti i testi in italiano, tranne gli estratti copiati alla lettera dalle fonti, che restano nella lingua originale.',
         'Se la risposta si interrompe e ti scrivo "continua", riprendi esattamente dal carattere in cui ti eri fermato.',
         '',
@@ -63,7 +82,12 @@ export function componiRichiesta(
       ].join('\n'),
     )
   } else {
-    parti.push('=== FORMATO DELLA RISPOSTA ===', 'Rispondi in italiano, in testo semplice.')
+    parti.push(
+      '=== FORMATO DELLA RISPOSTA ===',
+      codice
+        ? `Sulla prima riga scrivi solo il codice ${codice}. Poi rispondi in italiano, in testo semplice.`
+        : 'Rispondi in italiano, in testo semplice.',
+    )
   }
   return parti.join('\n\n')
 }
@@ -103,6 +127,53 @@ export function controllaSchema(dati: unknown, schema: Record<string, unknown>):
   return mancanti.length ? `Nella risposta mancano dei pezzi (${mancanti.join(', ')}). Copia tutta la risposta, oppure chiedi a Claude di seguire il formato.` : null
 }
 
+/** Toglie dalla risposta la riga con il codice della richiesta (serve solo a riconoscerla). */
+export function togliCodice(testo: string): string {
+  return testo
+    .replace(/^\s*\**\s*ST-[A-Z2-9]{4}\s*\**\s*\n?/m, '')
+    .replace(RE_CODICE, '')
+    .trim()
+}
+
+export type Riconoscimento =
+  /** Ha il codice di questa richiesta. */
+  | 'codice'
+  /** Niente codice, ma è JSON completo e conforme allo schema. */
+  | 'json'
+  /** Negli appunti c'è ancora la richiesta, non la risposta. */
+  | 'richiesta'
+  /** Ha il codice di un'altra richiesta: è una risposta vecchia. */
+  | 'altra'
+  | null
+
+/** Guarda se un testo (di solito gli appunti) sembra la risposta di Claude a questa richiesta. */
+export function riconosciRisposta(testo: string, r: Pick<RichiestaPonte, 'codice' | 'schema' | 'testo'>): Riconoscimento {
+  const t = testo.trim()
+  if (t.length < 2) return null
+  if (t.includes('=== ISTRUZIONI (seguile alla lettera) ===') || t === r.testo.trim()) return 'richiesta'
+  const codici: string[] = t.match(RE_CODICE) ?? []
+  if (codici.includes(r.codice)) {
+    if (!r.schema) return 'codice'
+    // Con lo schema serve anche il JSON: il codice da solo vuol dire che manca la risposta.
+    try {
+      estraiJson(t)
+      return 'codice'
+    } catch {
+      return null
+    }
+  }
+  if (codici.length) return 'altra'
+  if (r.schema) {
+    try {
+      const dati = estraiJson(t)
+      return controllaSchema(dati, r.schema) ? null : 'json'
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 /** Il Controllore aggiunge alle istruzioni il motivo dello scarto quando ripete un passo. */
 function avvisoTentativo(testo: string): string | null {
   const m = testo.match(/ATTENZIONE: la tua risposta precedente non è utilizzabile\. ([^\n]*?) Rifalla da capo/)
@@ -127,18 +198,20 @@ export function chiediAClaudeAi(opts: {
     }
     if (opts.signal?.aborted) return abortito()
     opts.signal?.addEventListener('abort', abortito, { once: true })
-    const testo = componiRichiesta(opts.system, opts.messages, opts.schema ?? null)
+    const codice = nuovoCodice()
+    const testo = componiRichiesta(opts.system, opts.messages, opts.schema ?? null, codice)
     const richiesta: RichiestaPonte = {
       id,
       chi: opts.chi,
       azione: opts.azione ?? 'richiesta',
       testo,
       schema: opts.schema ?? null,
+      codice,
       avviso: avvisoTentativo(testo),
       risolvi: (risposta) => {
         opts.signal?.removeEventListener('abort', abortito)
         togli()
-        resolve(risposta)
+        resolve(opts.schema ? risposta : togliCodice(risposta))
       },
       annulla: () => {
         opts.signal?.removeEventListener('abort', abortito)

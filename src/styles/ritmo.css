@@ -1,0 +1,453 @@
+/* ================================================================== */
+/* Panoramica: consegna, ritmo e grafico dei progressi                 */
+/* ================================================================== */
+
+.ritmo {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.5fr);
+  gap: 24px 32px;
+  padding: 24px 26px;
+}
+
+@media (max-width: 900px) {
+  .ritmo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .ritmo {
+    padding: 18px 16px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pan > .ritmo {
+    animation: pan-sale 0.6s 0.18s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+}
+
+.ritmo-dati {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ritmo-testa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.ritmo-testa h2 {
+  font-size: 1.25rem;
+}
+
+.ritmo-testa-icona {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: var(--oliva);
+  background: var(--oliva-chiaro);
+  flex: none;
+}
+
+.ritmo-cambia {
+  margin-left: auto;
+}
+
+.ritmo-invito {
+  margin: 0 0 6px;
+  color: var(--inchiostro-2);
+  line-height: 1.45;
+}
+
+.ritmo-modulo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0 12px;
+  align-items: end;
+}
+
+.ritmo-modulo .campo-blocco {
+  margin-bottom: 10px;
+}
+
+.ritmo-modulo-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.ritmo-consegna-data {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--inchiostro-2);
+}
+
+.ritmo-consegna-data .ico {
+  color: var(--oliva);
+}
+
+.ritmo-consegna-data strong {
+  color: var(--inchiostro);
+}
+
+.ritmo-giorni {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--oliva-chiaro);
+  color: var(--oliva-scuro);
+  font-size: 0.84rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.ritmo-giorni-pochi {
+  background: var(--ambra-chiaro);
+  color: var(--testo-ambra);
+}
+
+.ritmo-giorni-passati {
+  background: var(--rosso-chiaro);
+  color: var(--rosso);
+}
+
+.ritmo-oggi {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 8px 0 0;
+  font-family: var(--serif);
+}
+
+.ritmo-oggi-etichetta {
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--inchiostro-3);
+}
+
+.ritmo-oggi strong {
+  font-size: clamp(1.6rem, 2.6vw, 2.05rem);
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--inchiostro);
+}
+
+.ritmo-oggi-sotto {
+  margin: -4px 0 0;
+}
+
+.ritmo-stato {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  margin: 4px 0 2px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-weight: 650;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+}
+
+.ritmo-stato-pallino {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ritmo-stato-ok {
+  background: var(--verde-chiaro);
+  border-color: var(--bordo-verde);
+  color: var(--verde-ok);
+}
+
+.ritmo-stato-pari {
+  background: var(--cielo-chiaro);
+  border-color: var(--bordo-cielo);
+  color: var(--cielo);
+}
+
+.ritmo-stato-attenzione {
+  background: var(--ambra-chiaro);
+  border-color: var(--bordo-ambra);
+  color: var(--testo-ambra);
+}
+
+/* barra delle pagine, con il segno del ritmo regolare */
+.ritmo-barra-blocco {
+  margin-top: 4px;
+}
+
+.ritmo-barra {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--inchiostro) 8%, var(--carta));
+  overflow: visible;
+}
+
+.ritmo-barra-pieno {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--oliva), color-mix(in srgb, var(--oliva) 55%, var(--oro)));
+  transition: width 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.ritmo-barra-ritardo,
+.ritmo-barra-scaduta {
+  background: linear-gradient(90deg, var(--ambra), var(--oro));
+}
+
+.ritmo-barra-ideale {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--oro);
+  box-shadow: 0 0 0 2px var(--carta);
+}
+
+.ritmo-barra-testo {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: var(--inchiostro-2);
+}
+
+.ritmo-barra-testo strong {
+  color: var(--inchiostro);
+}
+
+/* --- grafico ------------------------------------------------------- */
+.ritmo-colonna-grafico {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ritmo-sottotitolo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  color: var(--inchiostro-2);
+}
+
+.ritmo-sottotitolo .ico {
+  color: var(--oliva);
+}
+
+.ritmo-grafico {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.ritmo-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: pan-y;
+  border-radius: 14px;
+  cursor: crosshair;
+}
+
+.ritmo-svg:focus-visible {
+  outline: 2px solid var(--oliva);
+  outline-offset: 4px;
+}
+
+.ritmo-griglia {
+  stroke: var(--bordo);
+  stroke-width: 1;
+}
+
+.ritmo-asse {
+  fill: var(--inchiostro-3);
+  font-size: 11px;
+  font-family: var(--sans);
+}
+
+.ritmo-obiettivo {
+  stroke: var(--inchiostro-3);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.ritmo-obiettivo-testo {
+  fill: var(--inchiostro-3);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--sans);
+}
+
+.ritmo-ideale {
+  stroke: var(--oro);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  stroke-linecap: round;
+}
+
+.ritmo-consegna line {
+  stroke: var(--oro);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.7;
+}
+
+.ritmo-consegna circle {
+  fill: var(--carta);
+  stroke: var(--oro);
+  stroke-width: 2.5;
+}
+
+.ritmo-linea-oggi {
+  stroke: var(--cielo);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  opacity: 0.8;
+}
+
+.ritmo-linea {
+  fill: none;
+  stroke: var(--oliva);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.ritmo-punto {
+  fill: var(--carta);
+  stroke: var(--oliva);
+  stroke-width: 2;
+}
+
+.ritmo-scelto line {
+  stroke: var(--inchiostro-3);
+  stroke-width: 1;
+}
+
+.ritmo-scelto circle {
+  fill: var(--oliva);
+  stroke: var(--carta);
+  stroke-width: 2.5;
+}
+
+.ritmo-scelto .ritmo-scelto-ideale {
+  fill: var(--oro);
+}
+
+.ritmo-fumetto {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--vetro);
+  border: 1px solid var(--bordo);
+  box-shadow: var(--ombra);
+  font-family: var(--sans);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--inchiostro-2);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.ritmo-fumetto strong {
+  color: var(--inchiostro);
+  font-size: 13px;
+}
+
+.ritmo-fumetto-ideale {
+  color: var(--testo-oro);
+}
+
+.ritmo-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--inchiostro-2);
+}
+
+.ritmo-legenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ritmo-legenda-segno {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 3px solid var(--oliva);
+  border-radius: 2px;
+}
+
+.ritmo-legenda-ideale {
+  border-top: 2px dashed var(--oro);
+}
+
+.ritmo-legenda-oggi {
+  width: 0;
+  height: 14px;
+  border-top: 0;
+  border-left: 2px dashed var(--cielo);
+}
+
+.ritmo-nota-grafico {
+  margin: 0;
+}
+
+/* --- iPad: tocchi da 44px e testo da almeno 15px --- */
+.app.modo-ipad .ritmo-giorni,
+.app.modo-ipad .ritmo-legenda,
+.app.modo-ipad .ritmo-barra-testo,
+.app.modo-ipad .ritmo-stato,
+.app.modo-ipad .ritmo-oggi-etichetta {
+  font-size: 15px;
+}
+
+.app.modo-ipad .ritmo-asse,
+.app.modo-ipad .ritmo-obiettivo-testo {
+  font-size: 15px;
+}
+
+.app.modo-ipad .ritmo-fumetto {
+  font-size: 15px;
+}
+
+.app.modo-ipad .ritmo-fumetto strong {
+  font-size: 15px;
+}
+
+.ritmo-svg:focus:not(:focus-visible) {
+  outline: none;
+}

@@ -1,0 +1,203 @@
+/* ================================================================== */
+/* Il collega che pensa: ritratto che respira, alone e nuvoletta.      */
+/* ================================================================== */
+
+.pensa {
+  --colore-agente: var(--oliva);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 4px 4px 4px 2px;
+}
+
+.pensa-volto {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.pensa-alone {
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--colore-agente) 60%, transparent);
+  box-shadow: 0 0 14px 2px color-mix(in srgb, var(--colore-agente) 35%, transparent);
+}
+
+.pensa-respiro {
+  display: grid;
+  border-radius: 50%;
+}
+
+.pensa-respiro .ritratto {
+  border-radius: 50%;
+}
+
+.pensa-nuvola {
+  position: absolute;
+  right: -14px;
+  top: -12px;
+  width: 34px;
+  height: 30px;
+  pointer-events: none;
+}
+
+.pensa-bolla {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--carta);
+  border: 1px solid color-mix(in srgb, var(--colore-agente) 40%, var(--bordo));
+}
+
+.pensa-bolla-1 {
+  width: 5px;
+  height: 5px;
+  left: 0;
+  bottom: 0;
+}
+
+.pensa-bolla-2 {
+  width: 8px;
+  height: 8px;
+  left: 5px;
+  bottom: 6px;
+}
+
+.pensa-fumetto {
+  position: absolute;
+  right: -6px;
+  top: -4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 34px;
+  height: 20px;
+  border-radius: 12px;
+  background: var(--carta);
+  border: 1px solid color-mix(in srgb, var(--colore-agente) 40%, var(--bordo));
+  box-shadow: var(--ombra);
+}
+
+.pensa-fumetto i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--colore-agente);
+  opacity: 0.55;
+}
+
+.pensa-testi {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-left: 16px;
+  line-height: 1.3;
+}
+
+.pensa-chi {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--colore-agente);
+}
+
+.pensa-frase {
+  font-weight: 600;
+}
+
+.pensa-dettaglio {
+  font-size: 0.85rem;
+  color: var(--inchiostro-3);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pensa-respiro {
+    animation: pensa-respiro 3.2s ease-in-out infinite;
+  }
+  .pensa-alone {
+    animation: pensa-alone 3.2s ease-in-out infinite;
+  }
+  .pensa-bolla-1 {
+    animation: pensa-galleggia 2.4s ease-in-out infinite;
+  }
+  .pensa-bolla-2 {
+    animation: pensa-galleggia 2.4s ease-in-out 0.2s infinite;
+  }
+  .pensa-fumetto {
+    animation: pensa-galleggia 2.4s ease-in-out 0.4s infinite;
+  }
+  .pensa-fumetto i {
+    animation: pensa-puntino 1.2s ease-in-out infinite;
+  }
+  .pensa-fumetto i:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .pensa-fumetto i:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+  .pensa-frase {
+    animation: pensa-frase 0.4s ease both;
+  }
+}
+
+@keyframes pensa-respiro {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.045);
+  }
+}
+
+@keyframes pensa-alone {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes pensa-galleggia {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes pensa-puntino {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes pensa-frase {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+.messaggio-pensa {
+  padding: 16px 30px 12px 16px;
+}
+
+.app.modo-ipad .pensa-chi,
+.app.modo-ipad .pensa-dettaglio {
+  font-size: 15px;
+}

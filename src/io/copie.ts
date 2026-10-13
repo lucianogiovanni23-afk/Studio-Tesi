@@ -1,5 +1,6 @@
 import { get, set as idbSet } from 'idb-keyval'
 import { normalizzaProgetto, nuovoId } from '../domain/progettoIniziale'
+import { avviaDiario } from '../domain/ritmo'
 import { paroleCapitolo, useStudio } from '../store'
 import type { Progetto } from '../types'
 
@@ -71,4 +72,6 @@ export function avviaCopieAutomatiche() {
   if (useStudio.persist.hasHydrated()) prima()
   else useStudio.persist.onFinishHydration(prima)
   setInterval(() => void creaCopia('Automatica').catch(() => {}), OGNI_MS)
+  // Il diario dei progressi (una voce al giorno) parte insieme alle copie.
+  avviaDiario()
 }

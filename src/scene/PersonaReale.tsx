@@ -9,6 +9,7 @@ import { useStudio } from '../store'
 import type { AgentKey, AgentStatus } from '../types'
 import { MISURE, RigPersona, type StatoPersona } from './posaPersona'
 import { useQualita } from './qualita'
+import { occhiataIngresso } from './sguardi'
 import { Sedia } from './Sedia'
 
 /**
@@ -128,7 +129,7 @@ export function PersonaReale({
     statoPrima.current = status
   }, [status])
 
-  const statoRef = useRef<StatoPersona>({ t: 0, dt: 0, lavora: 0, guarda: null, parla: false, saluto: 0, salutoDa: 0, girata: 0, sorriso: 0 })
+  const statoRef = useRef<StatoPersona>({ t: 0, dt: 0, lavora: 0, guarda: null, parla: false, saluto: 0, salutoDa: 0, girata: 0, rivolta: 0, sorriso: 0 })
   const cameraRef = useRef(new THREE.Vector3())
 
   useFrame((s, delta) => {
@@ -148,7 +149,9 @@ export function PersonaReale({
     // la telecamera nello spazio della persona
     camera.copy(s.camera.position)
     radice.worldToLocal(camera)
-    const guardaTe = scelta || sal.peso > 0.5
+    // chi ti parla si gira verso di te; appena entri, tutti alzano gli occhi un momento
+    const parlaConTe = scelta
+    const guardaTe = parlaConTe || sal.peso > 0.5 || occhiataIngresso((sfasamento + 4.5) / 3)
 
     stato.t = ora + sfasamento
     stato.dt = dt
@@ -158,6 +161,8 @@ export function PersonaReale({
     stato.saluto = sal.peso
     stato.salutoDa = trascorso
     stato.girata = THREE.MathUtils.clamp(Math.atan2(camera.x, camera.z), -0.7, 0.7)
+    // il busto segue piano (~0,6 s), la testa un po' prima
+    stato.rivolta += ((parlaConTe ? 1 : 0) - stato.rivolta) * (1 - Math.exp(-dt * 3.2))
     stato.sorriso = sal.peso > 0.3 ? 0.55 : scelta ? 0.22 : 0
     rig.aggiorna(stato)
   })

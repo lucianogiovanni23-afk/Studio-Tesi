@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk'
+import type Anthropic from '@anthropic-ai/sdk'
 import type { Chi } from '../types'
 import { formattaDollari, normalizzaUso, sommaUsi, type Stima, type UsoNormalizzato } from './costs'
 import { chiediAClaudeAi } from './ponte'
@@ -102,8 +102,10 @@ function leggiRetryAfter(err: unknown): number | null {
 /** Traduce l'errore dell'SDK in un messaggio italiano e in una decisione su "ritentare o no". */
 export function toApiError(err: unknown): ApiError {
   if (err instanceof ApiError) return err
+  // L'SDK si carica solo alla prima chiamata: se non c'è, l'errore non viene da lì.
+  const A = modSdk?.default
 
-  if (err instanceof Anthropic.AuthenticationError) {
+  if (A && err instanceof A.AuthenticationError) {
     return new ApiError(
       'chiave_non_valida',
       'La chiave API non funziona: forse è sbagliata o è stata cancellata. Controlla di aver incollato quella giusta nelle impostazioni.',
@@ -112,7 +114,7 @@ export function toApiError(err: unknown): ApiError {
     )
   }
 
-  if (err instanceof Anthropic.BadRequestError) {
+  if (A && err instanceof A.BadRequestError) {
     const testo = (err.message ?? '').toLowerCase()
     if (testo.includes('credit balance')) {
       return new ApiError(
@@ -149,7 +151,7 @@ export function toApiError(err: unknown): ApiError {
     return new ApiError('richiesta_non_valida', `Anthropic ha rifiutato la richiesta. ${err.message}`, 400, false)
   }
 
-  if (err instanceof Anthropic.NotFoundError) {
+  if (A && err instanceof A.NotFoundError) {
     return new ApiError(
       'modello_non_trovato',
       `Non trovo il modello scelto. Controllalo nelle impostazioni. Dettaglio: ${err.message}`,
@@ -158,7 +160,7 @@ export function toApiError(err: unknown): ApiError {
     )
   }
 
-  if (err instanceof Anthropic.RateLimitError) {
+  if (A && err instanceof A.RateLimitError) {
     return new ApiError(
       'limite_richieste',
       'Troppe richieste in poco tempo. Aspetto un attimo e riprovo.',
@@ -168,7 +170,7 @@ export function toApiError(err: unknown): ApiError {
     )
   }
 
-  if (err instanceof Anthropic.APIError) {
+  if (A && err instanceof A.APIError) {
     const status = err.status ?? null
     if (status === 529) {
       return new ApiError('sovraccarico', 'Anthropic in questo momento è sovraccarico. Riprovo fra poco.', 529, true)
@@ -215,19 +217,40 @@ export function costoStimato(stima: Pick<Stima, 'minimo' | 'massimo'>, volte = 1
   return `Costa circa ${formattaDollari(stima.minimo * volte)} – ${formattaDollari(stima.massimo * volte)}`
 }
 
-export function creaClient(apiKey: string): Anthropic {
+/**
+ * Il client vero (l'SDK Anthropic, piuttosto pesante) si carica solo alla
+ * prima chiamata: così l'apertura dell'app resta leggera.
+ */
+export interface ClientApi {
+  readonly chiave: string
+}
+
+let modSdk: typeof import('@anthropic-ai/sdk') | null = null
+const clientCreati = new Map<string, Anthropic>()
+
+async function clientVero(c: ClientApi): Promise<Anthropic> {
+  modSdk ??= await import('@anthropic-ai/sdk')
+  let client = clientCreati.get(c.chiave)
+  if (!client) {
+    client = new modSdk.default({
+      apiKey: c.chiave,
+      dangerouslyAllowBrowser: true,
+      // I tentativi li governa il Controllore, che sa distinguere i casi.
+      maxRetries: 0,
+    })
+    clientCreati.set(c.chiave, client)
+  }
+  return client
+}
+
+export function creaClient(apiKey: string): ClientApi {
   // Senza chiave le chiamate passano da Claude.ai: il client non serve.
-  if (gratuita()) return {} as Anthropic
+  if (gratuita()) return { chiave: '' }
   const chiave = apiKey.trim()
   if (!chiave) {
     throw new ApiError('chiave_mancante', 'Manca la chiave API: incollala nelle impostazioni.')
   }
-  return new Anthropic({
-    apiKey: chiave,
-    dangerouslyAllowBrowser: true,
-    // I tentativi li governa il Controllore, che sa distinguere i casi.
-    maxRetries: 0,
-  })
+  return { chiave }
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +296,7 @@ export type Messaggio = Anthropic.MessageParam
 export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export interface ChiamataBase {
-  client: Anthropic
+  client: ClientApi
   model: string
   system: Anthropic.TextBlockParam[]
   messages: Messaggio[]
@@ -337,7 +360,7 @@ async function viaClaudeAi<T>(opts: ChiamataBase & { schema: JsonSchema }): Prom
 export async function chiamataStrutturata<T>(opts: ChiamataBase & { schema: JsonSchema }): Promise<T> {
   if (gratuita()) return viaClaudeAi<T>(opts)
   verificaBudget()
-  const risposta = await opts.client.messages.create(
+  const risposta = await (await clientVero(opts.client)).messages.create(
     {
       model: opts.model,
       max_tokens: opts.maxTokens,
@@ -366,7 +389,7 @@ export async function chiamataStrutturataStream<T>(
     return viaClaudeAi<T>(opts)
   }
   verificaBudget()
-  const stream = opts.client.messages.stream(
+  const stream = (await clientVero(opts.client)).messages.stream(
     {
       model: opts.model,
       max_tokens: opts.maxTokens,
@@ -433,7 +456,7 @@ export async function chiamataConStrumenti(
   try {
     for (let giro = 0; giro < MAX_CONTINUAZIONI; giro++) {
       verificaBudget()
-  const risposta = await opts.client.messages.create(
+  const risposta = await (await clientVero(opts.client)).messages.create(
         {
           model: opts.model,
           max_tokens: opts.maxTokens,
@@ -477,7 +500,7 @@ export async function chiamataChatStream(opts: ChiamataBase & { onTesto: (framme
     return testo
   }
   verificaBudget()
-  const stream = opts.client.messages.stream(
+  const stream = (await clientVero(opts.client)).messages.stream(
     {
       model: opts.model,
       max_tokens: opts.maxTokens,
