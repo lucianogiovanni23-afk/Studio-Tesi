@@ -75,6 +75,7 @@ export default defineConfig({
   // Percorsi relativi: il sito funziona sia su localhost sia in una
   // sottocartella come quella di GitHub Pages (/Studio-Tesi/).
   base: './',
+  worker: { format: 'es' },
   build: {
     // Il pezzo più grande è three.js (~360 kB gzip): si scarica solo con l'ufficio 3D
     // e resta in cache; tutto il resto dell'app sta sotto i 500 kB.

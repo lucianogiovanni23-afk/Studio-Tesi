@@ -26,6 +26,10 @@ export async function caricaFileCorso(lista: FileList | File[], suScartati: (nom
       scartati.push(file.name)
       continue
     }
+    // Se lo stesso file era rimasto in errore o da ricaricare, il nuovo prende il suo posto.
+    for (const vecchio of st().progetto.courseFiles) {
+      if (vecchio.name === file.name && vecchio.status !== 'pronto') st().rimuoviCourseFile(vecchio.id)
+    }
     const id = nuovoId('corso')
     coda.push({ file, kind, id })
     st().aggiungiCourseFile({ id, name: file.name, size: file.size, kind, progress: 0, status: 'lettura' })

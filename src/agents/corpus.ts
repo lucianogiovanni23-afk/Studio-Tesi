@@ -1,4 +1,5 @@
 import type * as PdfJs from 'pdfjs-dist/legacy/build/pdf.mjs'
+import './flussoIterabile'
 import { del, get, set as idbSet } from 'idb-keyval'
 import type { Passaggio } from '../types'
 
@@ -21,7 +22,7 @@ function pdfjs(): Promise<typeof PdfJs> {
   if (!modulo) {
     modulo = Promise.all([
       import('pdfjs-dist/legacy/build/pdf.mjs'),
-      import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'),
+      import('./pdfWorker?worker&url'),
     ]).then(([m, w]) => {
       m.GlobalWorkerOptions.workerSrc = w.default
       return m
