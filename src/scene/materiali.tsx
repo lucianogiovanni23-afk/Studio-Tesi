@@ -1,16 +1,17 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
-import { useMovimentoRidotto } from '../hooks/useLayoutMode'
-import { useQualita } from './qualita'
+import { useFermo, useGrafica } from './qualita'
 
 /**
  * Materiali PBR dell'ufficio: rovere vero (venatura, ruvidezza, rilievo),
  * resina lucida per il pavimento, pelle e tessuto con grana, metallo
  * spazzolato e vetro. Le texture stanno in public/assets/materiali e si
- * scaricano solo quando si apre la scena 3D; nella qualità ridotta si usano
- * versioni più piccole e niente rilievi.
+ * scaricano solo quando si apre la scena 3D. Si parte sempre dalle versioni
+ * piccole (la sala si vede subito); con "Qualità texture: Alta" quelle grandi
+ * con il rilievo arrivano in sottofondo e sostituiscono le piccole quando
+ * sono pronte, senza fermare la sala.
  */
 
 const CARTELLA = `${import.meta.env.BASE_URL}assets/materiali/`
@@ -59,17 +60,75 @@ export interface Materiali {
   vetro: THREE.MeshPhysicalMaterial
 }
 
-const cache = new Map<string, { chiave: THREE.Texture | undefined; materiali: Materiali }>()
+/** I materiali in uso (uno solo alla volta: cambiando qualità quelli di prima si liberano). */
+let attuale: { chiave: string; rovere: THREE.Texture | undefined; materiali: Materiali; creati: THREE.Material[] } | null = null
 
-function prepara(t: Texture, completa: boolean) {
+const ANISOTROPIA = [1, 2, 8]
+
+function prepara(t: Texture, livello: number) {
   for (const [k, tex] of Object.entries(t)) {
-    if (!tex || tex.userData.pronta) continue
+    if (!tex) continue
+    const anisotropia = ANISOTROPIA[livello]
+    if (tex.userData.pronta && tex.anisotropy === anisotropia) continue
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping
     tex.colorSpace = COLORE.has(k) ? THREE.SRGBColorSpace : THREE.NoColorSpace
-    tex.anisotropy = completa ? 8 : 2
+    tex.anisotropy = anisotropia
     tex.userData.pronta = true
     tex.needsUpdate = true
   }
+}
+
+/* --- texture grandi: scaricate in sottofondo, senza sospendere la sala --- */
+const grandi: { stato: 'nessuna' | 'in-arrivo' | 'pronte'; texture: Texture | null } = { stato: 'nessuna', texture: null }
+const ascoltatori = new Set<() => void>()
+const avvisa = () => ascoltatori.forEach((f) => f())
+const iscrivi = (f: () => void) => {
+  ascoltatori.add(f)
+  return () => ascoltatori.delete(f)
+}
+
+function caricaGrandi() {
+  if (grandi.stato !== 'nessuna') return
+  grandi.stato = 'in-arrivo'
+  const loader = new THREE.TextureLoader()
+  Promise.all(Object.entries(URL_COMPLETI).map(([k, u]) => loader.loadAsync(u).then((t) => [k, t] as const)))
+    .then((coppie) => {
+      if (grandi.stato !== 'in-arrivo') {
+        coppie.forEach(([, t]) => t.dispose())
+        return
+      }
+      grandi.texture = Object.fromEntries(coppie) as Texture
+      grandi.stato = 'pronte'
+      avvisa()
+    })
+    .catch(() => {
+      // senza rete restano le piccole
+      grandi.stato = 'nessuna'
+    })
+}
+
+function liberaGrandi() {
+  if (grandi.texture) Object.values(grandi.texture).forEach((t) => t?.dispose())
+  grandi.texture = null
+  grandi.stato = 'nessuna'
+  avvisa()
+}
+
+function materialiPer(chiave: string, t: Texture, livello: number): Materiali {
+  if (attuale && attuale.chiave === chiave && attuale.rovere === t.rovere) return attuale.materiali
+  prepara(t, livello)
+  const creati: THREE.Material[] = []
+  const materiali = crea(t, livello === 2, creati)
+  const vecchio = attuale
+  attuale = { chiave, rovere: t.rovere, materiali, creati }
+  if (vecchio) {
+    // dopo un attimo nessuno li usa più: si libera la memoria della scheda video
+    window.setTimeout(() => {
+      vecchio.creati.forEach((m) => m.dispose())
+      if (livello !== 2 && grandi.stato !== 'nessuna') liberaGrandi()
+    }, 1500)
+  }
+  return materiali
 }
 
 /** Toglie le chiavi undefined: three avvisa se riceve una mappa "undefined". */
@@ -77,13 +136,17 @@ function pulito<T extends object>(o: T): T {
   return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
 }
 
-function crea(t: Texture, completa: boolean): Materiali {
-  const perColore = <M,>(fn: (c: string) => M) => {
+function crea(t: Texture, completa: boolean, creati: THREE.Material[]): Materiali {
+  const tieni = <M extends THREE.Material>(m: M): M => {
+    creati.push(m)
+    return m
+  }
+  const perColore = <M extends THREE.Material,>(fn: (c: string) => M) => {
     const m = new Map<string, M>()
     return (c: string) => {
       let x = m.get(c)
       if (!x) {
-        x = fn(c)
+        x = tieni(fn(c))
         m.set(c, x)
       }
       return x
@@ -91,20 +154,20 @@ function crea(t: Texture, completa: boolean): Materiali {
   }
   const rilievo = (n?: THREE.Texture, forza = 1) => (completa && n ? { normalMap: n, normalScale: new THREE.Vector2(forza, forza) } : {})
   return {
-    rovere: new THREE.MeshStandardMaterial(pulito({
+    rovere: tieni(new THREE.MeshStandardMaterial(pulito({
       map: t.rovere,
       color: '#d9b48a',
       roughnessMap: t.rovereRuvidezza,
       roughness: t.rovereRuvidezza ? 0.95 : 0.62,
       ...rilievo(t.rovereNormale, 0.55),
-    })),
-    resina: new THREE.MeshStandardMaterial(pulito({
+    }))),
+    resina: tieni(new THREE.MeshStandardMaterial(pulito({
       map: t.resina,
       color: '#bdb5a8',
       roughnessMap: t.resinaRuvidezza,
       roughness: t.resinaRuvidezza ? 1 : 0.4,
       metalness: 0.02,
-    })),
+    }))),
     resinaMappe: { map: t.resina, roughnessMap: t.resinaRuvidezza },
     metallo: perColore(
       (c) =>
@@ -142,7 +205,7 @@ function crea(t: Texture, completa: boolean): Materiali {
           ...rilievo(t.tessutoNormale, 0.7),
         })),
     ),
-    vetro: new THREE.MeshPhysicalMaterial(pulito({
+    vetro: tieni(new THREE.MeshPhysicalMaterial(pulito({
       color: '#c6d4e2',
       transparent: true,
       opacity: 0.2,
@@ -153,23 +216,22 @@ function crea(t: Texture, completa: boolean): Materiali {
       clearcoatRoughness: 0.02,
       envMapIntensity: 2.2,
       depthWrite: false,
-    })),
+    }))),
   }
 }
 
 /** I materiali condivisi da tutta la sala (le texture si caricano una volta sola). */
 export function useMateriali(): Materiali {
-  const completa = useQualita() === 'completa'
-  const t = useTexture(completa ? URL_COMPLETI : URL_RIDOTTI) as Texture
-  return useMemo(() => {
-    const chiave = completa ? 'completa' : 'ridotta'
-    const c = cache.get(chiave)
-    if (c && c.chiave === t.rovere) return c.materiali
-    prepara(t, completa)
-    const materiali = crea(t, completa)
-    cache.set(chiave, { chiave: t.rovere, materiali })
-    return materiali
-  }, [t, completa])
+  const livello = useGrafica().texture
+  const piccole = useTexture(URL_RIDOTTI) as Texture
+  const stato = useSyncExternalStore(iscrivi, () => grandi.stato)
+  useEffect(() => {
+    if (livello === 2) caricaGrandi()
+  }, [livello])
+  const conGrandi = livello === 2 && stato === 'pronte' && grandi.texture !== null
+  const t = conGrandi ? (grandi.texture as Texture) : piccole
+  const effettivo = conGrandi ? 2 : Math.min(livello, 1)
+  return useMemo(() => materialiPer(`${effettivo}`, t, effettivo), [t, effettivo])
 }
 
 /**
@@ -221,7 +283,7 @@ export function uvMetriche(metri: number) {
  */
 export function useRgbLuce(sfasamento = 0, velocita = 0.06, luminosita = 0.55, intensita = 1) {
   const materiali = useRef<(THREE.MeshStandardMaterial | THREE.MeshBasicMaterial | THREE.SpriteMaterial | null)[]>([])
-  const fermo = useMovimentoRidotto()
+  const fermo = useFermo()
   const colore = useRef(new THREE.Color())
   useFrame((stato) => {
     const t = fermo ? 0 : stato.clock.elapsedTime
@@ -235,6 +297,8 @@ export function useRgbLuce(sfasamento = 0, velocita = 0.06, luminosita = 0.55, i
     })
   })
   return (i: number) => (m: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial | THREE.SpriteMaterial | null) => {
+    // cambia colore da solo: resta fuori dall'unione dei mobili fermi (Statico)
+    if (m) m.userData.vivo = true
     materiali.current[i] = m
   }
 }

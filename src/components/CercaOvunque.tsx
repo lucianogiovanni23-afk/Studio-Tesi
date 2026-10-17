@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { cercaPassaggi } from '../agents/corpus'
+import { cercaPassaggiAsync } from '../agents/corpus'
+import type { Passaggio } from '../types'
 import { NOME_GRUPPO, cercaOvunque, type GruppoRisultati, type Risultato } from '../domain/ricercaGlobale'
 import { useStudio } from '../store'
 import { apriCerca, chiudiCerca, useCerca } from './cercaStato'
@@ -59,13 +60,28 @@ function Riquadro() {
     }
   }, [])
 
+  const [corso, setCorso] = useState<Passaggio[]>([])
+
   // Si cerca quando smetti di scrivere per un attimo: con testi lunghi resta fluido.
+  // I passaggi del corso li cerca il lavoratore in sottofondo; i risultati si mostrano tutti insieme.
   useEffect(() => {
-    const t = setTimeout(() => setRinviata(domanda), 150)
-    return () => clearTimeout(t)
+    let valida = true
+    const t = setTimeout(() => {
+      void cercaPassaggiAsync(domanda, 6)
+        .catch(() => [] as Passaggio[])
+        .then((p) => {
+          if (!valida) return
+          setCorso(p)
+          setRinviata(domanda)
+        })
+    }, 150)
+    return () => {
+      valida = false
+      clearTimeout(t)
+    }
   }, [domanda])
 
-  const risultati = useMemo(() => cercaOvunque(progetto, rinviata, (d) => cercaPassaggi(d, 6)), [progetto, rinviata])
+  const risultati = useMemo(() => cercaOvunque(progetto, rinviata, () => corso), [progetto, rinviata, corso])
   const gruppi = ORDINE.map((g) => ({ g, voci: risultati.filter((r) => r.gruppo === g) })).filter((x) => x.voci.length > 0)
 
   const apri = (r: Risultato) => {

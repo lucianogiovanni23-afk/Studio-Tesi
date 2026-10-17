@@ -210,31 +210,50 @@ function Raccolta({ alberi }: { alberi: Olivo[] }) {
   )
 }
 
-function useMaterialiOlivo(completa: boolean, stagione: Stagione) {
+function useMaterialiOlivo(rilievo: boolean, stagione: Stagione) {
   const mappa = useTexture(`${BASE}corteccia.jpg`, prepara(true))
   const normali = useTexture(`${BASE}corteccia-n.jpg`, prepara(false))
   const foglieTex = useTexture(`${BASE}foglie.webp`, prepara(true, false, 4))
   return useMemo(() => {
-    return { corteccia: materialeCorteccia(mappa, completa ? normali : null), foglie: materialeFoglie(foglieTex, INDICE_STAGIONE[stagione]) }
-  }, [mappa, normali, foglieTex, completa, stagione])
+    return { corteccia: materialeCorteccia(mappa, rilievo ? normali : null), foglie: materialeFoglie(foglieTex, INDICE_STAGIONE[stagione]) }
+  }, [mappa, normali, foglieTex, rilievo, stagione])
 }
 
 /**
  * L'uliveto: alberi vicini in pieno dettaglio, quelli a media distanza più
  * semplici, i lontani come immagini sempre rivolte verso chi guarda.
  */
-export function Uliveto({ alberi, completa, sole, notte, stagione }: { alberi: Olivo[]; completa: boolean; sole: THREE.Vector3; notte: number; stagione: Stagione }) {
+/** Per "Distanza visiva alberi" (vicina, media, lontana): fin dove gli ulivi sono veri, fin dove semplificati. */
+const LIMITE_VICINI = [0, 0, 38]
+const LIMITE_MEDI = [35, 50, 95]
+
+export function Uliveto({
+  alberi,
+  distanza,
+  rilievo,
+  sole,
+  notte,
+  stagione,
+}: {
+  alberi: Olivo[]
+  distanza: number
+  rilievo: boolean
+  sole: THREE.Vector3
+  notte: number
+  stagione: Stagione
+}) {
+  const completa = distanza === 2
   const medi = useGLTF(`${BASE}olivi-medi.glb`, false, true)
   const atlante = useTexture(`${BASE}olivi-lontani.webp`, prepara(true, false))
   const variantiMedie = useMemo(() => estrai(medi.scene), [medi])
-  const materiali = useMaterialiOlivo(completa, stagione)
+  const materiali = useMaterialiOlivo(rilievo, stagione)
   useEffect(() => () => {
     materiali.corteccia.dispose()
     materiali.foglie.dispose()
   }, [materiali])
 
-  const limiteVicini = completa ? 38 : 0
-  const limiteMedi = completa ? 95 : 50
+  const limiteVicini = LIMITE_VICINI[distanza]
+  const limiteMedi = LIMITE_MEDI[distanza]
   const gruppi = useMemo(() => {
     const vicini = alberi.filter((a) => a.d < limiteVicini)
     const medi = alberi.filter((a) => a.d >= limiteVicini && a.d < limiteMedi)

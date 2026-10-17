@@ -1,12 +1,12 @@
 import '../styles/corso.css'
 import { costoStimato, modalitaGratuita } from '../agents/api'
 import { useMemo, useRef, useState } from 'react'
-import { collocazione, cercaPassaggi, rimuoviDalCorpus } from '../agents/corpus'
+import { collocazione, cercaPassaggiAsync, rimuoviDalCorpus } from '../agents/corpus'
 import { annullaQuadro, generaQuadro, stimaQuadro } from '../agents/lettoreCorso'
 import { ricavaLessico, stimaLessico } from '../agents/lessico'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
-import { ACCETTA_CORSO as ACCETTA, caricaFileCorso } from '../io/fileCorso'
+import { ACCETTA_CORSO as ACCETTA, caricaFileCorso, fermaOcr } from '../io/fileCorso'
 import { estrazioneInCorso, quadroObsoleto, useStudio } from '../store'
 import type { CourseFile, Passaggio } from '../types'
 import { Fisarmonica } from '../ui/Fisarmonica'
@@ -118,15 +118,27 @@ function Caricamento() {
                   <span className="nome-file" title={f.name}>
                     {f.name}
                   </span>
-                  <span className="nota">
+                  <span className="nota" role={f.fase === 'ocr' && f.status === 'estrazione' ? 'status' : undefined}>
                     {f.status === 'estrazione'
-                      ? `pagina ${f.paginaCorrente ?? 0} di ${f.pagine ?? '…'}`
+                      ? f.fase === 'ocr'
+                        ? (f.paginaCorrente ?? 0) === 0
+                          ? 'È una scansione: preparo la lettura delle immagini…'
+                          : `Leggo le immagini: pagina ${f.paginaCorrente} di ${f.pagine ?? '…'}`
+                        : `pagina ${f.paginaCorrente ?? 0} di ${f.pagine ?? '…'}`
                       : f.status === 'pronto'
-                        ? `${f.pagine} ${f.pagine === 1 ? 'pagina' : 'pagine'} · ${f.passaggi} ${f.passaggi === 1 ? 'passaggio' : 'passaggi'}`
+                        ? `${f.pagine} ${f.pagine === 1 ? 'pagina' : 'pagine'} · ${f.passaggi} ${f.passaggi === 1 ? 'passaggio' : 'passaggi'}${f.ocr ? ' · letto dalle immagini' : ''}`
                         : formatta(f.size)}
                   </span>
                   {f.errore && <span className="errore-file">{f.errore}</span>}
+                  {f.ocr && f.status === 'pronto' && (
+                    <span className="nota corso-ocr">Era una scansione: ho letto il testo dalle immagini, controlla le citazioni più importanti sul PDF.</span>
+                  )}
                 </span>
+                {f.status === 'estrazione' && f.fase === 'ocr' && (
+                  <button type="button" className="bottone bottone-vuoto bottone-piccolo" onClick={() => fermaOcr(f.id)}>
+                    Ferma
+                  </button>
+                )}
                 <Conferma
                   classe="icona"
                   etichetta="✕"
@@ -297,7 +309,16 @@ function CercaNelCorso() {
         onSubmit={(e) => {
           e.preventDefault()
           void firma
-          setRisultati(domanda.trim() ? cercaPassaggi(domanda, 6) : null)
+          const cercata = domanda
+          if (!cercata.trim()) {
+            setRisultati(null)
+            return
+          }
+          // La ricerca la fa il lavoratore in sottofondo: la pagina resta libera.
+          void cercaPassaggiAsync(cercata, 6).then(
+            (r) => setRisultati(r),
+            () => setRisultati([]),
+          )
         }}
       >
         <Icona nome="cerca" dimensione={20} className="corso-cerca-lente" />
@@ -332,6 +353,7 @@ function CercaNelCorso() {
                 <li key={p.id}>
                   <cite>
                     <Icona nome="file" dimensione={14} /> {collocazione(p)}
+                    {p.ocr ? ' · letto dalle immagini' : ''}
                   </cite>
                   <p>{p.testo.length > 600 ? `${p.testo.slice(0, 600)}…` : p.testo}</p>
                 </li>

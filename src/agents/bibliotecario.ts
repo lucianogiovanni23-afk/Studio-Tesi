@@ -20,7 +20,7 @@ import {
   creaClient,
   type Messaggio,
 } from './api'
-import { CATALOGHI, CERCA, unisci, type Catalogo, type RisultatoCatalogo } from './cataloghi'
+import { CATALOGHI, cercaConMemoria, puliziaMemoriaCataloghi, unisci, type Catalogo, type RisultatoCatalogo } from './cataloghi'
 import { verificaEstratto } from './citations'
 import { pagineDaPdfBase64 } from './corpus'
 import { daPagine } from '../io/pdfPaper'
@@ -43,13 +43,25 @@ export interface Passo {
   dettaglio: string
 }
 
+/** Risultati degli archivi presi dalla memoria (ricerca uguale fatta nei 7 giorni prima). */
+export interface MemoriaRicerca {
+  /** Quando era arrivata la risposta più vecchia fra quelle riusate. */
+  quando: string
+  domanda: string
+  query: string[]
+  /** Aggiornamento in corso o appena fatto. */
+  aggiorno: boolean
+  esito: string | null
+}
+
 interface StatoRicerca {
   passi: Passo[]
   inCorso: boolean
   errore: string | null
+  memoria: MemoriaRicerca | null
 }
 
-export const useRicerca = create<StatoRicerca>(() => ({ passi: [], inCorso: false, errore: null }))
+export const useRicerca = create<StatoRicerca>(() => ({ passi: [], inCorso: false, errore: null, memoria: null }))
 
 function passo(id: Passo['id'], stato: StatoPasso, dettaglio = '') {
   useRicerca.setState((s) => ({ passi: s.passi.map((p) => (p.id === id ? { ...p, stato, dettaglio } : p)) }))
@@ -156,38 +168,99 @@ function fonteDaCatalogo(r: RisultatoCatalogo): Fonte {
   }
 }
 
-async function cercaNeiCataloghi(query: string[], signal: AbortSignal) {
+async function cercaNeiCataloghi(query: string[], signal: AbortSignal, forza = false) {
   const perCatalogo: Record<string, number | string> = {}
-  const tutti: RisultatoCatalogo[] = []
+  // Un posto per ogni risposta, così l'ordine non dipende da chi risponde prima.
+  const risposte: RisultatoCatalogo[][][] = CATALOGHI.map(() => [])
+  let piùVecchia: string | null = null
 
   await Promise.all(
-    CATALOGHI.map(async ({ key, nome }) => {
+    CATALOGHI.map(async ({ key, nome }, c) => {
       let trovati = 0
       let ultimoErrore = ''
       for (const q of query.slice(0, 6)) {
+        let daMemoria: string | null = null
         try {
-          const r = await CERCA[key as Catalogo](q, 6, signal)
-          trovati += r.length
-          tutti.push(...r)
+          const r = await cercaConMemoria(key as Catalogo, q, 6, signal, forza)
+          daMemoria = r.daMemoria
+          if (daMemoria && (!piùVecchia || daMemoria < piùVecchia)) piùVecchia = daMemoria
+          trovati += r.risultati.length
+          risposte[c].push(r.risultati)
         } catch (err) {
           if (signal.aborted) throw err
           ultimoErrore = err instanceof Error ? err.message : 'errore'
           // Un catalogo che non risponde non blocca gli altri; dopo un 429 si smette.
           if (ultimoErrore.includes('429') || ultimoErrore.includes('non raggiungibile')) break
         }
-        // Semantic Scholar senza chiave accetta circa una richiesta al secondo.
-        if (key === 'semanticscholar') await new Promise((r) => setTimeout(r, 1100))
+        // Semantic Scholar senza chiave accetta circa una richiesta al secondo (dalla memoria non serve aspettare).
+        if (key === 'semanticscholar' && !daMemoria) await new Promise((r) => setTimeout(r, 1100))
       }
       perCatalogo[nome] = trovati > 0 || !ultimoErrore ? trovati : ultimoErrore
     }),
   )
 
+  const tutti = risposte.flat(2)
   const fonti = useStudio.getState().progetto.fonti
   const uniti = unisci(tutti)
     .filter((r) => !giàInBiblioteca(fonti, r))
     .sort((a, b) => Number(Boolean(b.abstract)) - Number(Boolean(a.abstract)))
     .slice(0, MAX_CANDIDATI_CATALOGO)
-  return { uniti, perCatalogo }
+  void puliziaMemoriaCataloghi()
+  return { uniti, perCatalogo, daMemoria: piùVecchia as string | null }
+}
+
+/**
+ * "Aggiorna": rifà le ricerche negli archivi dell'ultima ricerca senza usare la
+ * memoria. I risultati nuovi (non già in biblioteca né da guardare) si aggiungono
+ * a quelli da approvare; quelli già proposti restano come sono.
+ */
+export async function aggiornaCataloghi(): Promise<void> {
+  const m = useRicerca.getState().memoria
+  if (!m || m.aggiorno || useRicerca.getState().inCorso) return
+  const st = useStudio.getState
+  controller = new AbortController()
+  const signal = controller.signal
+  useRicerca.setState({ memoria: { ...m, aggiorno: true, esito: null } })
+  try {
+    const esito = await cercaNeiCataloghi(m.query, signal, true)
+    const inAttesa = st().progetto.inAttesa.map((c) => c.fonte)
+    const nuovi = esito.uniti.filter((r) => !giàInBiblioteca(inAttesa, r))
+    const ricercaId = nuovoId('ric')
+    if (nuovi.length) {
+      st().registraRicerca(
+        {
+          id: ricercaId,
+          domanda: m.domanda,
+          data: adesso(),
+          query: m.query,
+          perCatalogo: esito.perCatalogo,
+          trovati: nuovi.length,
+          esclusi: [],
+          passaggi: ['Ho chiesto di nuovo agli archivi i risultati aggiornati.'],
+        },
+        nuovi.map((r) => ({ id: nuovoId('cand'), ricercaId, fonte: fonteDaCatalogo(r), verifica: 'catalogo' as const, estrattiScartati: 0, consiglio: null })),
+      )
+    }
+    const errori = Object.values(esito.perCatalogo).filter((v) => typeof v === 'string').length
+    useRicerca.setState({
+      memoria: null,
+      passi: useRicerca.getState().passi.map((p) =>
+        p.id === 'cataloghi'
+          ? {
+              ...p,
+              stato: errori ? 'avviso' : 'ok',
+              dettaglio: `Aggiornati adesso: ${Object.entries(esito.perCatalogo).map(([k, v]) => `${k}: ${typeof v === 'number' ? `${v} risultati` : v}`).join(' · ')} → ${nuovi.length === 1 ? '1 risultato nuovo' : `${nuovi.length} risultati nuovi`} da guardare`,
+            }
+          : p,
+      ),
+    })
+    logOk('bibliotecario', `Archivi aggiornati: ${nuovi.length} risultati nuovi.`)
+  } catch (err) {
+    const msg = signal.aborted ? 'Aggiornamento fermato.' : err instanceof Error ? err.message : 'Non sono riuscito ad aggiornare.'
+    useRicerca.setState({ memoria: { ...m, aggiorno: false, esito: msg } })
+  } finally {
+    controller = null
+  }
 }
 
 interface FonteDichiarata {
@@ -420,6 +493,7 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
   useRicerca.setState({
     inCorso: true,
     errore: null,
+    memoria: null,
     passi: [
       { id: 'piano', titolo: 'Preparo la ricerca', stato: 'attesa', dettaglio: '' },
       { id: 'cataloghi', titolo: 'Archivi di articoli', stato: opzioni.cataloghi ? 'attesa' : 'saltato', dettaglio: '' },
@@ -448,6 +522,9 @@ export async function avviaRicerca(domanda: string, opzioni: OpzioniRicerca): Pr
       st().patchAgente('bibliotecario', { etichetta: 'cerco negli archivi di articoli…' })
       const esito = await cercaNeiCataloghi(piano.risultato.query_cataloghi, signal)
       perCatalogo = esito.perCatalogo
+      if (esito.daMemoria) {
+        useRicerca.setState({ memoria: { quando: esito.daMemoria, domanda, query: piano.risultato.query_cataloghi, aggiorno: false, esito: null } })
+      }
       candidati.push(
         ...esito.uniti.map((r) => ({ id: nuovoId('cand'), ricercaId, fonte: fonteDaCatalogo(r), verifica: 'catalogo' as const, estrattiScartati: 0, consiglio: null })),
       )

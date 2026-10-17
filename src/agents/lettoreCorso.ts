@@ -4,7 +4,7 @@ import { useStudio } from '../store'
 import type { ConcettoCorso, Consegna, QuadroTeorico } from '../types'
 import { chiamataStrutturata, creaClient, ApiError } from './api'
 import { verificaEstratto } from './citations'
-import { BUDGET_LETTORE, collocazione, recuperaPassaggi, statisticheCorpus } from './corpus'
+import { BUDGET_LETTORE, collocazione, recuperaPassaggiAsync, statisticheCorpus } from './corpus'
 import { stimaChiamata, tokenDaCaratteri, type Stima } from './costs'
 import { SYSTEM_LETTORE, messaggioLettore } from './prompts'
 import { SCHEMA_QUADRO } from './schemas'
@@ -34,7 +34,7 @@ export function annullaQuadro() {
 export async function generaQuadro(): Promise<void> {
   const s = useStudio.getState()
   const progetto = s.progetto
-  const passaggi = recuperaPassaggi(
+  const passaggi = await recuperaPassaggiAsync(
     [progetto.titolo, progetto.domanda, ...progetto.capitoli.map((c) => c.titolo), ...DOMANDE_CORSO],
     BUDGET_LETTORE,
   )

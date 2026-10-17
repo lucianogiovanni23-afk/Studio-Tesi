@@ -7,6 +7,7 @@ import { PonteClaude } from './components/PonteClaude'
 import { useModoUso } from './hooks/useModoUso'
 import { BottoneGuida, GuidaFinestra } from './components/Guida'
 import { BottoneCerca, CercaOvunque } from './components/CercaOvunque'
+import { useGraficaStore } from './grafica/grafica'
 import { BottoneSuoni } from './ui/BottoneSuoni'
 import { NavigazionePrincipale, TestaSchermata } from './components/Navigazione'
 import { avviaCopieAutomatiche } from './io/copie'
@@ -28,6 +29,8 @@ const Ricerca = lazy(() => import('./screens/Ricerca').then((m) => ({ default: m
 const Ufficio = lazy(() => import('./screens/Ufficio').then((m) => ({ default: m.Ufficio })))
 const Copertura = lazy(() => import('./screens/Copertura').then((m) => ({ default: m.Copertura })))
 const Scrittura = lazy(() => import('./screens/Scrittura').then((m) => ({ default: m.Scrittura })))
+// Il menu Grafica si scarica solo quando lo apri.
+const MenuGrafica = lazy(() => import('./grafica/MenuGrafica').then((m) => ({ default: m.MenuGrafica })))
 
 /**
  * Il corpus del corso vive in IndexedDB, separato dal progetto: all'avvio si
@@ -87,6 +90,7 @@ function Schermo({ s }: { s: Schermata }) {
 export default function App() {
   const modo = useModoUso()
   const schermata = useStudio((s) => s.schermata)
+  const menuGrafica = useGraficaStore((s) => s.menu !== null)
   const vai = useStudio((s) => s.vai)
   const titolo = useStudio((s) => s.progetto.titolo)
 
@@ -161,6 +165,11 @@ export default function App() {
       <PonteClaude />
       <GuidaFinestra />
       <CercaOvunque />
+      {menuGrafica && (
+        <Suspense fallback={null}>
+          <MenuGrafica />
+        </Suspense>
+      )}
     </div>
   )
 }

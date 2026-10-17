@@ -85,6 +85,12 @@ function turnoLettrice(p: Progetto): Turno {
 
   if (inLettura.length) {
     const f = inLettura[0]
+    if (f.fase === 'ocr') {
+      return {
+        testo: `«${f.name}» è una scansione: sto leggendo il testo dalle immagini${f.paginaCorrente ? `, pagina ${f.paginaCorrente} di ${f.pagine}` : ''}. Ci vuole un po' di più, ma resta tutto qui sul tuo dispositivo.`,
+        azioni: [],
+      }
+    }
     return { testo: `Sto leggendo «${f.name}»${f.pagine ? `: pagina ${f.paginaCorrente ?? 0} di ${f.pagine}` : ''}. Un attimo e ti dico.`, azioni: [] }
   }
   if (pronti === 0) {

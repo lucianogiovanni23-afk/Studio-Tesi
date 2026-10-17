@@ -237,7 +237,7 @@ export function CameraRig({
     } else {
       camera.lookAt(aBers.current)
     }
-    invalida()
+    // il prossimo fotogramma lo chiede il Motore (la visuale si muove → piena velocità, fino al limite FPS)
   })
 
   return null

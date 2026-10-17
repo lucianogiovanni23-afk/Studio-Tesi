@@ -2,9 +2,8 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
-import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { COLORI } from './layout'
-import { useNotte, useQualita } from './qualita'
+import { useFermo, useGrafica, useNotte } from './qualita'
 import { textureAlone } from './notte'
 import { uvMetriche, useMateriali, useRgbLuce } from './materiali'
 
@@ -101,9 +100,11 @@ function useSchermata(colore: string): Schermata | null {
 function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: boolean; lavora: boolean }) {
   const s = useSchermata(colore)
   const schermata = s?.texture ?? null
-  const ombre = useQualita() === 'completa'
+  const g = useGrafica()
+  const ombre = g.ombre > 0
+  const luci = g.luci
   const notte = useNotte()
-  const fermo = useMovimentoRidotto()
+  const fermo = useFermo()
   const scorre = useRef({ y: 0, attesa: 0, cursore: false, sporca: false })
 
   // Mentre lavora il testo scorre (a scatti leggeri, ~12 volte al secondo: niente allocazioni).
@@ -127,8 +128,8 @@ function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: bool
     s.pagina(r.y, r.cursore)
   })
   const mat = useMateriali()
-  // con il bloom (qualità completa) le luci superano 1 e brillano davvero
-  const luceAccento = useMemo(() => new THREE.Color(colore).multiplyScalar(ombre ? 3 : 1), [colore, ombre])
+  // con le luci realistiche (e il bagliore) i LED superano 1 e brillano davvero
+  const luceAccento = useMemo(() => new THREE.Color(colore).multiplyScalar(luci ? 3 : 1), [colore, luci])
   const alluminio = mat.metallo('#c9ccd1')
   const R = 1.1
   const L = 0.74
@@ -168,9 +169,9 @@ function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: bool
         <cylinderGeometry args={[R + 0.018, R + 0.018, 0.012, 48, 1, true, Math.PI - L / 2 + 0.05, L - 0.1]} />
         <meshBasicMaterial color={luceAccento} toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
-      {notte && (
+      {/* bagliore dello schermo sulla parete e sul piano: solo di notte (sempre montato, così gli shader sono già pronti) */}
+      <group visible={notte}>
         <>
-          {/* bagliore dello schermo sulla parete e sul piano */}
           <mesh position={[0, 0.4, -0.06]} rotation={[0, Math.PI, 0]}>
             <planeGeometry args={[1.25, 0.75]} />
             <meshBasicMaterial map={textureAlone() ?? undefined} color={acceso ? '#8fb4ff' : '#4a5f99'} transparent opacity={acceso ? 0.5 : 0.28} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
@@ -179,9 +180,10 @@ function MonitorCurvo({ colore, acceso, lavora }: { colore: string; acceso: bool
             <planeGeometry args={[0.9, 0.42]} />
             <meshBasicMaterial map={textureAlone() ?? undefined} color={colore} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
           </mesh>
-          {ombre && <pointLight position={[0, 0.4, 0.35]} intensity={acceso ? 0.9 : 0.45} distance={1.8} decay={2} color="#a9c4ff" />}
         </>
-      )}
+      </group>
+      {/* sempre montata (di giorno spenta): passando alla notte il numero di luci non cambia e gli shader non si ricompilano */}
+      {luci && <pointLight position={[0, 0.4, 0.35]} intensity={notte ? (acceso ? 0.9 : 0.45) : 0} distance={1.8} decay={2} color="#a9c4ff" />}
     </group>
   )
 }
@@ -193,7 +195,7 @@ function Ventola({ posizione, materiale, gira }: { posizione: [number, number, n
     if (gira && pale.current) pale.current.rotation.z += d * 9
   })
   return (
-    <group position={posizione}>
+    <group position={posizione} userData={{ vivo: true }}>
       <mesh>
         <torusGeometry args={[0.058, 0.008, 8, 32]} />
         <meshBasicMaterial ref={materiale} toneMapped={false} />
@@ -216,9 +218,10 @@ function Ventola({ posizione, materiale, gira }: { posizione: [number, number, n
 
 /** Case con vetro temperato su due lati, tre ventole frontali, scheda video e RAM illuminate. */
 function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }) {
-  const completa = useQualita() === 'completa'
+  const g = useGrafica()
+  const completa = g.luci
   const notte = useNotte()
-  const fermo = useMovimentoRidotto()
+  const fermo = useFermo()
   const rgb = useRgbLuce(sfasamento, 0.06, 0.55, completa ? 3.2 : 1)
   const mat = useMateriali()
   const W = 0.24
@@ -227,7 +230,7 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
   return (
     <group>
       {/* telaio */}
-      <RoundedBox args={[W, 0.03, D]} radius={0.01} position={[0, 0.015, 0]} castShadow={completa}>
+      <RoundedBox args={[W, 0.03, D]} radius={0.01} position={[0, 0.015, 0]} castShadow={g.ombre > 0}>
         <meshStandardMaterial color="#111317" roughness={0.4} metalness={0.6} />
       </RoundedBox>
       <RoundedBox args={[W, 0.03, D]} radius={0.01} position={[0, H - 0.015, 0]}>
@@ -280,9 +283,9 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
         <meshBasicMaterial ref={rgb(8)} transparent opacity={0.35} toneMapped={false} />
       </mesh>
       {completa && <pointLight position={[0, H / 2, 0]} intensity={notte ? 1.3 : 0.35} distance={notte ? 1.6 : 0.9} color={colore} />}
-      {notte && (
+      <group visible={notte}>
         <>
-          {/* alone RGB: un finto "bloom" per la qualità ridotta (nella completa c'è quello vero) */}
+          {/* alone RGB: un finto "bloom" con le luci semplici (con quelle realistiche c'è il bagliore vero) */}
           {!completa && <sprite position={[0.02, H / 2, D / 2 + 0.02]} scale={[0.75, 0.9, 1]}>
             <spriteMaterial ref={rgb(9) as never} map={textureAlone() ?? undefined} transparent opacity={0.5} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
           </sprite>}
@@ -291,14 +294,14 @@ function PcGaming({ colore, sfasamento }: { colore: string; sfasamento: number }
             <meshBasicMaterial ref={rgb(10)} map={textureAlone() ?? undefined} transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
           </mesh>
         </>
-      )}
+      </group>
     </group>
   )
 }
 
 /** Tastiera meccanica con retroilluminazione che scorre. */
 function Tastiera({ sfasamento }: { sfasamento: number }) {
-  const rgb = useRgbLuce(sfasamento + 0.3, 0.08, 0.6, useQualita() === 'completa' ? 1.8 : 1)
+  const rgb = useRgbLuce(sfasamento + 0.3, 0.08, 0.6, useGrafica().luci ? 1.8 : 1)
   const tasti = useMemo(() => {
     const t: [number, number][] = []
     for (let r = 0; r < 5; r++) for (let c = 0; c < 15; c++) t.push([-0.196 + c * 0.028, -0.05 + r * 0.025])
@@ -334,12 +337,13 @@ export function Scrivania({
   lavora?: boolean
   sfasamento?: number
 }) {
-  const ombre = useQualita() === 'completa'
+  const g = useGrafica()
+  const ombre = g.ombre > 0
   const notte = useNotte()
-  const led = useRgbLuce(sfasamento + 0.5, 0.05, 0.55, ombre ? 4 : 1)
+  const led = useRgbLuce(sfasamento + 0.5, 0.05, 0.55, g.luci ? 4 : 1)
   const mat = useMateriali()
   const gambe = mat.metallo('#1a1c20')
-  const accento = useMemo(() => new THREE.Color(colore).multiplyScalar(ombre ? 2.5 : 1), [colore, ombre])
+  const accento = useMemo(() => new THREE.Color(colore).multiplyScalar(g.luci ? 2.5 : 1), [colore, g.luci])
   return (
     <group>
       {/* piano in rovere massello con bordo smussato e top in linoleum grafite */}
@@ -352,13 +356,11 @@ export function Scrivania({
         <boxGeometry args={[1.7, 0.008, 0.008]} />
         <meshBasicMaterial ref={led(0)} toneMapped={false} />
       </mesh>
-      {notte && (
-        // luce del LED che cade sul pavimento davanti alla scrivania
-        <mesh position={[0, 0.012, 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* luce del LED che cade sul pavimento davanti alla scrivania (solo di notte) */}
+      <mesh visible={notte} position={[0, 0.012, 0.55]} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[2.4, 1.1]} />
           <meshBasicMaterial ref={led(1)} map={textureAlone() ?? undefined} transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
-      )}
       {/* gambe a portale in alluminio scuro, regolabili in altezza */}
       {[-0.8, 0.8].map((x) => (
         <group key={x} position={[x, 0, 0]}>

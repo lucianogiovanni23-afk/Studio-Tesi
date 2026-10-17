@@ -54,6 +54,7 @@ const PERCORSI: Record<string, ReactNode> = {
   bandiera: <><path d="M5 21V4" /><path d="M5 4h12l-2 4 2 4H5" /></>,
   concentrazione: <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" />,
   carta: <><path d="M7 3h7l4 4v14H7z" /><path d="M14 3v4h4M10 12h5M10 16h5" /></>,
+  monitor: <><rect x="2.5" y="4" width="19" height="12.5" rx="1.8" /><path d="M8 20.5h8M12 16.5v4" /><path d="M7 12.5l3-3.5 2.5 2.5 4.5-5" /></>,
 }
 
 export type NomeIcona = keyof typeof PERCORSI

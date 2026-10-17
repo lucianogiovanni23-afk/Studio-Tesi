@@ -367,9 +367,9 @@ export function Ufficio() {
       {conScena && (
         <div className="ufficio-scena">
           <Suspense fallback={<div className="scena scena-carico" />}>
-            <Scene key={qualita} qualita={qualita} spazioDestra={PANNELLO} />
+            <Scene spazioDestra={PANNELLO} />
           </Suspense>
-          <CaricamentoUfficio key={qualita} />
+          <CaricamentoUfficio />
         </div>
       )}
       <div className="ufficio-pannello">

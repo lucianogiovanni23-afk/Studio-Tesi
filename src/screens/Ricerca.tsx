@@ -1,8 +1,8 @@
 import '../styles/fonti.css'
 import { costoStimato } from '../agents/api'
 import { useEffect, useMemo, useState } from 'react'
-import { annullaRicerca, avviaRicerca, stimaRicerca, useRicerca, type OpzioniRicerca } from '../agents/bibliotecario'
-import { CATALOGHI, provaCataloghi, type EsitoProva } from '../agents/cataloghi'
+import { aggiornaCataloghi, annullaRicerca, avviaRicerca, stimaRicerca, useRicerca, type OpzioniRicerca } from '../agents/bibliotecario'
+import { CATALOGHI, provaCataloghi, quandoLeggibile, type EsitoProva } from '../agents/cataloghi'
 import { Conferma } from '../components/Conferma'
 import { Esito } from '../components/Esito'
 import { Ritratto } from '../components/Ritratto'
@@ -129,8 +129,29 @@ function Avanzamento() {
           </li>
         ))}
       </ol>
+      <MemoriaArchivi />
       {errore && <p className="allerta allerta-errore">{errore}</p>}
     </section>
+  )
+}
+
+/** "Risultati di 2 giorni fa · Aggiorna": gli archivi hanno risposto dalla memoria di questo dispositivo. */
+function MemoriaArchivi() {
+  const memoria = useRicerca((s) => s.memoria)
+  const inCorso = useRicerca((s) => s.inCorso)
+  if (!memoria) return null
+  return (
+    <div className="ric-memoria" role="status">
+      <p className="nota">
+        <Icona nome="orologio" dimensione={16} /> Risultati degli archivi {quandoLeggibile(memoria.quando)}: la stessa ricerca l'avevi già fatta, li ho
+        presi da qui.
+      </p>
+      <button type="button" className="bottone bottone-secondario bottone-piccolo" disabled={memoria.aggiorno || inCorso} onClick={() => void aggiornaCataloghi()}>
+        <Icona nome="aggiorna" dimensione={16} />
+        {memoria.aggiorno ? 'Aggiorno…' : 'Aggiorna'}
+      </button>
+      {memoria.esito && <p className="allerta">{memoria.esito}</p>}
+    </div>
   )
 }
 

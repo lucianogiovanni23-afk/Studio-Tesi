@@ -1,5 +1,5 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { ContactShadows, Environment, Lightformer, OrbitControls } from '@react-three/drei'
 import { AGENTE, AGENTI } from '../agents/agenti'
@@ -12,7 +12,7 @@ import { Scrivania } from './Scrivania'
 import { CameraRig, type ControlliOrbita, type Ingresso } from './CameraRig'
 import { CAMERA_BERSAGLIO, CAMERA_CASA, DIETRO_SCRIVANIA, POSTAZIONI } from './layout'
 import { Persona3D } from './Persona3D'
-import { ContestoEtichette, ContestoNotte, ContestoQualita } from './qualita'
+import { ContestoEtichette, ContestoGrafica, ContestoNotte, useGrafica, type Grafica } from './qualita'
 import { Etichetta } from './Etichetta'
 import { EVENTO_PRONTO, Effetti } from './Effetti'
 import { segnalaIngresso } from './sguardi'
@@ -20,11 +20,15 @@ import { introDaSaltare, passaggio } from '../ufficio/passaggio'
 import { useNotteScena } from './notte'
 import { AmbienteCielo, LuceVetrata } from './esterno/AmbienteCielo'
 import { Icona } from '../ui/Icona'
+import { apriMenuGrafica, useGraficaStore, useValoriGrafica } from '../grafica/grafica'
+import { Motore, Precompila, prestazioni, segnalaAttivita } from './Motore'
+import { LIVELLO_ORIGINALI, Statico, useCotturaOmbre } from './Statico'
+import '../styles/grafica.css'
 import '../styles/scena.css'
 
-/** A ogni apertura dell'app si entra dalla porta a vetri; mai con meno animazioni. */
-function scegliIngresso(ridotto: boolean): Ingresso {
-  if (ridotto) return null
+/** A ogni apertura dell'app si entra dalla porta a vetri; mai con meno animazioni o se l'hai spenta nel menu Grafica. */
+function scegliIngresso(ridotto: boolean, entrata: boolean): Ingresso {
+  if (ridotto || !entrata) return null
   if (!passaggio.introFatta && !introDaSaltare()) return { tipo: 'intro' }
   return null
 }
@@ -75,7 +79,7 @@ const STATO = {
 function Postazione({ k, scelta, primoPiano, onScegli }: { k: AgentKey; scelta: boolean; primoPiano: boolean; onScegli: (k: AgentKey) => void }) {
   const def = AGENTE[k]
   const runtime = useStudio((s) => s.agenti[k])
-  const completa = useStudio((s) => s.preferenze.modalitaScena) !== 'ridotta'
+  const ombre = useGrafica().ombre > 0
   const { scrivania, rotazione } = POSTAZIONI[k]
   const lavora = runtime.status === 'lavoro'
   const [sopra, setSopra] = useState(false)
@@ -97,7 +101,7 @@ function Postazione({ k, scelta, primoPiano, onScegli }: { k: AgentKey; scelta: 
       >
         <Scrivania colore={def.colore} schermoAcceso={lavora || scelta} lavora={lavora} sfasamento={scrivania[0] / 10} />
         <group position={[0, 0, DIETRO_SCRIVANIA]}>
-          <Persona3D persona={def.persona} lavora={lavora} status={runtime.status} scelta={scelta} parla={scelta} sfasamento={scrivania[0]} ombre={completa} />
+          <Persona3D persona={def.persona} lavora={lavora} status={runtime.status} scelta={scelta} parla={scelta} sfasamento={scrivania[0]} ombre={ombre} vicino={primoPiano || scelta} />
         </group>
         {/* alone a terra per chi stai ascoltando */}
         {(scelta || sopra) && (
@@ -135,7 +139,7 @@ function Postazione({ k, scelta, primoPiano, onScegli }: { k: AgentKey; scelta: 
  * Sposta il centro ottico verso sinistra quando a destra c'è il pannello
  * della conversazione: la sala resta centrata nello spazio libero.
  */
-function CentroOttico({ spostamento }: { spostamento: number }) {
+function CentroOttico({ spostamento, campo }: { spostamento: number; campo: number }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
   const size = useThree((s) => s.size)
   const invalida = useThree((s) => s.invalidate)
@@ -149,18 +153,55 @@ function CentroOttico({ spostamento }: { spostamento: number }) {
     // Se lo spazio libero è stretto (barra laterale, finestra piccola) allarga il campo
     // visivo quel tanto che basta perché tutte e quattro le scrivanie restino nell'inquadratura.
     const libera = (offset ? size.width - spostamento : size.width) / Math.max(1, size.height)
-    const fov = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(27.5)) / libera) * 180) / Math.PI, 44, 56)
+    // Il "Campo visivo" del menu Grafica sposta tutto di quanto si discosta dai 44° di partenza.
+    const base = THREE.MathUtils.clamp((2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(27.5)) / libera) * 180) / Math.PI, 44, 56)
+    const fov = THREE.MathUtils.clamp(base + campo - 44, 35, 85)
     if (Math.abs(camera.fov - fov) > 0.01) Object.assign(camera, { fov })
     camera.updateProjectionMatrix()
     invalida()
     return () => camera.clearViewOffset()
-  }, [camera, size.width, size.height, spostamento, invalida])
+  }, [camera, size.width, size.height, spostamento, campo, invalida])
   return null
 }
 
-/** Luci, cielo e riflessi: di giorno luce naturale, di notte lampade calde e bagliori. */
-function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
+const LATO_OMBRE = [0, 512, 1024, 2048, 4096]
+
+/**
+ * Luci, cielo e riflessi: di giorno luce naturale, di notte lampade calde e bagliori.
+ * Le ombre dell'arredo sono "cotte": la mappa delle ombre si ricalcola solo
+ * quando cambia qualcosa di fermo (giorno/notte, impostazioni, arredo) e, per
+ * le persone che respirano e si girano, una decina di volte al secondo. Con le
+ * ombre "Epiche" si ricalcola a ogni fotogramma.
+ */
+function Luci({ notte, g }: { notte: boolean; g: Grafica }) {
+  const pieno = g.luci
   const sfondo = notte ? '#121828' : '#eef0ee'
+  const sole = useRef<THREE.DirectionalLight>(null)
+  const lato = LATO_OMBRE[g.ombre]
+  const cuoci = useCotturaOmbre()
+  useLayoutEffect(() => {
+    const l = sole.current
+    if (!l || !lato) return
+    if (l.shadow.mapSize.x !== lato) {
+      l.shadow.mapSize.set(lato, lato)
+      l.shadow.map?.dispose()
+      Object.assign(l.shadow, { map: null })
+    }
+    cuoci()
+  }, [lato, notte, cuoci])
+  useEffect(() => () => sole.current?.shadow.map?.dispose(), [])
+  const ultimo = useRef(0)
+  useFrame(() => {
+    const l = sole.current
+    if (!l || !l.castShadow) return
+    l.shadow.autoUpdate = g.ombre === 4
+    if (g.ombre === 4) return
+    const ora = performance.now()
+    if (cuoci.sporche() || (!g.fermo && ora - ultimo.current > 100)) {
+      l.shadow.needsUpdate = true
+      ultimo.current = ora
+    }
+  })
   return (
     <>
       <color attach="background" args={[sfondo]} />
@@ -183,16 +224,13 @@ function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
           </>
         )}
       </Environment>
-      <hemisphereLight
-        args={notte ? ['#ffdcb0', '#2b2638', completa ? 0.28 : 0.62] : ['#ffffff', '#b9ae9c', completa ? 0.34 : 0.72]}
-      />
+      <hemisphereLight args={notte ? ['#ffdcb0', '#2b2638', pieno ? 0.28 : 0.62] : ['#ffffff', '#b9ae9c', pieno ? 0.34 : 0.72]} />
       <directionalLight
+        ref={sole}
         position={[4, 9, 9]}
-        intensity={notte ? (completa ? 0.5 : 0.7) : completa ? 1.25 : 1.1}
+        intensity={notte ? (pieno ? 0.5 : 0.7) : pieno ? 1.25 : 1.1}
         color={notte ? '#ffcf96' : '#fff4e6'}
-        castShadow={completa}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        castShadow={g.ombre > 0}
         shadow-camera-left={-13}
         shadow-camera-right={13}
         shadow-camera-top={8}
@@ -208,23 +246,79 @@ function Luci({ notte, completa }: { notte: boolean; completa: boolean }) {
   )
 }
 
-export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ridotta'; spazioDestra?: number }) {
-  const completa = qualita === 'completa'
+/** Contatore FPS nell'angolo (menu Grafica › Mostra FPS). */
+function ContatoreFps() {
+  const [, setGiro] = useState(0)
+  useEffect(() => {
+    const t = window.setInterval(() => setGiro((x) => x + 1), 500)
+    return () => window.clearInterval(t)
+  }, [])
+  const reale = prestazioni.fpsReale
+  const potenziale = Math.round(prestazioni.fpsPotenziale)
+  return (
+    <div className="contatore-fps" role="status" aria-label={`${reale} fotogrammi al secondo`}>
+      {reale} FPS
+      {prestazioni.aRiposo && potenziale > reale && <small>a riposo · regge {potenziale}</small>}
+    </div>
+  )
+}
+
+/** "Ho abbassato un po' la grafica": la modalità automatica lo dice, una volta, con il link al menu. */
+function AvvisoAuto() {
+  const avviso = useGraficaStore((s) => s.avvisoAuto)
+  const chiudi = useGraficaStore((s) => s.chiudiAvviso)
+  useEffect(() => {
+    if (!avviso) return
+    const t = window.setTimeout(chiudi, 14000)
+    return () => window.clearTimeout(t)
+  }, [avviso, chiudi])
+  if (!avviso) return null
+  return (
+    <span className="avviso-grafica" role="status">
+      Ho abbassato un po’ la grafica per tenerla fluida.
+      <button
+        type="button"
+        className="link-scuro"
+        onClick={() => {
+          chiudi()
+          apriMenuGrafica('grafica')
+        }}
+      >
+        Apri il menu Grafica
+      </button>
+      <button type="button" className="avviso-chiudi" aria-label="Chiudi l’avviso" onClick={chiudi}>
+        <Icona nome="chiudi" dimensione={14} />
+      </button>
+    </span>
+  )
+}
+
+/** Le impostazioni grafiche effettive, con le animazioni che seguono anche "riduci movimento". */
+function useGraficaScena(): Grafica {
+  const valori = useValoriGrafica()
+  const extra = useGraficaStore((s) => s.extra)
+  const ridotto = useMovimentoRidotto()
+  return useMemo(() => ({ ...valori, extra, fermo: extra.animazioni === null ? ridotto : !extra.animazioni }), [valori, extra, ridotto])
+}
+
+export function Scene({ spazioDestra = 0 }: { spazioDestra?: number }) {
+  const g = useGraficaScena()
   const controlli = useRef<ControlliOrbita | null>(null)
   const contenitore = useRef<HTMLDivElement>(null)
   const visibile = useVisibile(contenitore)
   const modo = useModoUso()
-  const fermo = useMovimentoRidotto()
+  const ridotto = useMovimentoRidotto()
   const scelto = useStudio((s) => s.agenteUfficio)
   const scegli = useStudio((s) => s.scegliAgente)
   const inquadratura = useStudio((s) => s.inquadratura)
   const estrazione = useStudio((s) => estrazioneInCorso(s.progetto))
+  const firmaLibri = useStudio((s) => s.progetto.fonti.map((f) => f.stato[0]).join(''))
   // All'avvio si vede tutta la sala; quando scegli una persona la telecamera la raggiunge.
   const [vista, setVista] = useState<AgentKey | null>(null)
   const [token, setToken] = useState(0)
   const [inquadraturaPrima, setInquadraturaPrima] = useState(inquadratura)
   const { notte, preferenza, alterna } = useNotteScena()
-  const [ingresso] = useState(() => scegliIngresso(fermo))
+  const [ingresso] = useState(() => scegliIngresso(ridotto, g.extra.entrata))
   const [intro, setIntro] = useState(ingresso !== null)
   const [partenza, setPartenza] = useState(false)
   const [salta, setSalta] = useState(0)
@@ -243,6 +337,7 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
   useEffect(() => {
     let t = 0
     const via = () => {
+      prestazioni.prontaDa = performance.now()
       t = window.setTimeout(() => {
         if (ingresso) setPartenza(true)
         else segnalaIngresso()
@@ -253,6 +348,7 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
     return () => {
       window.removeEventListener(EVENTO_PRONTO, via)
       window.clearTimeout(t)
+      prestazioni.prontaDa = 0
     }
   }, [ingresso])
 
@@ -276,36 +372,47 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
     document.body.style.cursor = ''
   }, [])
 
-  const frameloop = estrazione || !visibile ? 'never' : fermo ? 'demand' : 'always'
+  const inPausa = estrazione || (g.extra.pausa && !visibile)
+  // Statico rifà l'unione dei mobili quando cambia qualcosa che si vede su di loro.
+  const chiaveStatico = `${notte}|${g.ombre > 0}|${g.texture}|${g.luci}|${firmaLibri}`
+  const attivita = () => segnalaAttivita(1200)
 
   return (
-    <div className="scena scena-ufficio" ref={contenitore}>
+    <div className="scena scena-ufficio" ref={contenitore} onPointerMove={attivita} onPointerDown={attivita} onWheel={attivita}>
       <Canvas
-        frameloop={frameloop}
-        shadows={completa ? 'soft' : false}
-        dpr={completa ? [1, 2] : 1}
-        gl={{ antialias: true, powerPreference: completa ? 'high-performance' : 'low-power' }}
+        frameloop={inPausa ? 'never' : 'demand'}
+        shadows={g.ombre >= 3 ? 'soft' : g.ombre > 0 ? 'percentage' : false}
+        dpr={THREE.MathUtils.clamp((Math.min(window.devicePixelRatio || 1, g.tettoDpr) * g.scala) / 100, 0.5, 3)}
+        gl={{ antialias: false, powerPreference: 'high-performance' }}
         camera={{ position: CAMERA_CASA, fov: 44, near: 0.1, far: 120 }}
         style={{ touchAction: 'pan-y' }}
-        onCreated={({ camera }) => camera.lookAt(...CAMERA_BERSAGLIO)}
+        onCreated={({ camera, raycaster }) => {
+          camera.lookAt(...CAMERA_BERSAGLIO)
+          // i mobili uniti da Statico restano cliccabili sul loro livello
+          raycaster.layers.enable(LIVELLO_ORIGINALI)
+        }}
       >
-        <Luci notte={notte} completa={completa} />
-        <ContestoQualita.Provider value={qualita}>
+        <ContestoGrafica.Provider value={g}>
           <ContestoNotte.Provider value={notte}>
+            <Luci notte={notte} g={g} />
             <ContestoEtichette.Provider value={{ spazioDestra, nascoste: intro }}>
               <Suspense fallback={null}>
-                <Sala etichette={vista === null} />
-                {AGENTI.map((a) => (
-                  <Postazione key={a.key} k={a.key} scelta={scelto === a.key} primoPiano={vista === a.key} onScegli={scegli} />
-                ))}
-                {completa && <ContactShadows position={[0, 0.01, 0]} scale={30} resolution={1024} blur={2.4} opacity={notte ? 0.5 : 0.38} far={3} frames={1} />}
-                <Effetti qualita={qualita} notte={notte} />
+                <Statico chiave={chiaveStatico}>
+                  <Sala etichette={vista === null} />
+                  {AGENTI.map((a) => (
+                    <Postazione key={a.key} k={a.key} scelta={scelto === a.key} primoPiano={vista === a.key} onScegli={scegli} />
+                  ))}
+                </Statico>
+                <OmbreContatto notte={notte} accese={g.ombre >= 3} />
+                <Precompila />
+                <Effetti g={g} notte={notte} />
               </Suspense>
             </ContestoEtichette.Provider>
           </ContestoNotte.Provider>
-        </ContestoQualita.Provider>
+          <Motore inPausa={inPausa} forzaAttivo={intro && partenza} />
+        </ContestoGrafica.Provider>
 
-        <CentroOttico spostamento={spazioDestra} />
+        <CentroOttico spostamento={spazioDestra} campo={g.extra.fov} />
         <Risveglio visibile={visibile} />
         <CameraRig controlli={controlli} fuoco={vista} token={token} ingresso={ingresso} partenza={partenza} salta={salta} onFineIntro={fineIntro} />
         {modo === 'computer' && (
@@ -314,7 +421,7 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
             target={CAMERA_BERSAGLIO}
             enablePan={false}
             enableZoom={false}
-            enableDamping={!fermo}
+            enableDamping={!ridotto}
             dampingFactor={0.08}
             minPolarAngle={1.3}
             maxPolarAngle={Math.PI / 2.15}
@@ -323,6 +430,8 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
           />
         )}
       </Canvas>
+
+      {g.extra.mostraFps && <ContatoreFps />}
 
       {intro && partenza && (
         <button type="button" className="salta-intro" style={{ left: `calc((100% - ${spazioDestra}px) / 2)` }} onClick={() => setSalta((x) => x + 1)}>
@@ -345,6 +454,15 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
         >
           <Icona nome={notte ? 'luna' : 'sole'} dimensione={18} />
         </button>
+        <button
+          type="button"
+          className={`gettone gettone-tondo gettone-grafica ${notte ? 'gettone-notte-attivo' : ''}`}
+          aria-label="Impostazioni grafiche"
+          title="Impostazioni grafiche: qualità, ombre, FPS…"
+          onClick={() => apriMenuGrafica()}
+        >
+          <Icona nome="monitor" dimensione={18} />
+        </button>
         {vista !== null && (
           <button
             type="button"
@@ -357,7 +475,23 @@ export function Scene({ qualita, spazioDestra = 0 }: { qualita: 'completa' | 'ri
             ← Tutta la sala
           </button>
         )}
+        <AvvisoAuto />
       </div>
     </div>
+  )
+}
+
+/**
+ * Ombre a contatto sul pavimento sotto mobili e persone: si calcolano una
+ * volta sola (cotte) e si rifanno quando l'arredo cambia.
+ */
+function OmbreContatto({ notte, accese }: { notte: boolean; accese: boolean }) {
+  // ContactShadows ridisegna la sua mappa (una volta) a ogni nuovo render: la versione dell'arredo lo provoca.
+  // Resta sempre montato (spegnerlo lo smonterebbe senza liberare i suoi buffer): si nasconde e basta.
+  const versione = useCotturaOmbre().versione
+  return (
+    <group visible={accese}>
+      <ContactShadows userData={{ versione }} position={[0, 0.01, 0]} scale={30} resolution={1024} blur={2.4} opacity={notte ? 0.5 : 0.38} far={3} frames={1} />
+    </group>
   )
 }
