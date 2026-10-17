@@ -107,10 +107,18 @@ export function Somiglianze() {
           </button>
         </div>
       ) : (
-        <button type="button" className="bottone bottone-primario" onClick={() => void controllaSomiglianze()}>
-          <Icona nome="lente" dimensione={18} />
-          {esito ? 'Controlla di nuovo (gratis)' : 'Controlla le frasi (gratis)'}
-        </button>
+        <div className="sim-bottoni">
+          <button type="button" className="bottone bottone-primario" onClick={() => void controllaSomiglianze()}>
+            <Icona nome="lente" dimensione={18} />
+            {esito ? 'Controlla di nuovo (gratis)' : 'Controlla le frasi (gratis)'}
+          </button>
+          {esito && (
+            <button type="button" className="bottone bottone-secondario" onClick={() => void controllaSomiglianze(true)}>
+              <Icona nome="aggiorna" dimensione={18} />
+              Ricontrolla tutto
+            </button>
+          )}
+        </div>
       )}
       {errore && <p className="allerta allerta-errore">{errore}</p>}
 
@@ -120,6 +128,14 @@ export function Somiglianze() {
             <Icona nome="orologio" dimensione={16} /> {new Date(esito.data).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })} ·{' '}
             {esito.frasi} frasi della tesi confrontate con {esito.fonti} {esito.fonti === 1 ? 'testo' : 'testi'} del corso e della biblioteca
           </p>
+          {esito.ricontrollati < esito.paragrafi && (
+            <p className="nota sim-memoria">
+              {esito.ricontrollati === 0
+                ? 'Niente è cambiato dall\'ultimo controllo: ho riusato i risultati.'
+                : `Ho ricontrollato solo ${esito.ricontrollati === 1 ? 'il paragrafo cambiato' : `i ${esito.ricontrollati} paragrafi cambiati`}; gli altri ${esito.paragrafi - esito.ricontrollati} non sono cambiati.`}{' '}
+              Se vuoi, usa "Ricontrolla tutto".
+            </p>
+          )}
           {esito.simili.length === 0 ? (
             <p className="nota nota-ok">Nessuna frase troppo simile alle fonti. Bel lavoro!</p>
           ) : (

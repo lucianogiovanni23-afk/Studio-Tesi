@@ -3916,6 +3916,12 @@ a.bottone {
   margin: -16px -20px -16px;
 }
 
+/* sull'iPad il margine della pagina è 16px (non 20): la sala lo segue, senza sbordare a destra */
+.modo-ipad .ufficio-con-scena {
+  margin-left: calc(-1 * max(16px, env(safe-area-inset-left)));
+  margin-right: calc(-1 * max(16px, env(safe-area-inset-right)));
+}
+
 .ufficio-scena {
   position: absolute;
   inset: 0;

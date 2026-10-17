@@ -620,8 +620,17 @@ export function quadroObsoleto(p: Progetto): boolean {
   return p.quadro !== null && p.quadro.firmaCorso !== firmaCorso(p)
 }
 
+/** Conteggi già fatti: con 60 pagine l'indice ricontava tutte le sezioni a ogni salvataggio. */
+const paroleContate = new Map<string, number>()
+
 export function contaParoleTesto(testo: string): number {
-  return testo.replace(/\[[A-Z]\d+\]/g, '').split(/\s+/).filter(Boolean).length
+  const noto = paroleContate.get(testo)
+  if (noto !== undefined) return noto
+  const n = testo.replace(/\[[A-Z]\d+\]/g, '').split(/\s+/).filter(Boolean).length
+  // Pochi testi alla volta (sezioni e versioni aperte): oltre, si ricomincia.
+  if (paroleContate.size > 500) paroleContate.clear()
+  paroleContate.set(testo, n)
+  return n
 }
 
 export function paroleCapitolo(c: Capitolo): number {

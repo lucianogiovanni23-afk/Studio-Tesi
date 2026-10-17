@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { clone as cloneScheletro } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { Persona } from '../agents/agenti'
-import { useMovimentoRidotto } from '../hooks/useLayoutMode'
 import { useStudio } from '../store'
 import type { AgentKey, AgentStatus } from '../types'
 import { MISURE, RigPersona, type StatoPersona } from './posaPersona'
-import { useQualita } from './qualita'
+import { useFermo, useGrafica } from './qualita'
 import { occhiataIngresso } from './sguardi'
 import { Sedia } from './Sedia'
 
@@ -67,31 +66,32 @@ function preparaMateriali(radice: THREE.Object3D, completa: boolean) {
   })
 }
 
-export function PersonaReale({
-  chiave,
-  persona,
-  lavora,
-  status,
-  scelta,
-  parla,
-  sfasamento,
-  ombre,
-}: {
-  chiave: AgentKey
-  persona: Persona
+/** Stato condiviso fra modello leggero e modello pieno: passando dall'uno all'altro la posa continua senza salti. */
+interface Condiviso {
+  saluto: { richiesto: boolean; inizio: number; peso: number }
+  stato: StatoPersona
+}
+
+interface PropsAvatar {
+  url: string
+  completa: boolean
+  condiviso: React.MutableRefObject<Condiviso>
   lavora: boolean
-  status?: AgentStatus
   scelta: boolean
   parla: boolean
   sfasamento: number
   ombre: boolean
-}) {
-  const completa = useQualita() === 'completa'
-  const gltf = useGLTF(urlPersona(chiave, !completa), false, true)
-  const fermo = useMovimentoRidotto()
+}
+
+/** Un modello (leggero o pieno) con la sua posa procedurale. */
+function Avatar({ url, completa, condiviso, lavora, scelta, parla, sfasamento, ombre }: PropsAvatar) {
+  const gltf = useGLTF(url, false, true)
+  const fermo = useFermo()
 
   const { radice, rig } = useMemo(() => {
     const radice = cloneScheletro(gltf.scene)
+    // si muove: resta fuori dall'unione dei mobili fermi
+    radice.userData.vivo = true
     preparaMateriali(radice, completa)
     const rig = new RigPersona(radice)
     return { radice, rig }
@@ -121,22 +121,13 @@ export function PersonaReale({
     [radice],
   )
 
-  // Saluto: quando lo stato diventa "fatto" la persona si gira verso di te e alza la mano.
-  const saluto = useRef({ richiesto: false, inizio: -1, peso: 0 })
-  const statoPrima = useRef(status)
-  useEffect(() => {
-    if (status === 'fatto' && statoPrima.current !== undefined && statoPrima.current !== 'fatto') saluto.current.richiesto = true
-    statoPrima.current = status
-  }, [status])
-
-  const statoRef = useRef<StatoPersona>({ t: 0, dt: 0, lavora: 0, guarda: null, parla: false, saluto: 0, salutoDa: 0, girata: 0, rivolta: 0, sorriso: 0 })
   const cameraRef = useRef(new THREE.Vector3())
 
   useFrame((s, delta) => {
     if (fermo) return
     const dt = Math.min(delta, 0.1)
     const ora = s.clock.elapsedTime
-    const sal = saluto.current
+    const sal = condiviso.current.saluto
     if (sal.richiesto) {
       sal.richiesto = false
       sal.inizio = ora
@@ -144,7 +135,7 @@ export function PersonaReale({
     const trascorso = sal.inizio < 0 ? 99 : ora - sal.inizio
     sal.peso += ((trascorso < DURATA_SALUTO ? 1 : 0) - sal.peso) * (1 - Math.exp(-dt * 7))
 
-    const stato = statoRef.current
+    const stato = condiviso.current.stato
     const camera = cameraRef.current
     // la telecamera nello spazio della persona
     camera.copy(s.camera.position)
@@ -167,10 +158,71 @@ export function PersonaReale({
     rig.aggiorna(stato)
   })
 
+  return <primitive object={radice} />
+}
+
+/**
+ * Livelli di dettaglio (menu Grafica › Qualità persone):
+ * - Semplice: sempre il modello leggero;
+ * - Realistica: leggero nella vista d'insieme, pieno in primo piano (il
+ *   pieno si scarica prima, in sottofondo; finché non è pronto resta il
+ *   leggero, quindi niente "buchi");
+ * - Massima: sempre il modello pieno.
+ */
+export function PersonaReale({
+  chiave,
+  persona,
+  lavora,
+  status,
+  scelta,
+  parla,
+  sfasamento,
+  ombre,
+  vicino = false,
+}: {
+  chiave: AgentKey
+  persona: Persona
+  lavora: boolean
+  status?: AgentStatus
+  scelta: boolean
+  parla: boolean
+  sfasamento: number
+  ombre: boolean
+  vicino?: boolean
+}) {
+  const livello = useGrafica().persone
+  const pieno = livello === 2 || (livello === 1 && vicino)
+  const condiviso = useRef<Condiviso>({
+    saluto: { richiesto: false, inizio: -1, peso: 0 },
+    stato: { t: 0, dt: 0, lavora: 0, guarda: null, parla: false, saluto: 0, salutoDa: 0, girata: 0, rivolta: 0, sorriso: 0 },
+  })
+
+  // Saluto: quando lo stato diventa "fatto" la persona si gira verso di te e alza la mano.
+  const statoPrima = useRef(status)
+  useEffect(() => {
+    if (status === 'fatto' && statoPrima.current !== undefined && statoPrima.current !== 'fatto') condiviso.current.saluto.richiesto = true
+    statoPrima.current = status
+  }, [status])
+
+  // Con la qualità realistica il modello pieno si scarica in sottofondo, quando la sala è già pronta.
+  useEffect(() => {
+    if (livello !== 1) return
+    const t = window.setTimeout(() => useGLTF.preload(urlPersona(chiave, false), false, true), 3000)
+    return () => window.clearTimeout(t)
+  }, [livello, chiave])
+
+  const comuni = { condiviso, lavora, scelta, parla, sfasamento, ombre }
+  const leggero = <Avatar url={urlPersona(chiave, true)} completa={false} {...comuni} />
   return (
     <group>
       <Sedia accento={persona.aspetto.cravatta} ombre={ombre} />
-      <primitive object={radice} />
+      {pieno ? (
+        <Suspense fallback={leggero}>
+          <Avatar url={urlPersona(chiave, false)} completa {...comuni} />
+        </Suspense>
+      ) : (
+        leggero
+      )}
     </group>
   )
 }

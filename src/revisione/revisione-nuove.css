@@ -568,3 +568,13 @@
 .app.modo-ipad .dis-numero {
   font-size: 15px;
 }
+
+/* Controlla di nuovo / Ricontrolla tutto, uno accanto all'altro (vanno a capo sul telefono). */
+.sim-bottoni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sim-memoria {
+  margin-top: -4px;
+}

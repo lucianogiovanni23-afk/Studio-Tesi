@@ -1,6 +1,20 @@
 import type * as PdfJs from 'pdfjs-dist/legacy/build/pdf.mjs'
 import './flussoIterabile'
-import { del, get, set as idbSet } from 'idb-keyval'
+import { delMany, get as getIdb, getMany, set as idbSet, setMany } from 'idb-keyval'
+import {
+  CHIAVE_CORPUS,
+  CHIAVE_FIRME,
+  CHIAVE_INDICE,
+  classifica,
+  costruisciIndice,
+  improntaCorpus,
+  improntaFile,
+  indiceValido,
+  tokenizza,
+  type IndiceCompatto,
+} from './indiceCorso'
+import type { EsitoIndice } from './lavori'
+import { chiedi } from './sottofondo'
 import type { Passaggio } from '../types'
 
 /**
@@ -41,7 +55,7 @@ function worker(m: typeof PdfJs): PdfJs.PDFWorker {
   return workerCondiviso
 }
 
-const CHIAVE_IDB = 'studio-tesi-corpus'
+const CHIAVE_IDB = CHIAVE_CORPUS
 const LUNGHEZZA_PASSAGGIO = 1600
 const SOVRAPPOSIZIONE = 200
 /** Sotto questa media di caratteri per pagina il PDF è considerato scansionato. */
@@ -92,6 +106,17 @@ export async function estraiPdf(
 
   const caratteri = pagine.reduce((s, p) => s + p.length, 0)
   return { pagine, scansionato: pagine.length > 0 && caratteri / pagine.length < SOGLIA_SCANSIONE }
+}
+
+/**
+ * Apre un PDF con pdf.js (stesso worker condiviso dell'estrazione), per chi deve
+ * disegnarne le pagine: la lettura delle immagini (OCR) dei PDF scansionati.
+ */
+export async function apriDocumentoPdf(dati: ArrayBuffer): Promise<{ documento: PdfJs.PDFDocumentProxy; chiudi: () => Promise<void> }> {
+  const m = await pdfjs()
+  const caricamento = m.getDocument({ data: new Uint8Array(dati.slice(0)), worker: worker(m) })
+  const documento = await caricamento.promise
+  return { documento, chiudi: () => caricamento.destroy() }
 }
 
 /** Testo di un PDF arrivato in base64 (per esempio da web_fetch). */
@@ -176,46 +201,94 @@ export function suddividi(fileId: string, nomeFile: string, pagine: string[]): P
 // ---------------------------------------------------------------------------
 
 const corpus = new Map<string, Passaggio[]>()
-let indice: IndiceBm25 | null = null
+/** Impronta del testo di ogni file: dice all'indice salvato se è ancora buono. */
+const firme = new Map<string, string>()
+/** Copia dell'indice nella pagina, per le richieste che non possono aspettare (lo Scrittore). */
+let indice: IndiceCompatto | null = null
+let piatti: Passaggio[] | null = null
+
+function ordineFirme(): [string, string][] {
+  return [...corpus.keys()].map((id) => {
+    let f = firme.get(id)
+    if (!f) {
+      f = improntaFile(corpus.get(id) ?? [])
+      firme.set(id, f)
+    }
+    return [id, f]
+  })
+}
+
+/** Impronta di tutto il corpus di adesso. */
+export function firmaCorpus(): string {
+  return improntaCorpus(ordineFirme())
+}
+
+function tuttiIPassaggi(): Passaggio[] {
+  piatti ??= [...corpus.values()].flat()
+  return piatti
+}
+
+function cambiato(ritardo = 1500) {
+  piatti = null
+  for (const id of [...firme.keys()]) if (!corpus.has(id)) firme.delete(id)
+  programmaIndice(ritardo)
+}
 
 async function salvaSuDisco() {
   const oggetto: Record<string, Passaggio[]> = {}
   for (const [id, passaggi] of corpus) oggetto[id] = passaggi
-  await idbSet(CHIAVE_IDB, oggetto)
+  // Testo e impronte nello stesso momento: chi li legge insieme li trova sempre d'accordo.
+  await setMany([
+    [CHIAVE_IDB, oggetto],
+    [CHIAVE_FIRME, ordineFirme()],
+  ])
 }
 
 /** Carica il corpus salvato e restituisce gli id dei file presenti. */
 export async function caricaCorpus(): Promise<Set<string>> {
-  const salvato = (await get<Record<string, Passaggio[]>>(CHIAVE_IDB)) ?? {}
+  const [salvato, salvate] = await getMany<unknown>([CHIAVE_IDB, CHIAVE_FIRME])
   corpus.clear()
-  for (const [id, passaggi] of Object.entries(salvato)) corpus.set(id, passaggi)
+  firme.clear()
+  for (const [id, passaggi] of Object.entries((salvato ?? {}) as Record<string, Passaggio[]>)) corpus.set(id, passaggi)
+  const lette = new Map(Array.isArray(salvate) ? (salvate as [string, string][]) : [])
+  for (const id of corpus.keys()) {
+    const f = lette.get(id)
+    if (f) firme.set(id, f)
+  }
+  // Corpus salvato da una versione precedente: le impronte si calcolano una volta e si salvano.
+  const ordine = ordineFirme()
+  if (corpus.size && (lette.size !== corpus.size || ordine.some(([id, f]) => lette.get(id) !== f))) await idbSet(CHIAVE_FIRME, ordine)
   indice = null
+  // All'avvio il lavoratore riprende subito l'indice salvato: la prima ricerca è già pronta.
+  cambiato(300)
   return new Set(corpus.keys())
 }
 
 export async function aggiungiAlCorpus(fileId: string, passaggi: Passaggio[]) {
   corpus.set(fileId, passaggi)
-  indice = null
+  firme.set(fileId, improntaFile(passaggi))
   await salvaSuDisco()
+  cambiato()
 }
 
 export async function rimuoviDalCorpus(fileId: string) {
   if (!corpus.delete(fileId)) return
-  indice = null
   await salvaSuDisco()
+  cambiato()
 }
 
 export async function svuotaCorpus() {
   corpus.clear()
+  await delMany([CHIAVE_IDB, CHIAVE_FIRME, CHIAVE_INDICE])
   indice = null
-  await del(CHIAVE_IDB)
+  cambiato()
 }
 
 /** Toglie dal corpus tutto tranne i file indicati (usato dal ripristino). */
 export async function tieniSoloNelCorpus(ids: Set<string>) {
   for (const id of [...corpus.keys()]) if (!ids.has(id)) corpus.delete(id)
-  indice = null
   await salvaSuDisco()
+  cambiato()
 }
 
 /** Tutto il corpus, per il file di progetto. */
@@ -225,10 +298,15 @@ export function esportaCorpus(): Record<string, Passaggio[]> {
 
 /** Sostituisce il corpus con quello di un file di progetto. */
 export async function importaCorpus(dati: Record<string, Passaggio[]>) {
+  const prima = new Map(corpus)
   corpus.clear()
-  for (const [id, passaggi] of Object.entries(dati)) corpus.set(id, passaggi)
-  indice = null
+  for (const [id, passaggi] of Object.entries(dati)) {
+    corpus.set(id, passaggi)
+    // Se il file è lo stesso di prima (stesso oggetto) l'impronta non si rifà.
+    if (prima.get(id) !== passaggi) firme.delete(id)
+  }
   await salvaSuDisco()
+  cambiato()
 }
 
 /** Passaggi di un file, per l'anteprima e le citazioni dal corso. */
@@ -262,82 +340,85 @@ export function statisticheCorpus(): { file: number; passaggi: number; caratteri
 // Recupero dei passaggi pertinenti (BM25)
 // ---------------------------------------------------------------------------
 
-const STOPWORD = new Set(
-  (
-    'il lo la i gli le un uno una di a da in con su per tra fra e ed o od ma se che chi cui non ne ci vi si ' +
-    'del dello della dei degli delle al allo alla ai agli alle dal dallo dalla dai dagli dalle nel nello nella nei ' +
-    'negli nelle col coi sul sullo sulla sui sugli sulle come anche quando dove quale quali questo questa questi ' +
-    'queste quello quella quelli quelle essere e stato stata sono era erano sia siano ha hanno avere aveva più meno ' +
-    'molto poco tutto tutti ogni altro altri altra altre suo sua suoi sue loro nostro nostra cosa tale tali quindi ' +
-    'perché poiché infatti inoltre dunque però mentre già ancora sempre solo così the of and to in is for on with ' +
-    'as by an be are this that from or at it its which'
-  ).split(/\s+/),
-)
+export { tokenizza }
 
-const SUFFISSI = ['amento', 'amenti', 'azione', 'azioni', 'mente', 'ità', 'ivo', 'iva', 'ivi', 'ive', 'ale', 'ali', 'are', 'ere', 'ire', 'ato', 'ata', 'ati', 'ate', 'ing', 'ies', 'es', 's']
-
-/** Tokenizzazione con radice approssimata: "stagionale" e "stagionalità" si incontrano. */
-export function tokenizza(testo: string): string[] {
-  return testo
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .split(/[^a-z0-9]+/)
-    .filter((t) => t.length >= 3 && !STOPWORD.has(t))
-    .map((t) => {
-      for (const s of SUFFISSI) {
-        if (t.length > s.length + 3 && t.endsWith(s)) return t.slice(0, -s.length)
-      }
-      return t.length > 5 ? t.slice(0, -1) : t
-    })
+/**
+ * Dopo un cambiamento l'indice si prepara in sottofondo, con calma: se arrivano
+ * tanti file uno dopo l'altro, si rifà una volta sola alla fine.
+ */
+let timerIndice: ReturnType<typeof setTimeout> | undefined
+function programmaIndice(ritardo: number) {
+  clearTimeout(timerIndice)
+  if (corpus.size === 0) return
+  // Poi una copia anche qui, per lo Scrittore che cerca nel corso senza aspettare (prompt e stime).
+  timerIndice = setTimeout(() => void preparaIndice().then(() => precaricaIndice()).catch(() => {}), ritardo)
 }
 
-interface IndiceBm25 {
-  passaggi: Passaggio[]
-  frequenze: Map<string, number>[]
-  lunghezze: number[]
-  documentiPerTermine: Map<string, number>
-  lunghezzaMedia: number
-}
-
-function costruisciIndice(): IndiceBm25 {
-  const passaggi = [...corpus.values()].flat()
-  const frequenze: Map<string, number>[] = []
-  const lunghezze: number[] = []
-  const documentiPerTermine = new Map<string, number>()
-
-  for (const p of passaggi) {
-    const conteggi = new Map<string, number>()
-    const token = tokenizza(p.testo)
-    for (const t of token) conteggi.set(t, (conteggi.get(t) ?? 0) + 1)
-    for (const t of conteggi.keys()) documentiPerTermine.set(t, (documentiPerTermine.get(t) ?? 0) + 1)
-    frequenze.push(conteggi)
-    lunghezze.push(token.length)
-  }
-
-  const lunghezzaMedia = lunghezze.reduce((s, l) => s + l, 0) / Math.max(1, lunghezze.length)
-  return { passaggi, frequenze, lunghezze, documentiPerTermine, lunghezzaMedia }
-}
-
-function punteggi(domanda: string): { passaggio: Passaggio; punteggio: number }[] {
-  if (!indice) indice = costruisciIndice()
-  const { passaggi, frequenze, lunghezze, documentiPerTermine, lunghezzaMedia } = indice
-  const termini = [...new Set(tokenizza(domanda))]
-  const n = passaggi.length
-  const k1 = 1.4
-  const b = 0.75
-
-  return passaggi.map((passaggio, i) => {
-    let punteggio = 0
-    for (const t of termini) {
-      const f = frequenze[i].get(t)
-      if (!f) continue
-      const df = documentiPerTermine.get(t) ?? 0
-      const idf = Math.log(1 + (n - df + 0.5) / (df + 0.5))
-      punteggio += (idf * (f * (k1 + 1))) / (f + k1 * (1 - b + (b * lunghezze[i]) / lunghezzaMedia))
+/** Prepara (o ritrova già salvato) l'indice nel lavoratore in sottofondo. */
+export async function preparaIndice(): Promise<EsitoIndice | null> {
+  if (corpus.size === 0) return null
+  const firma = firmaCorpus()
+  try {
+    return await chiedi<EsitoIndice>({ tipo: 'indice', firma }).esito
+  } catch (err) {
+    // Il lavoratore ha letto un corpus diverso (salvataggio in corso): lo fa la pagina.
+    if (err instanceof Error && err.name === 'FirmaDiversa') {
+      indiceSincrono()
+      return null
     }
-    return { passaggio, punteggio }
-  })
+    throw err
+  }
+}
+
+/**
+ * Indice nella pagina per le richieste sincrone. Prima prova la copia già
+ * caricata, poi la costruisce dal testo in memoria (riusando i file già
+ * indicizzati) e la salva per la volta dopo.
+ */
+function indiceSincrono(): IndiceCompatto {
+  const ordine = ordineFirme()
+  const firma = improntaCorpus(ordine)
+  if (indice?.firma === firma) return indice
+  const fatto = costruisciIndice(ordine, (id) => corpus.get(id), indice)
+  indice = fatto.indice
+  void idbSet(CHIAVE_INDICE, fatto.indice).catch(() => {})
+  return indice
+}
+
+/**
+ * Carica nella pagina l'indice salvato (per lo Scrittore, che lo usa senza
+ * aspettare). Se non c'è, lo prepara il lavoratore e poi si legge.
+ */
+export async function precaricaIndice(): Promise<void> {
+  if (corpus.size === 0) return
+  const firma = firmaCorpus()
+  if (indice?.firma === firma) return
+  let salvato = await getIdb<unknown>(CHIAVE_INDICE).catch(() => undefined)
+  if (!indiceValido(salvato, firma)) {
+    await preparaIndice().catch(() => null)
+    salvato = await getIdb<unknown>(CHIAVE_INDICE).catch(() => undefined)
+  }
+  if (indiceValido(salvato, firma) && firmaCorpus() === firma) indice = salvato
+}
+
+/** Classifiche (passaggi dal più pertinente) di più domande, calcolate nel lavoratore. */
+async function classificheAsync(domande: string[]): Promise<Passaggio[][]> {
+  const firma = firmaCorpus()
+  const tutti = tuttiIPassaggi()
+  try {
+    const classifiche = await chiedi<Uint32Array[]>({ tipo: 'cerca', firma, domande }).esito
+    // Se intanto il corpus è cambiato, gli indici non valgono più: si rifà qui.
+    if (firmaCorpus() === firma) return classifiche.map((c) => Array.from(c, (i) => tutti[i]))
+  } catch (err) {
+    if (!(err instanceof Error && err.name === 'FirmaDiversa')) throw err
+  }
+  return classificheSincrone(domande)
+}
+
+function classificheSincrone(domande: string[]): Passaggio[][] {
+  const ind = indiceSincrono()
+  const tutti = tuttiIPassaggi()
+  return domande.map((d) => Array.from(classifica(ind, d), (i) => tutti[i]))
 }
 
 /**
@@ -346,20 +427,7 @@ function punteggi(domanda: string): { passaggio: Passaggio; punteggio: number }[
  * risultati si alternano, così ogni sezione ha il suo materiale. Se tutto il
  * corpus sta nel budget, si manda tutto.
  */
-export function recuperaPassaggi(domande: string[], budget: number): Passaggio[] {
-  const tutti = [...corpus.values()].flat()
-  const totale = tutti.reduce((s, p) => s + p.testo.length, 0)
-  if (totale <= budget) return ordina(tutti)
-
-  const classifiche = domande
-    .filter((d) => d.trim())
-    .map((d) =>
-      punteggi(d)
-        .filter((x) => x.punteggio > 0)
-        .sort((a, b) => b.punteggio - a.punteggio)
-        .map((x) => x.passaggio),
-    )
-
+function scegliEntroBudget(classifiche: Passaggio[][], budget: number): Passaggio[] {
   const scelti = new Map<string, Passaggio>()
   let usati = 0
   let giro = 0
@@ -382,14 +450,35 @@ export function recuperaPassaggi(domande: string[], budget: number): Passaggio[]
   return ordina([...scelti.values()])
 }
 
+function tuttoNelBudget(budget: number): Passaggio[] | null {
+  const tutti = tuttiIPassaggi()
+  const totale = tutti.reduce((s, p) => s + p.testo.length, 0)
+  return totale <= budget ? ordina(tutti) : null
+}
+
+export function recuperaPassaggi(domande: string[], budget: number): Passaggio[] {
+  const tutto = tuttoNelBudget(budget)
+  if (tutto) return tutto
+  return scegliEntroBudget(classificheSincrone(domande.filter((d) => d.trim())), budget)
+}
+
+/** Come recuperaPassaggi, ma il lavoro pesante lo fa il lavoratore in sottofondo. */
+export async function recuperaPassaggiAsync(domande: string[], budget: number): Promise<Passaggio[]> {
+  const tutto = tuttoNelBudget(budget)
+  if (tutto) return tutto
+  return scegliEntroBudget(await classificheAsync(domande.filter((d) => d.trim())), budget)
+}
+
 /** I passaggi più pertinenti a una domanda, in ordine di pertinenza. */
 export function cercaPassaggi(domanda: string, quanti = 6): Passaggio[] {
   if (corpus.size === 0 || !domanda.trim()) return []
-  return punteggi(domanda)
-    .filter((x) => x.punteggio > 0)
-    .sort((a, b) => b.punteggio - a.punteggio)
-    .slice(0, quanti)
-    .map((x) => x.passaggio)
+  return classificheSincrone([domanda])[0].slice(0, quanti)
+}
+
+/** Come cercaPassaggi, nel lavoratore in sottofondo. */
+export async function cercaPassaggiAsync(domanda: string, quanti = 6): Promise<Passaggio[]> {
+  if (corpus.size === 0 || !domanda.trim()) return []
+  return (await classificheAsync([domanda]))[0].slice(0, quanti)
 }
 
 /** Ordine di lettura naturale: per file, poi per pagina. */

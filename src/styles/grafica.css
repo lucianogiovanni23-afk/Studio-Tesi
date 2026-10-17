@@ -1,0 +1,443 @@
+/* Menu "Grafica": pannello scuro e semitrasparente da videogioco, sempre scuro anche col tema chiaro. */
+
+.mg-velo {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  /* la sala resta visibile a destra: le modifiche si vedono subito */
+  background: linear-gradient(90deg, rgba(6, 8, 12, 0.72) 0, rgba(6, 8, 12, 0.45) 560px, rgba(6, 8, 12, 0.06) 100%);
+  pointer-events: none;
+  animation: mg-entra 0.18s ease-out;
+}
+
+.menu-grafica {
+  pointer-events: auto;
+  position: absolute;
+  left: 24px;
+  top: 24px;
+  bottom: 24px;
+  width: min(580px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  color: #eef1f5;
+  background: rgba(14, 17, 23, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  font-family: var(--sans);
+  font-size: 15px;
+  overflow: hidden;
+}
+
+@keyframes mg-entra {
+  from {
+    opacity: 0;
+  }
+}
+
+.mg-testa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 10px 18px;
+}
+
+.mg-testa h2 {
+  margin: 0;
+  flex: 1;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.mg-icona {
+  display: inline-flex;
+  color: #ffd36b;
+}
+
+.mg-chiudi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+}
+
+.mg-chiudi:hover,
+.mg-chiudi:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.mg-preset {
+  padding: 0 12px 8px;
+}
+
+.mg-preset .mg-riga {
+  background: linear-gradient(90deg, rgba(255, 211, 107, 0.16), rgba(255, 211, 107, 0.04));
+  border-color: rgba(255, 211, 107, 0.35);
+}
+
+.mg-preset .mg-nome {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mg-schede {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mg-scheda {
+  flex: 1;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: rgba(238, 241, 245, 0.66);
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.mg-scheda:hover,
+.mg-scheda:focus-visible {
+  color: #fff;
+}
+
+.mg-scheda-attiva {
+  color: #fff;
+  border-bottom-color: #ffd36b;
+}
+
+.mg-righe {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.mg-riga {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 4px 6px 4px 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  outline: none;
+}
+
+.mg-riga:hover,
+.mg-riga-attiva {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.mg-riga:focus-visible,
+.mg-riga:focus-within {
+  border-color: #ffd36b;
+  box-shadow: 0 0 0 1px #ffd36b inset;
+}
+
+.mg-nome {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.mg-controllo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.mg-freccia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: #ffd36b;
+  font-size: 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mg-freccia:hover:not(:disabled) {
+  background: rgba(255, 211, 107, 0.16);
+}
+
+.mg-freccia:disabled {
+  color: rgba(255, 255, 255, 0.18);
+  cursor: default;
+}
+
+.mg-valore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 9.5em;
+  text-align: center;
+  font-weight: 700;
+}
+
+.mg-tacche {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  justify-content: center;
+}
+
+.mg-tacche span {
+  flex: 1;
+  max-width: 26px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mg-tacche .mg-tacca-su {
+  background: #ffd36b;
+}
+
+.mg-controllo-cursore {
+  gap: 2px;
+}
+
+.mg-cursore {
+  width: 7.2em;
+  height: 44px;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.mg-cursore::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffd36b var(--quota), rgba(255, 255, 255, 0.2) var(--quota));
+}
+
+.mg-cursore::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffd36b var(--quota), rgba(255, 255, 255, 0.2) var(--quota));
+}
+
+.mg-cursore::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -8px;
+  border-radius: 50%;
+  border: 2px solid #14171d;
+  background: #fff;
+}
+
+.mg-cursore::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #14171d;
+  background: #fff;
+}
+
+.mg-cursore:focus-visible {
+  outline: none;
+}
+
+.mg-numero {
+  width: 3.4em;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mg-piede {
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.mg-spiega {
+  margin: 0 0 10px;
+  min-height: 2.9em;
+  color: rgba(238, 241, 245, 0.86);
+  line-height: 1.45;
+}
+
+.mg-nota {
+  margin: -4px 0 10px;
+  color: #ffd36b;
+}
+
+.mg-bottoni {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.mg-bottone {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mg-bottone:hover,
+.mg-bottone:focus-visible {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.mg-bottone-primario {
+  background: #ffd36b;
+  border-color: #ffd36b;
+  color: #1a1606;
+  min-width: 120px;
+}
+
+.mg-bottone-primario:hover,
+.mg-bottone-primario:focus-visible {
+  background: #ffe08f;
+}
+
+/* iPad: righe e testo un po' più grandi. */
+.mg-ipad .menu-grafica {
+  font-size: 16px;
+}
+
+.mg-ipad .mg-riga {
+  min-height: 58px;
+}
+
+.mg-ipad .mg-freccia {
+  width: 48px;
+  height: 48px;
+}
+
+/* Schermi stretti: il pannello occupa tutto. */
+@media (max-width: 720px) {
+  .mg-velo {
+    background: rgba(6, 8, 12, 0.6);
+  }
+  .menu-grafica {
+    left: 8px;
+    right: 8px;
+    top: 8px;
+    bottom: 8px;
+    width: auto;
+  }
+  .mg-riga {
+    flex-wrap: wrap;
+    padding: 8px 6px 8px 12px;
+  }
+  .mg-controllo {
+    margin-left: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-velo {
+    animation: none;
+  }
+}
+
+/* --- nella sala: contatore FPS e avviso della modalità automatica --- */
+
+.contatore-fps {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 5;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: rgba(10, 12, 16, 0.72);
+  color: #b9f27c;
+  font: 700 13px/1.3 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.contatore-fps small {
+  display: block;
+  color: rgba(238, 241, 245, 0.7);
+  font-weight: 500;
+  font-size: 11px;
+}
+
+.avviso-grafica {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: rgba(14, 17, 23, 0.84);
+  color: #eef1f5;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.avviso-grafica .link-scuro {
+  border: 0;
+  background: none;
+  color: #ffd36b;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 32px;
+}
+
+.avviso-grafica .avviso-chiudi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  cursor: pointer;
+}
+
+.modo-ipad .avviso-grafica {
+  min-height: 44px;
+  font-size: 15px;
+}
+
+.modo-ipad .avviso-grafica .link-scuro,
+.modo-ipad .avviso-grafica .avviso-chiudi {
+  min-height: 44px;
+  min-width: 44px;
+}

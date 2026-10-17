@@ -1,3 +1,4 @@
+import { createStore, del, entries, get, set, type UseStore } from 'idb-keyval'
 import { primaPaginaDa } from '../domain/pagine'
 import type { OrigineFonte } from '../types'
 
@@ -254,6 +255,94 @@ export const CERCA: Record<Catalogo, (q: string, n: number, s?: AbortSignal) => 
   openalex: cercaOpenAlex,
   crossref: cercaCrossref,
   semanticscholar: cercaSemanticScholar,
+}
+
+// ---------------------------------------------------------------------------
+// Memoria delle ricerche negli archivi
+// ---------------------------------------------------------------------------
+
+/**
+ * Le risposte degli archivi si ricordano per 7 giorni (in IndexedDB, su questo
+ * dispositivo): rifare la stessa ricerca non chiede di nuovo le stesse cose e
+ * funziona anche con internet lento. Si ricordano solo le risposte riuscite e
+ * con qualche risultato, mai gli errori. "Aggiorna" le chiede di nuovo.
+ */
+export const DURATA_MEMORIA_MS = 7 * 24 * 60 * 60 * 1000
+const FORMATO_MEMORIA = 1
+
+interface VoceMemoria {
+  formato: number
+  quando: string
+  risultati: RisultatoCatalogo[]
+}
+
+let archivio: UseStore | null = null
+function memoria(): UseStore | null {
+  try {
+    archivio ??= createStore('studio-tesi-cataloghi', 'risposte')
+    return archivio
+  } catch {
+    return null
+  }
+}
+
+/** La stessa ricerca scritta con maiuscole o spazi diversi è la stessa ricerca. */
+export function queryNormalizzata(q: string): string {
+  return q.normalize('NFC').toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function chiaveMemoria(catalogo: Catalogo, q: string, quanti: number): string {
+  return `${catalogo}|${quanti}|${queryNormalizzata(q)}`
+}
+
+export interface RispostaCatalogo {
+  risultati: RisultatoCatalogo[]
+  /** Se la risposta viene dalla memoria: quando era arrivata (ISO). */
+  daMemoria: string | null
+}
+
+/** Cerca in un archivio, usando la risposta ricordata se ha meno di 7 giorni (a meno di `forza`). */
+export async function cercaConMemoria(catalogo: Catalogo, q: string, quanti: number, signal?: AbortSignal, forza = false): Promise<RispostaCatalogo> {
+  const store = memoria()
+  const chiave = chiaveMemoria(catalogo, q, quanti)
+  if (store && !forza) {
+    const voce = await get<VoceMemoria>(chiave, store).catch(() => undefined)
+    if (voce && voce.formato === FORMATO_MEMORIA && Array.isArray(voce.risultati) && Date.now() - Date.parse(voce.quando) < DURATA_MEMORIA_MS) {
+      return { risultati: voce.risultati.map((r) => ({ ...r })), daMemoria: voce.quando }
+    }
+  }
+  // Gli errori arrivano al chiamante e non si ricordano.
+  const risultati = await CERCA[catalogo](q, quanti, signal)
+  if (store && risultati.length > 0) {
+    const voce: VoceMemoria = { formato: FORMATO_MEMORIA, quando: new Date().toISOString(), risultati }
+    await set(chiave, voce, store).catch(() => {})
+  }
+  return { risultati, daMemoria: null }
+}
+
+/** Toglie le risposte più vecchie di 7 giorni (si fa ogni tanto, senza fretta). */
+export async function puliziaMemoriaCataloghi(): Promise<void> {
+  const store = memoria()
+  if (!store) return
+  const tutte = await entries<string, VoceMemoria>(store).catch(() => [])
+  for (const [k, v] of tutte) {
+    if (!v || Date.now() - Date.parse(v.quando) >= DURATA_MEMORIA_MS) await del(k, store).catch(() => {})
+  }
+}
+
+/** "di poco fa", "di 20 minuti fa", "di oggi", "di ieri", "di 2 giorni fa". */
+export function quandoLeggibile(iso: string, adesso = Date.now()): string {
+  const t = Date.parse(iso)
+  const minuti = Math.max(0, Math.round((adesso - t) / 60000))
+  if (minuti < 60) return minuti < 2 ? 'di poco fa' : `di ${minuti} minuti fa`
+  const giorno = (x: number) => {
+    const d = new Date(x)
+    return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000
+  }
+  const giorni = giorno(adesso) - giorno(t)
+  if (giorni <= 0) return 'di oggi'
+  if (giorni === 1) return 'di ieri'
+  return `di ${giorni} giorni fa`
 }
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
+import { useThree } from '@react-three/fiber'
 import { useProgress, useTexture } from '@react-three/drei'
-import { Bloom, EffectComposer, LUT, N8AO, ToneMapping, Vignette } from '@react-three/postprocessing'
-import { BlendFunction, KernelSize, ToneMappingMode } from 'postprocessing'
+import { Bloom, EffectComposer, FXAA, LUT, N8AO, SMAA, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { BlendFunction, KernelSize, ToneMappingMode, type EffectComposer as EffectComposerImpl } from 'postprocessing'
 import * as THREE from 'three'
+import type { Grafica } from './qualita'
 
 /**
  * Post-produzione "da videogioco":
@@ -12,8 +14,10 @@ import * as THREE from 'three'
  * - occlusione ambientale (N8AO) per le ombre di contatto;
  * - tone mapping ACES, vignettatura leggera e una LUT di contrasto morbida,
  *   uguali di giorno e di notte.
- * Nella qualità ridotta restano solo tone mapping, vignettatura e un bloom
- * leggero a mezza risoluzione.
+ * Ogni effetto si accende o spegne dal menu Grafica: occlusione ambientale,
+ * bagliore (pieno con le luci realistiche, leggero senza), effetti cinema
+ * (LUT e vignettatura) e antialiasing (MSAA nel composer, oppure SMAA/FXAA
+ * in fondo alla catena).
  */
 
 const LUT_URL = `${import.meta.env.BASE_URL}assets/materiali/lut_contrasto_caldo.png`
@@ -63,28 +67,60 @@ function impostaOpacita(e: ConOpacita | null, valore: number) {
   if (e) e.blendMode.opacity.value = valore
 }
 
-export function Effetti({ qualita, notte }: { qualita: 'completa' | 'ridotta'; notte: boolean }) {
-  const completa = qualita === 'completa'
+export function Effetti({ g, notte }: { g: Grafica; notte: boolean }) {
+  const pieno = g.luci
   useSegnalePronto()
   const lut = useTexture(LUT_URL, preparaLut)
   const lutRef = useRef<ConOpacita | null>(null)
   useEffect(() => impostaOpacita(lutRef.current, notte ? 0.3 : 0.45))
+  const campioni = g.aa === 'msaa4' ? 4 : g.aa === 'msaa2' ? 2 : 0
+  const composer = useRef<EffectComposerImpl | null>(null)
+  const size = useThree((s) => s.size)
+  const dpr = useThree((s) => s.viewport.dpr)
+
+  // Cambiando la densità di pixel (scala, risoluzione dinamica) i buffer del composer vanno ridimensionati.
+  useEffect(() => {
+    composer.current?.setSize(size.width, size.height)
+  }, [dpr, size.width, size.height])
+
+  // Con un antialiasing MSAA diverso il composer si ricrea: quello vecchio libera la memoria.
+  useEffect(() => {
+    const c = composer.current
+    return () => c?.dispose()
+  }, [campioni])
 
   return (
-    <EffectComposer multisampling={completa ? 4 : 2} enableNormalPass={false}>
-      {completa ? <N8AO aoRadius={0.55} distanceFalloff={0.9} intensity={notte ? 2.2 : 2.6} quality="medium" halfRes color={notte ? '#0b0d18' : '#1a140c'} /> : <></>}
-      <Bloom
-        mipmapBlur={completa}
-        kernelSize={completa ? KernelSize.LARGE : KernelSize.SMALL}
-        luminanceThreshold={completa ? 1.0 : 1.15}
-        luminanceSmoothing={0.25}
-        intensity={completa ? (notte ? 0.95 : 0.55) : notte ? 0.6 : 0.3}
-        radius={0.72}
-        resolutionScale={completa ? 0.5 : 0.25}
-      />
+    <EffectComposer key={campioni} ref={composer} multisampling={campioni} enableNormalPass={false}>
+      {g.ao > 0 ? (
+        <N8AO
+          aoRadius={0.55}
+          distanceFalloff={0.9}
+          intensity={notte ? 2.2 : 2.6}
+          quality={g.ao === 2 ? 'high' : 'medium'}
+          halfRes={g.ao === 1}
+          color={notte ? '#0b0d18' : '#1a140c'}
+        />
+      ) : (
+        <></>
+      )}
+      {g.bagliore ? (
+        <Bloom
+          mipmapBlur={pieno}
+          kernelSize={pieno ? KernelSize.LARGE : KernelSize.SMALL}
+          luminanceThreshold={pieno ? 1.0 : 1.15}
+          luminanceSmoothing={0.25}
+          intensity={pieno ? (notte ? 0.95 : 0.55) : notte ? 0.6 : 0.3}
+          radius={0.72}
+          resolutionScale={pieno ? 0.5 : 0.25}
+        />
+      ) : (
+        <></>
+      )}
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      <LUT ref={lutRef as never} lut={lut} blendFunction={BlendFunction.NORMAL} />
-      <Vignette offset={0.3} darkness={notte ? 0.6 : 0.5} blendFunction={BlendFunction.NORMAL} />
+      {g.cinema ? <LUT ref={lutRef as never} lut={lut} blendFunction={BlendFunction.NORMAL} /> : <></>}
+      {g.cinema ? <Vignette offset={0.3} darkness={notte ? 0.6 : 0.5} blendFunction={BlendFunction.NORMAL} /> : <></>}
+      {g.aa === 'smaa' ? <SMAA /> : <></>}
+      {g.aa === 'fxaa' ? <FXAA /> : <></>}
     </EffectComposer>
   )
 }

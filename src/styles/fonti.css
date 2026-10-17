@@ -1327,3 +1327,16 @@
     transform: none;
   }
 }
+
+/* Archivi presi dalla memoria del dispositivo, con "Aggiorna". */
+.ric-memoria {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.ric-memoria .nota {
+  margin: 0;
+  flex: 1 1 260px;
+}

@@ -1,11 +1,51 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { createReadStream, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { defineConfig, type Plugin } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+/**
+ * Lettura delle immagini (OCR) dei PDF scansionati: lavoratore e motore di
+ * tesseract.js e le lingue italiano e inglese (modelli "best_int") presi dai
+ * pacchetti npm e serviti dall'app in assets/ocr/, senza CDN: dopo la prima
+ * lettura funziona anche offline. Non si copiano in public/ (16 MB nel
+ * repository): li aggiunge la build e, in sviluppo, li serve Vite.
+ */
+function risorseOcr(): Plugin {
+  const richiedi = createRequire(import.meta.url)
+  const pacchetto = (nome: string) => dirname(richiedi.resolve(`${nome}/package.json`))
+  const core = pacchetto('tesseract.js-core')
+  const file: [string, string][] = [
+    ['worker.min.js', join(pacchetto('tesseract.js'), 'dist/worker.min.js')],
+    // Il lavoratore sceglie da solo la versione del motore adatta al dispositivo (solo LSTM).
+    ['tesseract-core-relaxedsimd-lstm.wasm.js', join(core, 'tesseract-core-relaxedsimd-lstm.wasm.js')],
+    ['tesseract-core-simd-lstm.wasm.js', join(core, 'tesseract-core-simd-lstm.wasm.js')],
+    ['tesseract-core-lstm.wasm.js', join(core, 'tesseract-core-lstm.wasm.js')],
+    ['lang/ita.traineddata.gz', join(pacchetto('@tesseract.js-data/ita'), '4.0.0_best_int/ita.traineddata.gz')],
+    ['lang/eng.traineddata.gz', join(pacchetto('@tesseract.js-data/eng'), '4.0.0_best_int/eng.traineddata.gz')],
+  ]
+  return {
+    name: 'studio-tesi-ocr',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const voce = file.find(([nome]) => req.url?.split('?')[0].endsWith(`/assets/ocr/${nome}`))
+        if (!voce) return next()
+        res.setHeader('Content-Type', voce[0].endsWith('.gz') ? 'application/gzip' : 'text/javascript')
+        createReadStream(voce[1]).pipe(res)
+      })
+    },
+    generateBundle() {
+      for (const [nome, sorgente] of file) this.emitFile({ type: 'asset', fileName: `assets/ocr/${nome}`, source: readFileSync(sorgente) })
+    },
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
+    risorseOcr(),
     // App installabile (iPad: Condividi › Aggiungi alla schermata Home) e
     // utilizzabile anche senza rete dopo la prima visita.
     VitePWA({
@@ -35,7 +75,8 @@ export default defineConfig({
         // Guscio dell'app e tutto il codice (anche le schermate caricate dopo e
         // il worker di pdf.js), così l'app si apre anche senza rete.
         globPatterns: ['**/*.{js,mjs,css,html}', '*.{svg,png}'],
-        globIgnores: ['assets/**/*.{png,jpg,jpeg,webp,glb,gltf,hdr,ktx2}'],
+        // I file dell'OCR (circa 16 MB) non si scaricano in anticipo: si salvano la prima volta che servono.
+        globIgnores: ['assets/**/*.{png,jpg,jpeg,webp,glb,gltf,hdr,ktx2}', 'assets/ocr/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
@@ -51,6 +92,16 @@ export default defineConfig({
               cacheName: 'studio-risorse',
               expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 365 },
               cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Lettura delle immagini (OCR): lavoratore, motore e lingue, salvati al primo uso.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && /\/assets\/ocr\//.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'studio-ocr',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [200] },
             },
           },
           {

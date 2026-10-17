@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { AGENTE } from '../agents/agenti'
 import { Conferma } from '../components/Conferma'
 import { TestoCitato } from '../components/TestoCitato'
@@ -10,6 +10,7 @@ import { etichettaStile, useStile } from '../components/scrittura/stile'
 import { StrumentiSezione } from '../components/scrittura/StrumentiSezione'
 import { apriStrumenti, usePaginaScrittura } from '../components/scrittura/statoPagina'
 import { esaminaCitazioni } from '../agents/citations'
+import { precaricaIndice } from '../agents/corpus'
 import { selezionaParagrafo, useScrittore } from '../agents/scrittore'
 import { esportaTesto, paragrafoAlCursore } from '../domain/citazioniTesto'
 import { ETICHETTA_STATO } from '../domain/etichette'
@@ -28,14 +29,24 @@ function nomeAutore(a: Autore): string {
   return AGENTE[a].nome
 }
 
+// Un formattatore per tipo, creato una volta: toLocaleString ne crea uno nuovo a ogni chiamata (lento con 60 pagine).
+const FORMATO_DATA = new Intl.DateTimeFormat('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+const FORMATO_NUMERO = new Intl.NumberFormat('it-IT')
+const FORMATO_PAGINE = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 })
+
 function dataBreve(iso: string): string {
-  return new Date(iso).toLocaleString('it-IT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return FORMATO_DATA.format(new Date(iso))
 }
 
 type StatoSez = 'vuota' | 'pronta' | 'scritta'
 
+/** Come `testo.trim() !== ''`, ma senza copiare tutto il testo (con 60 pagine conta). */
+function haTesto(testo: string): boolean {
+  return /\S/.test(testo)
+}
+
 function statoSezione(s: Sezione): StatoSez {
-  if (s.testo.trim()) return 'scritta'
+  if (haTesto(s.testo)) return 'scritta'
   if (s.fontiConfermate && s.scalettaApprovata) return 'pronta'
   return 'vuota'
 }
@@ -45,17 +56,18 @@ const NOME_STATO_SEZ: Record<StatoSez, string> = { vuota: 'da cominciare', pront
 /** Colonna sinistra: indice navigabile, un gruppo per capitolo. */
 function IndiceLaterale({ capitoli, capId, sezId }: { capitoli: Capitolo[]; capId: string | null; sezId: string | null }) {
   const apri = useStudio((s) => s.apriSezione)
-  const totale = capitoli.reduce((t, c) => t + c.sezioni.reduce((u, s) => u + contaParoleTesto(s.testo), 0), 0)
+  const parolePerCapitolo = useMemo(() => capitoli.map((c) => c.sezioni.reduce((u, s) => u + contaParoleTesto(s.testo), 0)), [capitoli])
+  const totale = parolePerCapitolo.reduce((t, n) => t + n, 0)
   return (
     <nav className="indice-laterale sc-indice" aria-label="Indice">
       <div className="sc-indice-testa">
         <span>
           <Icona nome="elenco" /> Indice
         </span>
-        <small>{totale.toLocaleString('it-IT')} parole</small>
+        <small>{FORMATO_NUMERO.format(totale)} parole</small>
       </div>
       {capitoli.map((c, i) => {
-        const parole = c.sezioni.reduce((u, s) => u + contaParoleTesto(s.testo), 0)
+        const parole = parolePerCapitolo[i]
         return (
           <div key={c.id} className={`il-capitolo sc-cap stato-cap-${c.stato} ${c.id === capId ? 'sc-cap-aperto' : ''}`}>
             <p className="il-titolo sc-cap-titolo">
@@ -63,7 +75,7 @@ function IndiceLaterale({ capitoli, capId, sezId }: { capitoli: Capitolo[]; capI
                 {i + 1}
               </span>
               <span className="sc-cap-nome">{c.titolo}</span>
-              {parole > 0 && <small className="sc-cap-parole">{parole.toLocaleString('it-IT')}</small>}
+              {parole > 0 && <small className="sc-cap-parole">{FORMATO_NUMERO.format(parole)}</small>}
             </p>
             <ul>
               {c.sezioni.map((s, j) => {
@@ -82,7 +94,7 @@ function IndiceLaterale({ capitoli, capId, sezId }: { capitoli: Capitolo[]; capI
                         {i + 1}.{j + 1}
                       </span>
                       <span className="sc-sez-titolo">{s.titolo}</span>
-                      {s.testo.trim() ? <small>{contaParoleTesto(s.testo)} parole</small> : <small>vuota</small>}
+                      {haTesto(s.testo) ? <small>{contaParoleTesto(s.testo)} parole</small> : <small>vuota</small>}
                     </button>
                   </li>
                 )
@@ -128,7 +140,7 @@ function SelettoreCapitoli({ capitoli, cap, sez }: { capitoli: Capitolo[]; cap: 
             {c.sezioni.map((s, j) => (
               <option key={s.id} value={`${c.id}|${s.id}`}>
                 {i + 1}.{j + 1} {s.titolo}
-                {s.testo.trim() ? ` · ${contaParoleTesto(s.testo)} parole` : ''}
+                {haTesto(s.testo) ? ` · ${contaParoleTesto(s.testo)} parole` : ''}
               </option>
             ))}
           </optgroup>
@@ -292,7 +304,7 @@ type StatoPasso = 'fatto' | 'corrente' | 'dopo'
 
 /** Il passo da aprire quando arrivi su una sezione: il primo che manca, o il testo se c'è già. */
 function passoIniziale(sez: Sezione): Passo {
-  if (sez.testo.trim()) return 'testo'
+  if (haTesto(sez.testo)) return 'testo'
   if (!sez.fontiConfermate) return 'fonti'
   if (!sez.scalettaApprovata) return 'scaletta'
   return 'testo'
@@ -363,10 +375,14 @@ function PiedeFoglio({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
     setCopiato(null)
     if (aperto === 'citazioni') setAperto(null)
   }
-  const esame = useMemo(() => esaminaCitazioni(sez.testo, sez.citazioni), [sez.testo, sez.citazioni])
-  const { ia, lessico, segnalazioni } = useStile(sez)
+  // Citazioni e frasi da IA si ricalcolano con calma, dopo che la pagina ha risposto ai tasti.
+  const differita = useDeferredValue(sez)
+  // Cambiando sezione non si mostra mai, nemmeno per un attimo, il conto di quella di prima.
+  const sezCalma = differita.id === sez.id ? differita : sez
+  const esame = useMemo(() => esaminaCitazioni(sezCalma.testo, sezCalma.citazioni), [sezCalma.testo, sezCalma.citazioni])
+  const { ia, lessico, segnalazioni } = useStile(sezCalma)
   // I bottoni restano sempre al loro posto: se comparissero al primo salvataggio, si sposterebbero sotto il dito.
-  const vuoto = !sez.testo.trim()
+  const vuoto = !haTesto(sez.testo)
   const parole = contaParoleTesto(sez.testo)
   const alterna = (p: Piede) => setAperto((a) => (a === p ? null : p))
 
@@ -374,7 +390,7 @@ function PiedeFoglio({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
     <>
       <div className="sc-piede">
         <p className="nota conteggio sc-conteggio">
-          <strong>{parole.toLocaleString('it-IT')}</strong> parole · circa {(parole / parolePerPagina).toLocaleString('it-IT', { maximumFractionDigits: 1 })} pagine ·
+          <strong>{FORMATO_NUMERO.format(parole)}</strong> parole · circa {FORMATO_PAGINE.format(parole / parolePerPagina)} pagine ·
           ultima modifica {dataBreve(sez.aggiornataIl)}
         </p>
         <div className="sc-piede-bottoni">
@@ -407,7 +423,7 @@ function PiedeFoglio({ cap, sez }: { cap: Capitolo; sez: Sezione }) {
             disabled={vuoto}
           >
             <Icona nome="scintille" dimensione={15} />
-            {etichettaStile(sez, ia, lessico)}
+            {etichettaStile(sezCalma, ia, lessico)}
           </button>
           <button type="button" className="sc-mini" onClick={() => alterna('versioni')} aria-expanded={aperto === 'versioni'}>
             <Icona nome="versioni" dimensione={15} />
@@ -456,7 +472,7 @@ function BarraConcentrazione({ titolo, parole }: { titolo: string; parole: numbe
     <div className="barra-concentrazione" role="region" aria-label="Modalità concentrazione">
       <span className="barra-concentrazione-titolo">{titolo}</span>
       <span className="nota">
-        {parole} parole · circa {(parole / parolePerPagina).toLocaleString('it-IT', { maximumFractionDigits: 1 })} pagine
+        {parole} parole · circa {FORMATO_PAGINE.format(parole / parolePerPagina)} pagine
       </span>
       <button type="button" className="bottone bottone-piccolo bottone-secondario" onClick={() => esci(false)}>
         Esci <span className="tasto">Esc</span>
@@ -559,6 +575,11 @@ export function Scrittura() {
   const capId = useStudio((s) => s.capitoloAperto)
   const sezId = useStudio((s) => s.sezioneAperta)
   const largo = useLargo(1000)
+
+  // Lo Scrittore cerca nel corso senza aspettare: l'indice salvato si carica subito qui.
+  useEffect(() => {
+    void precaricaIndice().catch(() => {})
+  }, [])
 
   const cap = capitoli.find((c) => c.id === capId) ?? capitoli[0]
   const sez = cap?.sezioni.find((s) => s.id === sezId) ?? cap?.sezioni[0]

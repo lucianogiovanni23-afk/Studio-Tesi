@@ -1,35 +1,33 @@
 import { createContext, useContext } from 'react'
-import { useMovimentoRidotto } from '../hooks/useLayoutMode'
-import { dispositivoTattile, useModoUso } from '../hooks/useModoUso'
 import { useStudio } from '../store'
+import { PRESET, extraPredefinite, type ExtraGrafica, type ValoriGrafica } from '../grafica/grafica'
 
-/** Qualità effettiva della scena, dopo aver risolto la modalità "auto". */
-export type QualitaScena = 'completa' | 'ridotta' | 'spenta'
+/** La sala 3D è accesa o spenta (interruttore "Ufficio 3D" del menu Grafica). */
+export type QualitaScena = 'attiva' | 'spenta'
 
-export const ContestoQualita = createContext<'completa' | 'ridotta'>('completa')
-
-/** Dentro il Canvas: i componenti che accendono ombre o dettagli la consultano. */
-export function useQualita() {
-  return useContext(ContestoQualita)
-}
-
-function dispositivoModesto(): boolean {
-  if (typeof navigator === 'undefined') return false
-  const memoria = (navigator as Navigator & { deviceMemory?: number }).deviceMemory
-  const nuclei = navigator.hardwareConcurrency
-  return (memoria !== undefined && memoria <= 4) || (nuclei !== undefined && nuclei <= 4) || dispositivoTattile()
+export function useQualitaScena(): QualitaScena {
+  return useStudio((s) => s.preferenze.modalitaScena) === 'spenta' ? 'spenta' : 'attiva'
 }
 
 /**
- * "automatica" sceglie la ridotta su iPad, sui dispositivi meno potenti e
- * quando il sistema chiede meno animazioni; altrimenti la completa.
+ * Le impostazioni grafiche effettive, dentro il Canvas: ogni componente
+ * accende ombre, dettagli ed effetti in base a queste (vedi grafica/grafica.ts).
  */
-export function useQualitaScena(): QualitaScena {
-  const modalita = useStudio((s) => s.preferenze.modalitaScena)
-  const modo = useModoUso()
-  const ridotto = useMovimentoRidotto()
-  if (modalita !== 'auto') return modalita
-  return modo === 'ipad' || ridotto || dispositivoModesto() ? 'ridotta' : 'completa'
+export interface Grafica extends ValoriGrafica {
+  extra: ExtraGrafica
+  /** Animazioni d'ambiente ferme (respiro, ventole, luci RGB, vento, uccelli). */
+  fermo: boolean
+}
+
+export const ContestoGrafica = createContext<Grafica>({ ...PRESET.alta, extra: extraPredefinite(), fermo: false })
+
+export function useGrafica(): Grafica {
+  return useContext(ContestoGrafica)
+}
+
+/** Le animazioni d'ambiente sono ferme (menu Grafica › Animazioni, o "riduci movimento" del sistema). */
+export function useFermo(): boolean {
+  return useContext(ContestoGrafica).fermo
 }
 
 /** Di notte la sala cambia luci, cielo e bagliori. */

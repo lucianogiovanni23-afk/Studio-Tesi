@@ -28,8 +28,8 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
   con la biblioteca come scaffale (un libro per fonte, colorato per tema), i capitoli come volumi
   sul tavolo (colore per stato, altezza per parole scritte) e le postazioni dei quattro agenti.
   Toccando un agente si apre il suo ragionamento, una nuvoletta alla volta; toccando scaffale,
-  volumi o scrivanie si va alla schermata corrispondente. Modalità completa / ridotta / spenta;
-  "automatica" sceglie la ridotta su iPad e sui dispositivi meno potenti; si ferma mentre si estrae
+  volumi o scrivanie si va alla schermata corrispondente. La qualità si regola dal menu Grafica
+  (vedi "Menu grafica"); si ferma mentre si estrae
   il testo dei PDF; rispetta `prefers-reduced-motion`. Le etichette usano `Html` di drei (non `Text`,
   che scarica un font da CDN).
 - **Scrittura**: indice a sinistra, testo modificabile al centro, materiale utile a destra (su
@@ -42,7 +42,7 @@ https://lucianogiovanni23-afk.github.io/Studio-Tesi/
   elencati come lacune da non sviluppare.
 - **Glossario** condiviso (8 termini iniziali, con varianti da uniformare): entra nei prompt.
 - **Impostazioni**: chiave API, Salva/Apri progetto, stile di citazione (autore-anno predefinito),
-  caso aziendale facoltativo, modo d'uso, scena, modelli, costi per mese / agente / azione con il
+  caso aziendale facoltativo, modo d'uso, impostazioni grafiche, modelli, costi per mese / agente / azione con il
   risparmio della cache, registro degli eventi.
 - Biblioteca, Ricerca, Revisione e Chat mostrano cosa arriverà nelle fasi successive.
 
@@ -302,9 +302,42 @@ l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
 - **Luce ed effetti**: materiali con texture vere (legno, pelle, metallo), riflessi presi dal cielo
   di fuori, profondità di campo, bagliore, ombre morbide e colore da cinema. Schermata di
   caricamento all'ingresso e volo della telecamera verso il monitor quando apri un collega.
-- **Qualità**: in "ridotta" (iPad e computer leggeri) alberi, terreno ed effetti sono più leggeri e
-  il mare non fa lo specchio. Con "riduci movimento" vento, uccelli e nuvole stanno fermi.
+- **Qualità**: si regola dal menu **Grafica** (vedi sotto). Con "riduci movimento" vento, uccelli e
+  nuvole stanno fermi.
 - Crediti delle risorse in `public/assets/CREDITS.md`.
+
+## Menu grafica
+
+Come nei videogiochi: si apre dal bottone con il monitor nella sala (in basso a sinistra, accanto a
+giorno/notte) o da Impostazioni › Account e dispositivi › **Impostazioni grafiche**. Pannello scuro
+sopra la sala, che cambia mentre scegli; Esc o × per chiudere, frecce ◀ ▶ (o cursori), su/giù per
+passare da una riga all'altra, una riga di spiegazione in fondo, **Ripristina predefiniti**.
+
+- **Qualità**: Automatica (predefinita), Bassa, Media, Alta, Epica; toccando una voce si passa a
+  Personalizzata. *Automatica* parte da Alta su ogni dispositivo, iPad compreso, misura la
+  fluidità e, se resta sotto ~45 fotogrammi al secondo, scende un gradino alla volta (prima la
+  risoluzione, poi ombre, occlusione, mare, vegetazione) e lo dice ("Ho abbassato un po' la
+  grafica…" con il link al menu); se torna fluida può risalire, mai sopra Alta. Bassa ≈ la vecchia
+  "ridotta" senza extra, Media ≈ la vecchia "ridotta", Alta ≈ la vecchia "completa".
+- **Schermo**: scala di rendering 50–200%, risoluzione dinamica, limite FPS (30/60/120/illimitato),
+  contatore FPS, campo visivo 40–75°.
+- **Grafica**: ombre (Off → Epiche, 512–4096 px, morbide da Alte), occlusione ambientale,
+  antialiasing (FXAA, SMAA, MSAA 2x/4x), bagliore, qualità texture, qualità persone (Semplice,
+  Realistica = dettaglio pieno in primo piano, Massima), riflessi del mare (Off, Semplici,
+  Specchio), distanza degli alberi, densità della vegetazione, nuvole e uccelli, effetti cinema,
+  luci della sala.
+- **Avanzate**: Ufficio 3D acceso/spento (era "Scena 3D: spenta"), animazioni (spente di partenza
+  con "riduci movimento"), entrata dalla porta, pausa quando non guardi, precompila gli shader.
+- Le scelte valgono solo su questo dispositivo (`localStorage`, `studio-tesi.grafica`, JSON con
+  versione); la vecchia "ridotta" diventa Media e la "completa" Alta. Per le prove automatiche
+  `studio-tesi.grafica-prova` (per esempio `Alta`) fissa un preset.
+- **Più leggera a parità di aspetto**: la sala disegna solo quando serve (a piena velocità mentre
+  la visuale si muove o un collega parla, ~12 fotogrammi al secondo da ferma); i mobili fermi sono
+  uniti in poche mesh (da ~1900 a ~450 chiamate di disegno in Alta); le ombre dell'arredo si
+  calcolano una volta e quelle delle persone una decina di volte al secondo (in Epica sempre); il
+  pavimento non fa più lo specchio; il mare aggiorna il riflesso un fotogramma sì e uno no; prima
+  si carica la sala, poi il paesaggio, poi le texture grandi; le persone in primo piano passano al
+  modello pieno senza "buchi".
 
 ## Strumenti per finire la tesi
 
@@ -334,6 +367,51 @@ l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
 - **Più veloce e installabile**: ogni pagina si carica solo quando serve (primo caricamento da 218 a
   95 kB compressi); app installabile sull'iPad (Condividi › Aggiungi alla schermata Home) che funziona
   anche senza internet, con avviso "C'è una versione nuova · Aggiorna".
+
+## Tesi più prestante
+
+Migliorie al lavoro sulla tesi, a parità di risultati (dove si va più veloci, i risultati sono
+identici a prima: lo controllano i collaudi).
+
+- **Ricerca nel corso con l'indice salvato**: l'indice di ricerca delle lezioni (BM25) si costruisce
+  una volta e si salva in IndexedDB (`studio-tesi-indice-corso`, con un numero di formato e
+  l'impronta del testo di ogni file). Se aggiungi o togli un file si rifà, rileggendo solo i file
+  nuovi; all'avvio si riprende così com'è. Ricerca nel corso, "Cerca in tutta la tesi", la
+  Lettrice e lo Scrittore usano lo stesso indice e danno gli stessi passaggi di prima.
+- **Lavori pesanti in sottofondo**: indice, ricerca nel corso e controllo delle frasi simili girano
+  in un *web worker* (`src/agents/sottofondo.worker.ts`), così la pagina non si blocca. Se il
+  worker non parte, la pagina esegue lo stesso codice (`src/agents/lavori.ts`) con lo stesso
+  risultato; dove gira lo dice `<html data-sottofondo="lavoratore|pagina">`.
+- **Frasi simili: si ricontrolla solo ciò che cambia**: il risultato di ogni paragrafo si ricorda
+  (impronta del paragrafo + versione delle fonti, anche dopo la ricarica). "Controlla di nuovo"
+  rifà solo i paragrafi cambiati e lo dice; **Ricontrolla tutto** rifà ogni paragrafo.
+- **Ricerche negli archivi ricordate per 7 giorni**: le risposte di OpenAlex, Crossref e Semantic
+  Scholar si salvano su questo dispositivo (IndexedDB `studio-tesi-cataloghi`), per la stessa
+  ricerca scritta allo stesso modo (maiuscole e spazi non contano). Mai gli errori né le risposte
+  vuote. Se una ricerca usa la memoria, la pagina lo dice: "Risultati degli archivi di 2 giorni fa
+  · **Aggiorna**"; Aggiorna richiede tutto di nuovo e aggiunge i risultati nuovi da guardare.
+- **Sincronizzazione a pezzi**: vedi "Sincronizzazione fra dispositivi". Una modifica a una sezione
+  manda il suo capitolo e un file principale piccolo, non tutto il progetto.
+- **Scrittura fluida anche con 60 pagine**: conteggi delle parole ricordati, niente copie del testo
+  per sapere se una sezione è vuota, date e numeri formattati con un formattatore solo, citazioni e
+  frasi da IA ricalcolate subito dopo che la pagina ha risposto ai tasti. Si vede la stessa cosa di
+  prima.
+- **PDF scansionati letti dalle immagini (OCR)**: prima venivano rifiutati. Ora, se un PDF del corso
+  è fatto di immagini, l'app disegna ogni pagina a 300 dpi con pdf.js e ne legge il testo con
+  tesseract.js (italiano e inglese), tutto sul dispositivo: "Leggo le immagini: pagina 3 di 20",
+  con **Ferma**. I passaggi letti così sono segnati ("letto dalle immagini") e le citazioni dicono
+  comunque file e pagina. Motore, lavoratore e lingue (modelli `best_int` dai pacchetti
+  `@tesseract.js-data/ita` ed `eng`) li aggiunge la build in `assets/ocr/` (circa 16 MB, nessun
+  CDN): non entrano nel precache dell'app, si scaricano la prima volta che servono (un motore da
+  3,9 MB adatto al dispositivo + 4,6 MB di lingue) e poi il service worker li tiene, quindi l'OCR
+  funziona anche offline. Funziona anche su Safari per iPad.
+
+Misure con 50 PDF di lezioni (4.500 passaggi) e una tesi di 60 pagine, processore rallentato 4 volte
+come su un iPad: prima ricerca nel corso dopo la ricarica da 1,9 s (pagina ferma 1,8 s) a 0,2 s
+(pagina mai ferma); frasi simili, secondo controllo senza modifiche da 12 s a 0,4 s, dopo aver
+cambiato un paragrafo da 11,7 s a 1,4 s; scrivendo nell'editor (rallentato 6 volte) il lavoro che
+blocca la pagina scende da 1.044 a 262 ms, il blocco più lungo da 165 a 73 ms; una modifica a una
+sezione manda a GitHub 44 KB invece di 170 KB (con fonti dal testo completo la differenza cresce).
 
 ## Interfaccia: un percorso in quattro passi
 
@@ -374,7 +452,7 @@ l'ordine delle linguette è lo stesso delle scrivanie, da sinistra a destra:
 Ho scelto **una sola app che si adatta**, con due modi rilevati in automatico e modificabili a mano:
 un solo indirizzo, un solo file di progetto e nessun codice duplicato. Il modo *computer* ha
 l'editor a tre colonne e la scena ruotabile; il modo *iPad* mette prima lettura e decisioni, usa la
-scena ridotta senza controlli che catturano il dito (lo scorrimento resta alla pagina), tocchi di
+scena senza controlli che catturano il dito (la qualità grafica è la stessa: Automatica) (lo scorrimento resta alla pagina), tocchi di
 almeno 44×44 px, testo di almeno 15 px e rispetta le safe area.
 
 ## Agenti e modelli
@@ -449,9 +527,15 @@ scritto dal browser con l'API di GitHub (Impostazioni → Sincronizzazione fra d
 - **Preparazione, una volta**: un repository privato vuoto (per esempio `studio-tesi-dati`) e un
   token *fine-grained* limitato a quel repository, con *Contents* in lettura e scrittura. Su ogni
   dispositivo si incollano nome del repository e token. L'app rifiuta i repository pubblici.
-- **Cosa va su GitHub**: `studio-tesi/progetto.json` (tutto il progetto) e
-  `studio-tesi/corpus.json` (il testo dei file del corso, inviato solo quando cambia). Ogni invio
-  è un commit "Aggiornamento da iPhone/iPad/computer", quindi resta anche la storia delle versioni.
+- **Cosa va su GitHub**: `studio-tesi/progetto.json` (file principale), i pezzi del progetto in
+  `studio-tesi/pezzi/` (un file per capitolo, le fonti in 8 cassetti, `registro.json` con ricerche
+  e costi, `conversazioni.json`) e `studio-tesi/corpus.json` (il testo dei file del corso). Si manda
+  solo ciò che è cambiato: i pezzi cambiati, uno per volta, e per ultimo il file principale, che
+  elenca lo sha esatto di ogni pezzo (chi riceve legge proprio quelle versioni e scarica solo i
+  pezzi che non ha già). Il formato di prima (tutto in `progetto.json`) si legge ancora e al primo
+  invio diventa quello a pezzi; una versione vecchia dell'app, davanti al formato nuovo, chiede di
+  ricaricare la pagina senza toccare niente. Ogni invio è un commit "Aggiornamento da
+  iPhone/iPad/computer", quindi resta anche la storia delle versioni.
 - **Quando**: 15 secondi dopo l'ultima modifica, quando si esce dall'app o si torna a usarla,
   all'avvio e ogni due minuti mentre è aperta. Mentre un file del corso è in lettura si aspetta.
   Ricevendo, si resta sulla schermata in cui si è.
@@ -466,6 +550,15 @@ scritto dal browser con l'API di GitHub (Impostazioni → Sincronizzazione fra d
 
 ## Avvio e collaudo
 
+Il collaudo delle migliorie "tesi più prestante" aggiunge 84 controlli: indice salvato e riusato
+dopo la ricarica con risultati identici al BM25 di prima (20 domande su 50 PDF), ricerca nel
+lavoratore e ripiego nella pagina con il lavoratore bloccato, frasi simili identiche al controllo
+di prima e ricontrollo dei soli paragrafi cambiati, archivi ricordati con "Aggiorna" ed errori mai
+ricordati, sincronizzazione a pezzi con GitHub simulato (anche contro la build precedente), editor
+con 60 pagine, OCR in Chromium e "come Safari" (senza iteratore dei ReadableStream, anche nel
+worker di pdf.js), Ferma e OCR senza internet dopo il primo uso. I collaudi 1, 2, 3, 7 e 8 passano
+ancora (il primo ora aspetta il risultato della ricerca nel corso, che arriva dal lavoratore).
+
 Dopo il riordino delle pagine i collaudi sono stati adeguati ai nuovi posti dei comandi (schede,
 fisarmoniche, cassetti, menu "Chiedi allo scrittore", barra laterale) senza togliere controlli,
 e se ne è aggiunto uno nuovo (48 controlli): ricomincia da capo con le lezioni che restano e la
@@ -473,7 +566,7 @@ copia "Prima del ripristino", le quattro schede delle Impostazioni, il pulsante 
 cassetto dell'indice, il menu dello scrittore, il cassetto di una fonte, il giorno/notte
 dell'ufficio e nessuno scorrimento orizzontale su iPhone in 21 viste. Il collaudo ha trovato due
 problemi, corretti: misure da iPad (tocchi 44 px, testo 15 px) nei componenti nuovi e la conferma
-dopo il ripristino che non si vedeva. Passano tutti: 409 controlli in 12 collaudi. Dopo le nuove funzioni (ponte in un tocco, correzioni, frasi simili, discussione, consegna e ritmo, Word, dettatura, copie su GitHub, app installabile) i collaudi sono saliti a 507 controlli, tutti verdi.
+dopo il ripristino che non si vedeva. Passano tutti: 409 controlli in 12 collaudi. Dopo le nuove funzioni (ponte in un tocco, correzioni, frasi simili, discussione, consegna e ritmo, Word, dettatura, copie su GitHub, app installabile) i collaudi sono saliti a 507 controlli, tutti verdi. Con il menu grafica, lo studio più leggero e la tesi più prestante (indice salvato, lavori in sottofondo, PDF scansionati, sincronizzazione a pezzi) sono 516 controlli nelle 12 serie, più le prove dedicate a grafica e tesi.
 
 ```bash
 npm install

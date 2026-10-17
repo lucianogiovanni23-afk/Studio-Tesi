@@ -287,6 +287,8 @@ export interface Passaggio {
   /** Pagina iniziale e finale. */
   pagine: [number, number]
   testo: string
+  /** Testo riconosciuto dalle immagini di un PDF scansionato (OCR): può contenere qualche errore di lettura. */
+  ocr?: boolean
 }
 
 export type CourseFileStatus = 'lettura' | 'estrazione' | 'pronto' | 'errore'
@@ -302,6 +304,9 @@ export interface CourseFile {
   paginaCorrente?: number
   passaggi?: number
   errore?: string
+  /** PDF scansionato letto dalle immagini (OCR); durante la lettura `fase` è "ocr". */
+  ocr?: boolean
+  fase?: 'testo' | 'ocr'
 }
 
 export interface ConcettoCorso {

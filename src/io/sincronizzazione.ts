@@ -5,7 +5,8 @@ import { estrazioneInCorso, useStudio } from '../store'
 import type { Passaggio, Progetto } from '../types'
 import { creaCopia } from './copie'
 import { avviaCopieGitHub } from './copieGitHub'
-import { controllaSegreti, fileCorsoControllati, FORMATO, VERSIONE } from './fileProgetto'
+import { controllaSegreti, fileCorsoControllati, FORMATO } from './fileProgetto'
+import type { Struttura } from './pezziSync'
 
 /**
  * Sincronizzazione fra dispositivi tramite un repository GitHub privato dello
@@ -22,6 +23,13 @@ const CHIAVE_TOKEN = 'studio-tesi.github-token'
 const CHIAVE_COLLEGAMENTO = 'studio-tesi.sincronizzazione'
 const FILE_PROGETTO = 'studio-tesi/progetto.json'
 const FILE_CORPUS = 'studio-tesi/corpus.json'
+/**
+ * Versione del formato su GitHub. 1: tutto il progetto in progetto.json.
+ * 2: progetto.json è piccolo ed elenca i pezzi (capitoli, fonti, registro,
+ * conversazioni) in studio-tesi/pezzi/, così si manda solo ciò che cambia.
+ * Il formato 1 si legge ancora; al primo invio diventa 2.
+ */
+const VERSIONE_SYNC = 2
 /** Dopo l'ultima modifica si aspetta un po', per non fare un commit a ogni lettera. */
 const ATTESA_MS = 15_000
 /** Mentre l'app è aperta si controlla ogni tanto se l'altro dispositivo ha inviato qualcosa. */
@@ -34,6 +42,8 @@ interface Collegamento {
   improntaProgetto?: string
   improntaCorpus?: string
   ultima?: string
+  /** Pezzi del progetto come sono su GitHub: sha della versione e impronta del contenuto. */
+  pezzi?: Record<string, { sha: string; impronta: string }>
 }
 
 interface ProgettoRemoto {
@@ -42,6 +52,9 @@ interface ProgettoRemoto {
   salvatoIl: string
   salvatoDa: string
   progetto: Progetto
+  /** Dal formato 2: ordine di capitoli e fonti e sha di ogni pezzo. */
+  struttura?: Struttura
+  pezzi?: Record<string, string>
 }
 
 export type StatoSync = 'spenta' | 'ok' | 'in_corso' | 'attesa' | 'offline' | 'errore' | 'conflitto'
@@ -288,6 +301,8 @@ async function giro(scelta?: Scelta): Promise<void> {
     return
   }
   aggiorna({ stato: 'in_corso', messaggio: '' })
+  // Il codice dei pezzi serve solo qui: si carica al primo giro, non all'avvio dell'app.
+  const { dividi, ricomponi } = await import('./pezziSync')
 
   const locale = s.progetto
   const improntaLocale = improntaProgetto(locale)
@@ -315,11 +330,32 @@ async function giro(scelta?: Scelta): Promise<void> {
     if (remoto.formato !== FORMATO || !remoto.progetto || !Array.isArray(remoto.progetto.capitoli)) {
       throw new ErroreSync('errore', 'Il file su GitHub non è un progetto di Studio tesi.')
     }
-    if (remoto.versione > VERSIONE) throw new ErroreSync('errore', "I dati su GitHub vengono da una versione più nuova dell'app: ricarica la pagina.")
+    if (remoto.versione > VERSIONE_SYNC) throw new ErroreSync('errore', "I dati su GitHub vengono da una versione più nuova dell'app: ricarica la pagina.")
 
     if (azione === 'conflitto') {
       aggiorna({ stato: 'conflitto', messaggio: '', conflitto: { da: remoto.salvatoDa || 'altro dispositivo', il: remoto.salvatoIl } })
       return
+    }
+
+    // Formato a pezzi: si scaricano solo i pezzi diversi da quelli che questo dispositivo ha già.
+    let progettoRemoto = remoto.progetto
+    let pezziRicevuti: Collegamento['pezzi']
+    if (remoto.pezzi && remoto.struttura) {
+      const locali = new Map(dividi(locale).pezzi)
+      const testi = new Map<string, string>()
+      await Promise.all(
+        Object.entries(remoto.pezzi).map(async ([percorso, sha]) => {
+          const noto = col.pezzi?.[percorso]
+          const mio = locali.get(percorso)
+          testi.set(percorso, noto && noto.sha === sha && mio !== undefined && impronta(mio) === noto.impronta ? mio : await leggiVersione(token, col.repo, sha))
+        }),
+      )
+      try {
+        progettoRemoto = ricomponi(remoto.progetto, remoto.struttura, testi)
+      } catch {
+        throw new ErroreSync('errore', 'Su GitHub manca un pezzo del progetto: riprovo più tardi. Se continua, invia da questo dispositivo dalle Impostazioni.')
+      }
+      pezziRicevuti = Object.fromEntries([...testi].map(([percorso, json]) => [percorso, { sha: remoto.pezzi![percorso], impronta: impronta(json) }]))
     }
 
     // Il corpus si scarica solo se è cambiato.
@@ -336,7 +372,7 @@ async function giro(scelta?: Scelta): Promise<void> {
     // Lo stato attuale resta fra le copie di sicurezza.
     await creaCopia('Prima di ricevere dall\'altro dispositivo').catch(() => false)
     if (corpusNuovo) await importaCorpus(corpus)
-    const base = normalizzaProgetto({ ...progettoIniziale(), ...remoto.progetto } as Progetto)
+    const base = normalizzaProgetto({ ...progettoIniziale(), ...progettoRemoto } as Progetto)
     const progetto = { ...base, courseFiles: fileCorsoControllati(base, corpus) }
     applicaProgetto(progetto)
     const ultima = new Date().toISOString()
@@ -347,6 +383,7 @@ async function giro(scelta?: Scelta): Promise<void> {
       improntaProgetto: improntaProgetto(progetto),
       improntaCorpus: improntaCorpus(corpus),
       ultima,
+      pezzi: pezziRicevuti,
     })
     aggiorna({ stato: 'ok', messaggio: `Ho preso le modifiche fatte ${preposizione('da', remoto.salvatoDa || 'altro dispositivo')}.`, ultima, conflitto: null })
     return
@@ -361,11 +398,29 @@ async function giro(scelta?: Scelta): Promise<void> {
     controllaSegreti(json)
     shaCorpus = await scriviFile(token, col.repo, FILE_CORPUS, json, await shaRemoto(token, col.repo, FILE_CORPUS))
   }
-  const dati: ProgettoRemoto = { formato: FORMATO, versione: VERSIONE, salvatoIl: new Date().toISOString(), salvatoDa: nomeDispositivo(), progetto: locale }
+  // Poi i pezzi cambiati, uno per volta (due scritture insieme sullo stesso ramo si scontrano).
+  const { scheletro, struttura, pezzi } = dividi(locale)
+  for (const [, contenuto] of pezzi) controllaSegreti(contenuto)
+  const inviati: NonNullable<Collegamento['pezzi']> = {}
+  for (const [percorso, contenuto] of pezzi) {
+    const imp = impronta(contenuto)
+    const noto = col.pezzi?.[percorso]
+    inviati[percorso] = noto && noto.impronta === imp ? noto : { sha: await scriviFile(token, col.repo, percorso, contenuto, await shaRemoto(token, col.repo, percorso)), impronta: imp }
+  }
+  // Per ultimo il file principale: finché non c'è, gli altri dispositivi vedono la versione di prima, intera.
+  const dati: ProgettoRemoto = {
+    formato: FORMATO,
+    versione: VERSIONE_SYNC,
+    salvatoIl: new Date().toISOString(),
+    salvatoDa: nomeDispositivo(),
+    progetto: scheletro,
+    struttura,
+    pezzi: Object.fromEntries(Object.entries(inviati).map(([p, v]) => [p, v.sha])),
+  }
   const json = JSON.stringify(dati)
   controllaSegreti(json)
   const nuovoSha = await scriviFile(token, col.repo, FILE_PROGETTO, json, shaP)
-  salvaCollegamento({ ...col, shaProgetto: nuovoSha, shaCorpus, improntaProgetto: improntaLocale, improntaCorpus: impC, ultima: dati.salvatoIl })
+  salvaCollegamento({ ...col, shaProgetto: nuovoSha, shaCorpus, improntaProgetto: improntaLocale, improntaCorpus: impC, ultima: dati.salvatoIl, pezzi: inviati })
   aggiorna({ stato: 'ok', messaggio: '', ultima: dati.salvatoIl, conflitto: null })
 }
 

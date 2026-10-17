@@ -244,7 +244,8 @@ export function piantaOlivi(maxD: number, densita = 1): Olivo[] {
     for (let x0 = -meta; x0 < meta; x0 += passo) {
       const x = x0 + (r() - 0.5) * 1.2
       const z = z0 + (r() - 0.5) * 1.2
-      if (r() > densita && d > 150) continue
+      // la densità sfoltisce i filari lontani; sotto il 60% anche quelli a media distanza
+      if (r() > densita && d > (densita >= 0.6 ? 150 : 60)) continue
       if (appezzamento(x, z) !== 'uliveto') continue
       const xx = x
       const dd = FACCIATA_Z - z

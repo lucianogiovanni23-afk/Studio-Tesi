@@ -3,7 +3,7 @@ import { useStudio } from '../store'
 import type { Consegna, VoceGlossario } from '../types'
 import { ApiError, chiamataStrutturata, creaClient } from './api'
 import { normalizza, verificaEstratto } from './citations'
-import { BUDGET_LETTORE, collocazione, recuperaPassaggi, statisticheCorpus, testoCorpusNormalizzato } from './corpus'
+import { BUDGET_LETTORE, collocazione, recuperaPassaggiAsync, statisticheCorpus, testoCorpusNormalizzato } from './corpus'
 import { stimaChiamata, tokenDaCaratteri, type Stima } from './costs'
 import { SYSTEM_LETTORE, elencoPassaggi, intestazioneProgetto } from './prompts'
 import { SCHEMA_LESSICO } from './schemas'
@@ -45,7 +45,7 @@ export interface EsitoLessico {
 export async function ricavaLessico(): Promise<EsitoLessico> {
   const s = useStudio.getState()
   const p = s.progetto
-  const passaggi = recuperaPassaggi(
+  const passaggi = await recuperaPassaggiAsync(
     [...DOMANDE_CORSO, ...p.glossario.map((v) => v.termine), p.titolo, p.domanda],
     BUDGET_LETTORE,
   )

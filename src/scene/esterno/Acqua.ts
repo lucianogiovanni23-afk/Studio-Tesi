@@ -7,8 +7,10 @@ import { uniformiCielo } from './atmosfera'
  * di Slayvin, shader dell'acqua di Stemkoski e 29a.ch). Differenze:
  * - lo specchio ridisegna solo il livello LIVELLO_RIFLESSO (cielo, nuvole,
  *   luna), non la sala: costa poco;
- * - con `specchio: false` (qualità ridotta) niente seconda passata: il
- *   riflesso è il colore del cielo calcolato;
+ * - con `specchio: false` niente seconda passata: il riflesso è il colore
+ *   del cielo calcolato (o, con `riflessi: false`, niente riflesso);
+ * - lo specchio si ridisegna un fotogramma ogni `ogni` (2 di solito): il
+ *   cielo riflesso cambia piano e a 60 fps la differenza non si vede;
  * - luce, foschia e riflesso della luna seguono le uniform dell'esterno.
  */
 export const LIVELLO_RIFLESSO = 3
@@ -66,7 +68,9 @@ void main() {
   float theta = max(dot(eyeDirection, surfaceNormal), 0.0);
   float reflectance = 0.02 + 0.98 * pow(1.0 - theta, 5.0);
   vec3 cielo;
-  if (specchio > 0.5) {
+  if (specchio < -0.5) {
+    cielo = mix(waterColor * 4.0, uFoschia, 0.35);
+  } else if (specchio > 0.5) {
     vec2 distortion = surfaceNormal.xz * (0.001 + 1.0 / distance) * distortionScale;
     cielo = texture2D(mirrorSampler, mirrorCoord.xy / mirrorCoord.w + distortion).rgb;
   } else {
@@ -85,8 +89,9 @@ void main() {
 export class Acqua extends THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> {
   readonly renderTarget: THREE.WebGLRenderTarget | null
 
-  constructor(geometry: THREE.BufferGeometry, opzioni: { normali: THREE.Texture; specchio: boolean; risoluzione?: number }) {
+  constructor(geometry: THREE.BufferGeometry, opzioni: { normali: THREE.Texture; specchio: boolean; riflessi?: boolean; risoluzione?: number; ogni?: number }) {
     const specchio = opzioni.specchio
+    const ogni = Math.max(1, opzioni.ogni ?? 2)
     const renderTarget = specchio ? new THREE.WebGLRenderTarget(opzioni.risoluzione ?? 512, opzioni.risoluzione ?? 512, { type: THREE.HalfFloatType }) : null
     const textureMatrix = new THREE.Matrix4()
     const material = new THREE.ShaderMaterial({
@@ -95,7 +100,7 @@ export class Acqua extends THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial
         ...uniformiCielo,
         mirrorSampler: { value: renderTarget?.texture ?? null },
         normalSampler: { value: opzioni.normali },
-        specchio: { value: specchio ? 1 : 0 },
+        specchio: { value: specchio ? 1 : opzioni.riflessi === false ? -1 : 0 },
         distortionScale: { value: 3.2 },
         textureMatrix: { value: textureMatrix },
         waterColor: { value: new THREE.Color(0.012, 0.05, 0.075) },
@@ -121,8 +126,11 @@ export class Acqua extends THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial
     const q = new THREE.Vector4()
     const mirrorCamera = new THREE.PerspectiveCamera()
     mirrorCamera.layers.set(LIVELLO_RIFLESSO)
+    let giro = 0
 
     this.onBeforeRender = (renderer, scene, camera) => {
+      // il riflesso si aggiorna un fotogramma ogni `ogni`
+      if (giro++ % ogni !== 0) return
       mirrorWorldPosition.setFromMatrixPosition(this.matrixWorld)
       cameraWorldPosition.setFromMatrixPosition(camera.matrixWorld)
       rotationMatrix.extractRotation(this.matrixWorld)

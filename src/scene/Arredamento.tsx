@@ -1,10 +1,11 @@
-import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { MeshReflectorMaterial, RoundedBox } from '@react-three/drei'
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { avanzamento } from '../domain/avanzamento'
 import { useStudio } from '../store'
 import { ALTEZZA_SALA as H, COLORI, COLORE_STATO, PARETE_FONDO_Z, PORTA } from './layout'
-import { useNotte, useQualita } from './qualita'
+import { useGrafica, useNotte } from './qualita'
+import { EVENTO_PRONTO } from './Effetti'
 import { Etichetta } from './Etichetta'
 import { textureAlone } from './notte'
 import { uvMetriche, useMateriali } from './materiali'
@@ -18,15 +19,38 @@ import { uvMetriche, useMateriali } from './materiali'
 /** La campagna oltre la vetrata è un vero esterno 3D, caricato a parte solo con la scena. */
 const Esterno = lazy(() => import('./esterno/Esterno'))
 
+/**
+ * Caricamento a tappe: prima la sala (si entra subito), poi il paesaggio
+ * fuori dalla vetrata, quando la sala è già pronta.
+ */
+function useDopoLaSala(): boolean {
+  const [pronto, setPronto] = useState(() => typeof document !== 'undefined' && document.documentElement.dataset.ufficioPronto === '1')
+  useEffect(() => {
+    if (pronto) return
+    let t = 0
+    const via = () => {
+      t = window.setTimeout(() => setPronto(true), 250)
+    }
+    window.addEventListener(EVENTO_PRONTO, via, { once: true })
+    return () => {
+      window.removeEventListener(EVENTO_PRONTO, via)
+      window.clearTimeout(t)
+    }
+  }, [pronto])
+  return pronto
+}
+
 function Vetrata() {
   const notte = useNotte()
-  const qualita = useQualita()
+  const esterno = useDopoLaSala()
   const montanti = [-5.5, -3.67, -1.83, 0, 1.83, 3.67, 5.5]
   return (
     <group>
-      <Suspense fallback={null}>
-        <Esterno qualita={qualita} />
-      </Suspense>
+      {esterno && (
+        <Suspense fallback={null}>
+          <Esterno />
+        </Suspense>
+      )}
       {/* vetro leggermente riflettente */}
       <mesh position={[0, H / 2, -6.02]}>
         <planeGeometry args={[11, H]} />
@@ -75,7 +99,7 @@ function Listelli() {
 }
 
 function Pianta({ posizione, scala = 1, alta = false }: { posizione: [number, number, number]; scala?: number; alta?: boolean }) {
-  const ombre = useQualita() === 'completa'
+  const ombre = useGrafica().ombre > 0
   return (
     <group position={posizione} scale={scala}>
       <mesh position={[0, alta ? 0.42 : 0.24, 0]} castShadow={ombre}>
@@ -115,7 +139,7 @@ function Pianta({ posizione, scala = 1, alta = false }: { posizione: [number, nu
 function Libreria({ etichetta }: { etichetta: boolean }) {
   const fonti = useStudio((s) => s.progetto.fonti)
   const vai = useStudio((s) => s.vai)
-  const ombre = useQualita() === 'completa'
+  const ombre = useGrafica().ombre > 0
   const mat = useMateriali()
   const libri = useMemo(() => {
     const colori: Record<string, string> = { da_leggere: '#c9bfa8', letta: '#4f8fbf', usata: '#6b7d2e', scartata: '#a4553a' }
@@ -165,7 +189,8 @@ function Schermo({ etichetta }: { etichetta: boolean }) {
   const righe = a.capitoli.slice(0, 8)
   const notte = useNotte()
   return (
-    <group position={[8.4, 2.25, -5.92]}>
+    // le barre cambiano con le pagine scritte: non si uniscono agli altri mobili
+    <group position={[8.4, 2.25, -5.92]} userData={{ vivo: true }}>
       <RoundedBox args={[3.4, 2.0, 0.08]} radius={0.04} smoothness={3}>
         <meshStandardMaterial color="#141619" roughness={0.3} metalness={0.4} />
       </RoundedBox>
@@ -207,7 +232,7 @@ function Schermo({ etichetta }: { etichetta: boolean }) {
 
 /** Angolo relax: divano, poltrona, tavolino e tappeto. */
 function Relax() {
-  const ombre = useQualita() === 'completa'
+  const ombre = useGrafica().ombre > 0
   const mat = useMateriali()
   const divano = mat.tessuto(COLORI.tessuto)
   const g = uvMetriche(0.25)
@@ -244,7 +269,7 @@ function Relax() {
 
 /** Tavolo riunioni rotondo con sedie. */
 function Riunioni() {
-  const ombre = useQualita() === 'completa'
+  const ombre = useGrafica().ombre > 0
   const mat = useMateriali()
   const stoffa = mat.tessuto(COLORI.oliva)
   const g = uvMetriche(0.25)
@@ -307,7 +332,8 @@ function Soffitto() {
         <planeGeometry args={[25, 22]} />
         <meshStandardMaterial color="#e7e4de" roughness={0.95} side={THREE.DoubleSide} />
       </mesh>
-      <instancedMesh ref={lamelle} args={[undefined, mat.rovere, posizioni.length]}>
+      {/* il materiale come prop (non negli args): cambiando le texture l'istanza resta la stessa, con le sue posizioni */}
+      <instancedMesh ref={lamelle} args={[undefined, undefined, posizioni.length]} material={mat.rovere}>
         <boxGeometry args={[0.07, 0.42, 15.5]} />
       </instancedMesh>
       {[-7.5, -2.5, 2.5, 7.5].map((x) => (
@@ -327,7 +353,7 @@ function Soffitto() {
 
 /** Luci lineari sospese sopra le scrivanie. */
 function LuciLineari() {
-  const completa = useQualita() === 'completa'
+  const completa = useGrafica().luci
   const notte = useNotte()
   return (
     <group>
@@ -351,12 +377,11 @@ function LuciLineari() {
             </mesh>
           ))}
           {completa && <pointLight position={[0, -0.25, 0]} intensity={notte ? 3.2 : 2.4} distance={notte ? 7 : 6} decay={1.5} color={notte ? '#ffcf8f' : '#fff1d8'} />}
-          {notte && (
-            <mesh position={[0, -0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          {/* alone delle lampade: solo di notte (sempre montato, così lo shader è già pronto) */}
+          <mesh visible={notte} position={[0, -0.05, 0]} rotation={[Math.PI / 2, 0, 0]}>
               <planeGeometry args={[4.4, 0.7]} />
               <meshBasicMaterial map={textureAlone() ?? undefined} color="#ffb860" transparent opacity={0.45} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} side={THREE.DoubleSide} />
-            </mesh>
-          )}
+          </mesh>
         </group>
       ))}
     </group>
@@ -469,38 +494,21 @@ function PareteIngresso() {
 }
 
 /** Le etichette dell'arredo si nascondono in primo piano, per non finire sopra la conversazione. */
-/** Pavimento in resina: nella qualità completa riflette (sfocato) la sala e le luci. */
+/**
+ * Pavimento in resina opaca: niente specchio (costava una seconda passata
+ * della sala), resta solo una lucentezza morbida presa dalla luce d'ambiente.
+ */
 function Pavimento() {
-  const completa = useQualita() === 'completa'
-  const notte = useNotte()
   const mat = useMateriali()
   return (
-    <mesh ref={uvMetriche(2.6)} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.6]} receiveShadow material={completa ? undefined : mat.resina}>
+    <mesh ref={uvMetriche(2.6)} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.6]} receiveShadow material={mat.resina}>
       <planeGeometry args={[30, 23.2]} />
-      {completa && (
-        <MeshReflectorMaterial
-          map={mat.resinaMappe.map}
-          roughnessMap={mat.resinaMappe.roughnessMap}
-          color="#bdb5a8"
-          roughness={1}
-          metalness={0.02}
-          resolution={512}
-          blur={[420, 140]}
-          mixBlur={1}
-          mixStrength={notte ? 1.6 : 0.35}
-          mixContrast={1}
-          mirror={0}
-          depthScale={0.8}
-          minDepthThreshold={0.35}
-          maxDepthThreshold={1.25}
-        />
-      )}
     </mesh>
   )
 }
 
 export function Sala({ etichette = true }: { etichette?: boolean }) {
-  const ombre = useQualita() === 'completa'
+  const ombre = useGrafica().ombre > 0
   const mat = useMateriali()
   return (
     <group>

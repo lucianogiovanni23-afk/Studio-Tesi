@@ -17,7 +17,8 @@ import { useStudio } from '../store'
 import { Icona } from '../ui/Icona'
 import { Info } from '../ui/Info'
 import { impostaSuoni, suoniAccesi, suonoRisposta } from '../ui/suoni'
-import type { Frontespizio, ModalitaScena, ModelSlot, ModoUso, StileCitazione, Tema } from '../types'
+import type { Frontespizio, ModelSlot, ModoUso, StileCitazione, Tema } from '../types'
+import { apriMenuGrafica, riassuntoGrafica, useGraficaStore } from '../grafica/grafica'
 import { frontespizioDi, giornoLeggibile, impostaFrontespizio, impostaObiettivo } from '../domain/ritmo'
 
 /** Riquadro delle impostazioni: icona, titolo, una riga sotto e la "i" per le spiegazioni lunghe. */
@@ -521,6 +522,9 @@ function Dispositivo() {
   const preferenze = useStudio((s) => s.preferenze)
   const setPreferenze = useStudio((s) => s.setPreferenze)
   const modo = useModoUso()
+  const preset = useGraficaStore((s) => s.preset)
+  const livelloAuto = useGraficaStore((s) => s.autoLivello)
+  const riassunto = preferenze.modalitaScena === 'spenta' ? 'Ufficio 3D spento: solo i pannelli' : riassuntoGrafica(preset, livelloAuto)
 
   return (
     <Carta
@@ -530,7 +534,8 @@ function Dispositivo() {
       info={
         <>
           Come lo usi — Computer: scrittura completa, ricerca, revisione e file. iPad: rileggere su carta, approvare, schede, note
-          del relatore, chat e piccole modifiche, con bottoni più grandi e scena più leggera.
+          del relatore, chat e piccole modifiche, con bottoni più grandi. La grafica dell’ufficio 3D si regola a parte, come nei
+          videogiochi.
         </>
       }
     >
@@ -563,21 +568,17 @@ function Dispositivo() {
         </div>
         <div className="imp-riga">
           <span className="imp-riga-icona" aria-hidden>
-            <Icona nome="casa" dimensione={18} />
+            <Icona nome="monitor" dimensione={18} />
           </span>
-          <label className="imp-riga-campo">
-            <span className="imp-riga-nome">Scena 3D</span>
-            <select
-              className="campo"
-              value={preferenze.modalitaScena}
-              onChange={(e) => setPreferenze({ modalitaScena: e.target.value as ModalitaScena })}
-            >
-              <option value="auto">Automatica (più leggera su iPad e dispositivi lenti)</option>
-              <option value="completa">Completa — ombre e uliveto fitto</option>
-              <option value="ridotta">Ridotta — più leggera</option>
-              <option value="spenta">Spenta — solo pannelli</option>
-            </select>
-          </label>
+          <div className="imp-riga-campo imp-riga-grafica">
+            <span>
+              <span className="imp-riga-nome">Grafica dell’ufficio 3D</span>
+              <span className="imp-riga-sotto">{riassunto}</span>
+            </span>
+            <button type="button" className="bottone bottone-secondario" onClick={() => apriMenuGrafica()}>
+              Impostazioni grafiche
+            </button>
+          </div>
         </div>
         <Suoni />
       </div>

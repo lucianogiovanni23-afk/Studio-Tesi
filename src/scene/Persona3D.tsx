@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { AGENTI, type Persona } from '../agents/agenti'
 import { Sedia } from './Sedia'
-import { useMovimentoRidotto } from '../hooks/useLayoutMode'
+import { useFermo } from './qualita'
 import { useStudio } from '../store'
 import type { AgentStatus } from '../types'
 import { PersonaReale } from './PersonaReale'
@@ -27,6 +27,8 @@ interface PropsPersona {
   parla: boolean
   sfasamento: number
   ombre: boolean
+  /** La telecamera è vicina (primo piano): serve il modello con il dettaglio pieno. */
+  vicino?: boolean
 }
 
 /** Se il GLB non si carica (rete assente, WebGL limitato) si resta sulla versione semplice. */
@@ -208,7 +210,7 @@ const DURATA_SALUTO = 2.2
 /** La persona "semplice", fatta di primitive: riserva mentre l'avatar si carica. */
 export function PersonaSemplice({ persona, lavora, status, scelta, parla, sfasamento, ombre }: PropsPersona) {
   const a = persona.aspetto
-  const fermo = useMovimentoRidotto()
+  const fermo = useFermo()
   const busto = useRef<THREE.Group>(null)
   const testa = useRef<THREE.Group>(null)
   const bocca = useRef<THREE.Mesh>(null)
@@ -285,7 +287,8 @@ export function PersonaSemplice({ persona, lavora, status, scelta, parla, sfasam
   })
 
   return (
-    <group ref={radice}>
+    // si muove (respiro, sguardo): resta fuori dall'unione dei mobili fermi
+    <group ref={radice} userData={{ vivo: true }}>
       <Sedia accento={a.cravatta} ombre={ombre} />
 
       {/* gambe */}

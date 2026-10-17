@@ -2,7 +2,8 @@ import { Suspense, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import * as THREE from 'three'
-import { useMovimentoRidotto } from '../../hooks/useLayoutMode'
+import { useFermo, useGrafica } from '../qualita'
+import { Precompila } from '../Motore'
 import { useCielo } from '../notte'
 import { Acqua, LIVELLO_RIFLESSO } from './Acqua'
 import { LUNA, applicaAtmosfera, statoAtmosfera, uniformiCielo, type StatoAtmosfera } from './atmosfera'
@@ -43,15 +44,15 @@ function Luna({ notte }: { notte: number }) {
   )
 }
 
-function Mare({ completa, stato }: { completa: boolean; stato: StatoAtmosfera }) {
+function Mare({ livello, risoluzione, stato }: { livello: number; risoluzione: number; stato: StatoAtmosfera }) {
   const normali = useTexture(`${BASE}acqua-normali.jpg`, prepara(false))
   const acqua = useMemo(() => {
     const g = new THREE.PlaneGeometry(40000, 26000)
-    const a = new Acqua(g, { normali, specchio: completa, risoluzione: 512 })
+    const a = new Acqua(g, { normali, specchio: livello === 2, riflessi: livello > 0, risoluzione, ogni: 2 })
     a.rotation.x = -Math.PI / 2
     a.position.set(0, Y_MARE, -6 - 13000 + 2000)
     return a
-  }, [normali, completa])
+  }, [normali, livello, risoluzione])
   useLayoutEffect(() => {
     acqua.material.uniforms.uZenit.value.copy(stato.zenit)
   }, [acqua, stato])
@@ -65,9 +66,9 @@ function Mare({ completa, stato }: { completa: boolean; stato: StatoAtmosfera })
   return <primitive object={acqua} />
 }
 
-function Terreno({ completa, oliviFino, stagione }: { completa: boolean; oliviFino: number; stagione: Stagione }) {
-  const erba = useTexture(`${BASE}erba-${completa ? 1024 : 512}.jpg`, prepara(true, true, completa ? 8 : 2))
-  const geometria = useMemo(() => geometriaTerreno(!completa), [completa])
+function Terreno({ dettaglio, texture, oliviFino, stagione }: { dettaglio: boolean; texture: number; oliviFino: number; stagione: Stagione }) {
+  const erba = useTexture(`${BASE}erba-${texture === 2 ? 1024 : 512}.jpg`, prepara(true, true, [1, 2, 8][texture]))
+  const geometria = useMemo(() => geometriaTerreno(!dettaglio), [dettaglio])
   const materiale = useMemo(() => {
     return materialeTerreno(erba, oliviFino, INDICE_STAGIONE[stagione])
   }, [erba, oliviFino, stagione])
@@ -111,9 +112,14 @@ function Costruito({ dati }: { dati: ReturnType<typeof costruisci> }) {
  * Cambia con le stagioni (vedi stagioni.ts): raccolta delle olive in autunno,
  * ulivi in fiore in primavera, erba secca d'estate.
  */
-export default function Esterno({ qualita }: { qualita: 'completa' | 'ridotta' }) {
-  const completa = qualita === 'completa'
-  const fermo = useMovimentoRidotto()
+/** Fin dove arrivano gli ulivi per "Distanza visiva alberi": vicina, media, lontana. */
+const OLIVI_FINO = [300, 420, 720]
+
+export default function Esterno() {
+  const g = useGrafica()
+  // "Lontana" è il dettaglio pieno di prima: terreno fitto, paese con tutte le lucine, ulivi vicini veri
+  const dettaglio = g.alberi === 2
+  const fermo = useFermo()
   const cielo = useCielo()
   // la stagione si legge all'apertura della sala (basta: cambia una volta ogni tre mesi)
   const stagione = useMemo(() => stagioneDelMese(meseCorrente()), [])
@@ -143,12 +149,13 @@ export default function Esterno({ qualita }: { qualita: 'completa' | 'ridotta' }
     if (!fermo) uniformiCielo.uTempo.value = s.clock.elapsedTime
   })
 
-  const oliviFino = completa ? 720 : 420
+  const oliviFino = OLIVI_FINO[g.alberi]
+  const densita = g.vegetazione / 100
   const dati = useMemo(() => {
-    const c = costruisci(!completa)
-    const alberi = piantaOlivi(oliviFino, completa ? 1 : 0.6)
+    const c = costruisci(!dettaglio)
+    const alberi = piantaOlivi(oliviFino, densita)
     return { costruito: c, alberi }
-  }, [completa, oliviFino])
+  }, [dettaglio, oliviFino, densita])
   useEffect(
     () => () => {
       dati.costruito.geometria.dispose()
@@ -158,23 +165,25 @@ export default function Esterno({ qualita }: { qualita: 'completa' | 'ridotta' }
   )
 
   return (
-    <group>
+    // l'esterno ha shader e istanze propri: resta fuori dall'unione dei mobili della sala
+    <group userData={{ vivo: true }}>
       <Cielo stato={stato} />
       <Suspense fallback={null}>
-        <Terreno completa={completa} oliviFino={oliviFino} stagione={stagione} />
+        <Terreno dettaglio={dettaglio} texture={g.texture} oliviFino={oliviFino} stagione={stagione} />
         <Costruito dati={dati.costruito} />
       </Suspense>
       <Suspense fallback={null}>
-        <Mare completa={completa} stato={stato} />
+        <Mare livello={g.mare} risoluzione={g.risSpecchio} stato={stato} />
       </Suspense>
       <Suspense fallback={null}>
-        <Uliveto alberi={dati.alberi} completa={completa} sole={stato.sole} notte={stato.notte} stagione={stagione} />
+        <Uliveto alberi={dati.alberi} distanza={g.alberi} rilievo={g.texture === 2} sole={stato.sole} notte={stato.notte} stagione={stagione} />
       </Suspense>
       <Suspense fallback={null}>
         <Luna notte={stato.notte} />
-        <Nuvole stato={stato} />
+        {g.cielo && <Nuvole stato={stato} />}
+        <Precompila />
       </Suspense>
-      <Uccelli attivi={!fermo && stato.notte < 0.5} />
+      {g.cielo && <Uccelli attivi={!fermo && stato.notte < 0.5} />}
     </group>
   )
 }
