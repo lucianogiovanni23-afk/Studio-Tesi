@@ -413,6 +413,12 @@ cambiato un paragrafo da 11,7 s a 1,4 s; scrivendo nell'editor (rallentato 6 vol
 blocca la pagina scende da 1.044 a 262 ms, il blocco più lungo da 165 a 73 ms; una modifica a una
 sezione manda a GitHub 44 KB invece di 170 KB (con fonti dal testo completo la differenza cresce).
 
+## Ufficio: visuale su iPad e chat a scomparsa
+
+- Sull'iPad la visuale della sala si gira col dito, come sul computer con il mouse.
+- Il pulsante "Nascondi chat" in alto a destra toglie le chat per vedere tutta la sala; lo stesso
+  pulsante ("Mostra chat") le riapre. La scelta resta su quel dispositivo.
+
 ## Interfaccia: un percorso in quattro passi
 
 - **Menu**: Inizio · 1 Corso · 2 Fonti · 3 Scrittura · 4 Revisione · Chiedi, con Guida e

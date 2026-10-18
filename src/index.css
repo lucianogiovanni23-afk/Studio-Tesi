@@ -1872,9 +1872,14 @@ details summary {
   }
 }
 
-/* Il canvas della scena non deve catturare lo scorrimento con il dito. */
+/* Il canvas della scena non deve catturare lo scorrimento con il dito,
+   tranne nell'ufficio sull'iPad: lì il dito gira la visuale (la pagina non scorre). */
 .scena canvas {
   touch-action: pan-y !important;
+}
+
+.modo-ipad .scena-ufficio canvas {
+  touch-action: none !important;
 }
 
 .modo-ipad .marchio-titolo,
@@ -4804,4 +4809,45 @@ textarea.campo {
     font-size: 0.78rem;
     letter-spacing: -0.01em;
   }
+}
+
+/* Pulsante per nascondere e riaprire le chat sopra la sala */
+.bottone-chat {
+  position: absolute;
+  z-index: 3;
+  top: 16px;
+  right: calc(16px + 440px + 10px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--carta) 82%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--bordo) 70%, transparent);
+  box-shadow: 0 8px 22px rgba(30, 30, 20, 0.16);
+  font-weight: 600;
+  transition: right 0.28s ease;
+}
+
+.ufficio-chat-nascosta .bottone-chat {
+  right: 16px;
+}
+
+.ufficio-con-scena .ufficio-pannello {
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+
+.ufficio-chat-nascosta .ufficio-pannello {
+  transform: translateX(calc(100% + 24px));
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.modo-ipad .bottone-chat {
+  min-height: 44px;
+  font-size: 15px;
 }

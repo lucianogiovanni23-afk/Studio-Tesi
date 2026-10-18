@@ -385,7 +385,7 @@ export function Scene({ spazioDestra = 0 }: { spazioDestra?: number }) {
         dpr={THREE.MathUtils.clamp((Math.min(window.devicePixelRatio || 1, g.tettoDpr) * g.scala) / 100, 0.5, 3)}
         gl={{ antialias: false, powerPreference: 'high-performance' }}
         camera={{ position: CAMERA_CASA, fov: 44, near: 0.1, far: 120 }}
-        style={{ touchAction: 'pan-y' }}
+        style={{ touchAction: modo === 'ipad' ? 'none' : 'pan-y' }}
         onCreated={({ camera, raycaster }) => {
           camera.lookAt(...CAMERA_BERSAGLIO)
           // i mobili uniti da Statico restano cliccabili sul loro livello
@@ -415,7 +415,7 @@ export function Scene({ spazioDestra = 0 }: { spazioDestra?: number }) {
         <CentroOttico spostamento={spazioDestra} campo={g.extra.fov} />
         <Risveglio visibile={visibile} />
         <CameraRig controlli={controlli} fuoco={vista} token={token} ingresso={ingresso} partenza={partenza} salta={salta} onFineIntro={fineIntro} />
-        {modo === 'computer' && (
+        {(modo === 'computer' || modo === 'ipad') && (
           <OrbitControls
             ref={controlli as never}
             target={CAMERA_BERSAGLIO}

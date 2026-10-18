@@ -11,6 +11,7 @@ import type { AgentKey } from '../types'
 import { useTurno, type Azione } from '../ufficio/dialoghi'
 import { eseguiAzione, useUfficio } from '../ufficio/statoUfficio'
 import { seguiAmbiente } from '../ui/ambiente'
+import { Icona } from '../ui/Icona'
 import { Dettatura } from '../ui/Dettatura'
 import { aggiungiDettato } from '../ui/dettaturaVoce'
 import type { Schermata } from '../types'
@@ -355,24 +356,61 @@ function Conversazione({ k }: { k: AgentKey }) {
   )
 }
 
+/** Le chat sopra la sala si possono nascondere: la scelta resta su questo dispositivo. */
+const CHIAVE_CHAT_NASCOSTA = 'studio-tesi.chat-nascosta'
+
+function leggiChatNascosta(): boolean {
+  try {
+    return localStorage.getItem(CHIAVE_CHAT_NASCOSTA) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function Ufficio() {
   const scelto = useStudio((s) => s.agenteUfficio)
   const qualita = useQualitaScena()
   const largo = useLargo(1000)
   const conScena = largo && qualita !== 'spenta'
+  const [chatNascosta, setChatNascosta] = useState(leggiChatNascosta)
+  const nascosta = conScena && chatNascosta
+  const alternaChat = () => {
+    setChatNascosta((prima) => {
+      const dopo = !prima
+      try {
+        localStorage.setItem(CHIAVE_CHAT_NASCOSTA, dopo ? '1' : '0')
+      } catch {
+        // senza memoria del browser vale solo per questa visita
+      }
+      return dopo
+    })
+  }
   // sottofondo d'ufficio, solo se i suoni sono accesi e solo finché si è qui
   useEffect(() => seguiAmbiente(), [])
   return (
-    <div className={`ufficio ${conScena ? 'ufficio-con-scena' : ''}`}>
+    <div className={`ufficio ${conScena ? 'ufficio-con-scena' : ''} ${nascosta ? 'ufficio-chat-nascosta' : ''}`}>
       {conScena && (
         <div className="ufficio-scena">
           <Suspense fallback={<div className="scena scena-carico" />}>
-            <Scene spazioDestra={PANNELLO} />
+            <Scene spazioDestra={nascosta ? 0 : PANNELLO} />
           </Suspense>
           <CaricamentoUfficio />
         </div>
       )}
-      <div className="ufficio-pannello">
+      {conScena && (
+        <button
+          type="button"
+          className="gettone bottone-chat"
+          aria-pressed={!nascosta}
+          aria-label={nascosta ? 'Mostra le chat' : 'Nascondi le chat'}
+          title={nascosta ? 'Mostra le chat' : 'Nascondi le chat per vedere tutta la sala'}
+          onClick={alternaChat}
+        >
+          <Icona nome="chat" dimensione={18} />
+          <span>{nascosta ? 'Mostra chat' : 'Nascondi chat'}</span>
+        </button>
+      )}
+      <div className="ufficio-pannello" aria-hidden={nascosta || undefined}>
         <Colleghi />
         <Conversazione key={scelto} k={scelto} />
       </div>
