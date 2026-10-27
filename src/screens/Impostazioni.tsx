@@ -59,6 +59,86 @@ function Carta({
   )
 }
 
+/**
+ * Per usare la stessa chiave su un altro dispositivo: la si mostra qui, la si copia
+ * o la si manda con Condividi, e la si incolla di là. Non passa mai dalla
+ * sincronizzazione, così non finisce su GitHub. Dopo un minuto torna nascosta.
+ */
+function PortaChiave({ chiave }: { chiave: string }) {
+  const [visibile, setVisibile] = useState(false)
+  const [esito, setEsito] = useState('')
+  useEffect(() => {
+    if (!visibile) return
+    const t = window.setTimeout(() => setVisibile(false), 60_000)
+    return () => window.clearTimeout(t)
+  }, [visibile])
+  const puoCondividere = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
+  const copia = async () => {
+    try {
+      await navigator.clipboard.writeText(chiave)
+      setEsito('Copiata. Sull\'altro dispositivo vai qui in Impostazioni e incollala.')
+    } catch {
+      setEsito('Non riesco a copiarla da solo: tieni premuto sulla chiave e scegli Copia.')
+    }
+  }
+  const condividi = async () => {
+    try {
+      await navigator.share({ text: chiave })
+      setEsito('Inviata. Sull\'altro dispositivo incollala qui in Impostazioni.')
+    } catch {
+      // annullato da chi usa l'app: niente da dire
+    }
+  }
+
+  return (
+    <div className="imp-porta-chiave">
+      <p className="nota imp-spiega">
+        Vuoi la stessa chiave sull'altro dispositivo (per esempio dal tablet al computer)? Mostrala, copiala o mandala con
+        Condividi, e incollala di là. Non la passo con la sincronizzazione, così non finisce su GitHub.
+      </p>
+      {visibile ? (
+        <>
+          <input className="campo imp-chiave-visibile" readOnly value={chiave} aria-label="La tua chiave API" onFocus={(e) => e.target.select()} />
+          <div className="riga-editor">
+            <button type="button" className="bottone bottone-primario" onClick={copia}>
+              <Icona nome="copia" dimensione={16} />
+              Copia la chiave
+            </button>
+            {puoCondividere && (
+              <button type="button" className="bottone bottone-secondario" onClick={condividi}>
+                <Icona nome="link" dimensione={16} />
+                Condividi
+              </button>
+            )}
+            <button type="button" className="bottone bottone-vuoto" onClick={() => setVisibile(false)}>
+              Nascondi
+            </button>
+          </div>
+          <p className="nota imp-piccola">Non mandarla a nessun altro: chi ce l'ha può spendere il tuo credito. Tra un minuto si nasconde da sola.</p>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="bottone bottone-secondario"
+          onClick={() => {
+            setEsito('')
+            setVisibile(true)
+          }}
+        >
+          <Icona nome="occhio" dimensione={16} />
+          Mostra la chiave per copiarla
+        </button>
+      )}
+      {esito && (
+        <p className="nota nota-ok" role="status">
+          {esito}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function Chiave() {
   const apiKey = useStudio((s) => s.apiKey)
   const setApiKey = useStudio((s) => s.setApiKey)
@@ -117,6 +197,9 @@ function Chiave() {
               onConferma={() => setApiKey('')}
             />
           </div>
+        ) : null}
+        {apiKey ? (
+          <PortaChiave chiave={apiKey} />
         ) : (
           <form
             className="imp-chiave-form"

@@ -419,6 +419,13 @@ sezione manda a GitHub 44 KB invece di 170 KB (con fonti dal testo completo la d
 - Il pulsante "Nascondi chat" in alto a destra toglie le chat per vedere tutta la sala; lo stesso
   pulsante ("Mostra chat") le riapre. La scelta resta su quel dispositivo.
 
+## Portare la chiave API su un altro dispositivo
+
+In Impostazioni › Account e dispositivi, con la chiave salvata, "Mostra la chiave per copiarla"
+la fa vedere per un minuto con "Copia la chiave" e "Condividi" (AirDrop, Note, Messaggi). Sull'altro
+dispositivo la incolli e premi "Salva la chiave". La chiave non passa dalla sincronizzazione, così non
+finisce mai su GitHub.
+
 ## Interfaccia: un percorso in quattro passi
 
 - **Menu**: Inizio · 1 Corso · 2 Fonti · 3 Scrittura · 4 Revisione · Chiedi, con Guida e

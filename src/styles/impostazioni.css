@@ -1086,3 +1086,19 @@
   min-height: 44px;
   font-size: 15px;
 }
+
+/* Mostrare la chiave per portarla su un altro dispositivo */
+.imp-porta-chiave {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.imp-chiave-visibile {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.modo-ipad .imp-chiave-visibile {
+  font-size: 15px;
+}
